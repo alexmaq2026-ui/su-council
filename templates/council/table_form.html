@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header py-3">
+  <div class="container-fluid px-3 px-md-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div>
+        <h1 class="page-title fs-5 mb-0">{{ page_title }}</h1>
+        <small class="text-muted">الموضوع: {{ topic.title }} (الجلسة رقم {{ session.session_number }})</small>
+      </div>
+      <div>
+        <a href="{% url 'council:topic_detail' pk=topic.pk %}" class="btn btn-outline-light btn-sm">العودة للموضوع</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-9">
+      <div class="uc-card shadow-sm">
+        <div class="uc-card-header bg-navy text-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0 fs-6">{% if table %}تعديل بيانات الجدول{% else %}إنشاء جدول ديناميكي جديد{% endif %}</h5>
+          <span class="badge bg-gold text-dark">محرك الجداول والحسابات الآلية</span>
+        </div>
+        <div class="uc-card-body p-4">
+          <form method="post">
+            {% csrf_token %}
+
+            <!-- Table Preset Selection -->
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-bold">نوع أو قالب الجدول</label>
+                <select name="table_type" id="table-type-select" class="form-select form-select-sm">
+                  {% for val, label in preset_choices %}
+                    <option value="{{ val }}" {% if table and table.table_type == val %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted d-block mt-1">اختيار القالب يحدد تلقائياً رؤوس الأعمدة وإعدادات الجمع الحسابي.</small>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-bold">عنوان أو وصف الجدول</label>
+                <input type="text" name="title" class="form-control form-control-sm" value="{{ table.title|default:'' }}" placeholder="مثال: كشف بأسماء المرشحين للتعيين">
+              </div>
+            </div>
+
+            <!-- Column Headers -->
+            <div class="mb-3">
+              <label class="form-label fw-bold">رؤوس الأعمدة (مفصولة بفاصلة ,)</label>
+              <input type="text" name="headers" id="headers-input" class="form-control form-control-sm" value="{{ headers_text }}" placeholder="م, الاسم, الكلية, الدرجة, المبلغ ($)...">
+              <small class="text-muted">أدخل أسماء الأعمدة مفصولة بفاصلة. يمكنك إضافة أعمدة جديدة أو حذف أعمدة حسب الحاجة.</small>
+            </div>
+
+            <!-- Rows Data (Textarea for easy bulk paste or edit) -->
+            <div class="mb-3">
+              <label class="form-label fw-bold">بيانات الصفوف (كل سطر يمثل صفاً، والقيم مفصولة بفاصلة أو Tab)</label>
+              <textarea name="rows_data" class="form-control form-control-sm font-monospace" rows="10" placeholder="1, د. محمد عبدالله, كلية الهندسة, 500$&#10;2, د. أحمد علي, كلية الحاسوب, 300$">{{ rows_text }}</textarea>
+              <small class="text-muted">يمكنك نسخ البيانات مباشرة من ملف Excel أو Word ولصقها هنا.</small>
+            </div>
+
+            <!-- Auto-Sum Configuration -->
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-bold">أعمدة الجمع الرأسي التلقائي (أرقام الأعمدة تبدأ من 0)</label>
+                <input type="text" name="sum_columns" id="sum-columns-input" class="form-control form-control-sm" value="{{ sum_columns_text }}" placeholder="مثال: 7 أو 5">
+                <small class="text-muted">أدخل مؤشر العمود الرقمي المراد تجميع مبالغه أو أعداده آلياً في قاع الجدول.</small>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label fw-bold">ملاحظات أسفل الجدول (اختياري)</label>
+                <input type="text" name="notes" class="form-control form-control-sm" value="{{ table.notes|default:'' }}" placeholder="ملاحظة تظهر في أسفل الجدول">
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+              <a href="{% url 'council:topic_detail' pk=topic.pk %}" class="btn btn-outline-secondary btn-sm">إلغاء</a>
+              <button type="submit" class="btn btn-navy btn-sm px-4">
+                {% if table %}حفظ التعديلات على الجدول{% else %}حفظ وبناء الجدول{% endif %}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PRESETS = {{ presets_json|safe }};
+const selectEl = document.getElementById('table-type-select');
+const headersInput = document.getElementById('headers-input');
+const sumInput = document.getElementById('sum-columns-input');
+
+selectEl.addEventListener('change', function() {
+  const chosen = this.value;
+  if (PRESETS[chosen] && !headersInput.value) {
+    headersInput.value = PRESETS[chosen].join(', ');
+  }
+  if (chosen === 'scopus_reward') {
+    sumInput.value = '7';
+  } else if (chosen === 'graduates') {
+    sumInput.value = '5';
+  } else if (chosen === 'hourly_contract') {
+    sumInput.value = '6';
+  }
+});
+</script>
+{% endblock %}

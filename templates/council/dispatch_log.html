@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}سجل تعميم واطلاع الكليات على القرارات الموقعة | نظام مجلس الجامعة{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-lg-4" dir="rtl">
+
+  <!-- =========================================================================
+       1. شريط ترويسة سجل تعميم القرارات
+       ========================================================================= -->
+  <div class="card shadow-sm border-0 mb-4 bg-white">
+    <div class="card-body p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge bg-navy text-white px-3 py-2 fs-6" style="background-color: #1B365D;">الأمانة العامة • الرقابة والمتابعة</span>
+            <span class="badge bg-success px-2 py-1 fs-6">القرارات الموقعة</span>
+          </div>
+          <h3 class="fw-bold mb-1" style="color: #1B365D;">
+            سجل إرسال وتعميم القرارات الرسمية واطلاع الكليات
+          </h3>
+          <p class="text-muted small mb-0">
+            تتبع شامل لكل عملية إرسال قرار موقع، وتوثيق لحظة فتح واطلاع عمداء الكليات على القرارات مع حفظ التاريخ والساعة وعنوان IP.
+          </p>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <a href="{% url 'council:session_list' %}" class="btn btn-outline-secondary btn-sm px-3">
+            العودة للجلسات
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       2. بطاقات إحصائية للمراسلات
+       ========================================================================= -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 border-start border-primary border-4 bg-white p-3">
+        <div class="text-muted small fw-bold mb-1">إجمالي القرارات المرسلة للكليات</div>
+        <div class="fs-2 fw-bold text-navy" style="color: #1B365D;">{{ total_dispatched }}</div>
+        <div class="text-muted small mt-1">عملية تعميم رسمية</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 border-start border-success border-4 bg-white p-3">
+        <div class="text-muted small fw-bold mb-1">تم الاطلاع عليها رسميًا</div>
+        <div class="fs-2 fw-bold text-success">{{ viewed_count }}</div>
+        <div class="text-muted small mt-1">تم فتحها وتنزيلها من الكليات</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 border-start border-warning border-4 bg-white p-3">
+        <div class="text-muted small fw-bold mb-1">قيد الاطلاع والانتظار</div>
+        <div class="fs-2 fw-bold text-warning">{{ pending_count }}</div>
+        <div class="text-muted small mt-1">لم يفتحها ممثل الكلية بعد</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 border-start border-info border-4 bg-white p-3">
+        <div class="text-muted small fw-bold mb-1">نسبة التجاوب والاطلاع</div>
+        <div class="fs-2 fw-bold text-info">
+          {% if total_dispatched > 0 %}
+            {{ viewed_count|floatformat:1 }}%
+          {% else %}
+            0%
+          {% endif %}
+        </div>
+        <div class="text-muted small mt-1">مؤشر سرعة وصول القرارات</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       3. أدوات التصفية والبحث
+       ========================================================================= -->
+  <div class="card shadow-sm border-0 mb-4 bg-white">
+    <div class="card-body p-3">
+      <form method="get" class="row g-2 align-items-center">
+        <div class="col-md-4">
+          <label class="form-label small fw-bold text-muted mb-1">تصفية بحسب الجلسة:</label>
+          <select name="session" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">كافة الجلسات</option>
+            {% for s in sessions %}
+              <option value="{{ s.pk }}" {% if selected_session == s.pk|stringformat:"s" %}selected{% endif %}>
+                الجلسة رقم {{ s.session_number }} ({{ s.date|date:"Y-m-d" }})
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label small fw-bold text-muted mb-1">تصفية بحسب الكلية / الجهة:</label>
+          <select name="seat" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">كافة الكليات والجهات</option>
+            {% for st in seats %}
+              <option value="{{ st.pk }}" {% if selected_seat == st.pk|stringformat:"s" %}selected{% endif %}>
+                {{ st.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label small fw-bold text-muted mb-1">حالة الاطلاع:</label>
+          <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">الكل</option>
+            <option value="viewed" {% if selected_status == 'viewed' %}selected{% endif %}>تم الاطلاع</option>
+            <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>قيد الانتظار (جديد)</option>
+          </select>
+        </div>
+
+        <div class="col-md-1 d-flex align-items-end">
+          <a href="{% url 'council:dispatch_log' %}" class="btn btn-outline-secondary btn-sm w-100" style="margin-top: 24px;">إلغاء</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       4. جدول سجل إرسال واستلام القرارات
+       ========================================================================= -->
+  <div class="card shadow-sm border-0 bg-white">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+      <h5 class="mb-0 fw-bold" style="color: #1B365D;">
+        📋 السجل الرقابي التفصيلي للمراسلات الرسمية
+      </h5>
+      <span class="badge bg-light text-dark border">إجمالي السجلات: {{ dispatches|length }}</span>
+    </div>
+
+    <div class="card-body p-0">
+      {% if dispatches %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0 text-center">
+            <thead class="table-light text-muted small">
+              <tr>
+                <th style="width: 5%;">#</th>
+                <th class="text-end" style="width: 28%;">الموضوع والقرار الموقّع</th>
+                <th style="width: 17%;">الجهة / الكلية المستلمة</th>
+                <th style="width: 15%;">تاريخ ومسؤول الإرسال</th>
+                <th style="width: 20%;">بيانات الاطلاع والاستلام</th>
+                <th style="width: 15%;">مستند القرار</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in dispatches %}
+                <tr class="{% if not d.is_viewed %}table-warning bg-opacity-25{% endif %}">
+                  <td class="text-muted">{{ forloop.counter }}</td>
+                  <td class="text-end">
+                    <a href="{% url 'council:topic_detail' d.signed_decision.topic.pk %}" class="fw-bold text-decoration-none text-dark d-block">
+                      {{ d.signed_decision.topic.title }}
+                    </a>
+                    <div class="d-flex align-items-center gap-1 mt-1">
+                      <span class="badge bg-light text-dark border small">الجلسة {{ d.signed_decision.session.session_number }}</span>
+                      {% if d.signed_decision.decision_number %}
+                        <span class="badge bg-primary-subtle text-primary border border-primary small">قرار {{ d.signed_decision.decision_number }}</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <span class="fw-bold text-navy" style="color: #1B365D;">{{ d.seat.name }}</span>
+                    <small class="d-block text-muted">الممثل: {{ d.seat.primary_rep.full_name|default:"-" }}</small>
+                  </td>
+                  <td>
+                    <span class="small fw-bold">{{ d.sent_at|date:"Y-m-d H:i" }}</span>
+                    <small class="d-block text-muted">بواسطة: {{ d.sent_by.full_name|default:"الأمانة العامة" }}</small>
+                  </td>
+                  <td>
+                    {% if d.is_viewed %}
+                      <div class="text-success fw-bold small">
+                        تم الاطلاع بنجاح
+                      </div>
+                      <small class="d-block text-muted">{{ d.viewed_at|date:"Y-m-d H:i" }}</small>
+                      <small class="d-block text-muted">المطّلع: <strong>{{ d.viewed_by.full_name }}</strong></small>
+                      {% if d.ip_address %}
+                        <small class="d-block text-muted font-monospace">IP: {{ d.ip_address }}</small>
+                      {% endif %}
+                      <span class="badge bg-light text-secondary border small mt-1">مرات الفتح: {{ d.view_count }}</span>
+                    {% else %}
+                      <span class="badge bg-warning text-dark px-2 py-1">
+                        قيد الانتظار (لم يُفتح بعد)
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <a href="{% url 'council:view_signed_decision_file' d.pk %}" target="_blank" class="btn btn-sm btn-outline-primary fw-bold px-3">
+                      معاينة القرار الموقّع
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center py-5">
+          <div class="text-muted fs-1 mb-2">📋</div>
+          <h5 class="text-muted fw-bold">لا توجد سجلات مراسلات مطابقة للبحث</h5>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

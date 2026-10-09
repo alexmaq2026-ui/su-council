@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}صندوق مراسلات وقرارات {{ seat.name }} | نظام مجلس الجامعة{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-lg-4" dir="rtl">
+
+  <!-- =========================================================================
+       1. شريط ترويسة بطاقة مراسلات الجهة
+       ========================================================================= -->
+  <div class="card shadow-sm border-0 mb-4 bg-white">
+    <div class="card-body p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge bg-primary px-3 py-2 fs-6">صندوق المراسلات والقرارات الرسمية</span>
+            {% if unviewed_count > 0 %}
+              <span class="badge bg-danger px-2 py-1 fs-6">{{ unviewed_count }} قرار جديد</span>
+            {% endif %}
+          </div>
+          <h3 class="fw-bold mb-1" style="color: #1B365D;">
+            {{ seat.name }}
+          </h3>
+          <div class="text-muted small">
+            <span>الممثل الأصيل: <strong>{{ seat.primary_rep.full_name|default:"غير محدد" }}</strong></span>
+            {% if seat.deputy_rep_1 %}
+              • <span>الممثل بالإنابة: <strong>{{ seat.deputy_rep_1.full_name }}</strong></span>
+            {% endif %}
+            • <span>الترتيب الهرمي بالمجلس: {{ seat.order }}</span>
+          </div>
+        </div>
+
+        <!-- فلتر التبديل بين الكليات (للإدارة والأمانة فقط) -->
+        {% if is_manager and all_seats %}
+          <div class="d-flex align-items-center gap-2">
+            <label class="form-label small mb-0 fw-bold text-muted">عرض جهة أخرى:</label>
+            <select class="form-select form-select-sm" style="min-width: 220px;" onchange="if(this.value) location.href='/council/correspondence/' + this.value + '/';">
+              {% for s in all_seats %}
+                <option value="{{ s.pk }}" {% if s.pk == seat.pk %}selected{% endif %}>
+                  {{ s.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       2. بطاقات المؤشرات الإحصائية السريعة للقرارات
+       ========================================================================= -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 border-start border-primary border-4 bg-white p-3">
+        <div class="text-muted small fw-bold mb-1">إجمالي القرارات الواردة للجهة</div>
+        <div class="fs-2 fw-bold text-navy" style="color: #1B365D;">{{ total_count }}</div>
+        <div class="text-muted small mt-1">قرارات رسمية معتمدة من مجلس الجامعة</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 border-start border-success border-4 bg-white p-3">
+        <div class="text-muted small fw-bold mb-1">قرارات تم الاطلاع عليها</div>
+        <div class="fs-2 fw-bold text-success">{{ viewed_count }}</div>
+        <div class="text-muted small mt-1">موثقة ومثبتة بتاريخ وتوقيت الاستلام</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 border-start border-warning border-4 bg-white p-3">
+        <div class="text-muted small fw-bold mb-1">قرارات جديدة قيد الاطلاع</div>
+        <div class="fs-2 fw-bold text-warning">{{ unviewed_count }}</div>
+        <div class="text-muted small mt-1">تحتاج فتح وتحميل النسخة الموقعة</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       3. جدول القرارات والمراسلات الواردة للجهة
+       ========================================================================= -->
+  <div class="card shadow-sm border-0 bg-white">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+      <h5 class="mb-0 fw-bold" style="color: #1B365D;">
+        📜 سجل القرارات الموقعة الموجهة رسمياً إلى {{ seat.name }}
+      </h5>
+      <span class="text-muted small">تحديث فوري لبيانات المراسلات</span>
+    </div>
+
+    <div class="card-body p-0">
+      {% if dispatches %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0 text-center">
+            <thead class="table-light text-muted small">
+              <tr>
+                <th style="width: 5%;">#</th>
+                <th class="text-end" style="width: 30%;">الموضوع والقرار الإداري</th>
+                <th style="width: 15%;">الجلسة المنعقدة</th>
+                <th style="width: 15%;">تاريخ الإرسال</th>
+                <th style="width: 15%;">حالة الاطلاع الرسمي</th>
+                <th style="width: 20%;">المستند الموقّع والإجراء</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in dispatches %}
+                <tr class="{% if not d.is_viewed %}table-warning bg-opacity-25{% endif %}">
+                  <td class="text-muted">{{ forloop.counter }}</td>
+                  <td class="text-end">
+                    <a href="{% url 'council:topic_detail' d.signed_decision.topic.pk %}" class="fw-bold text-decoration-none text-dark d-block">
+                      {{ d.signed_decision.topic.title }}
+                    </a>
+                    {% if d.signed_decision.decision_number %}
+                      <span class="badge bg-light text-dark border mt-1">
+                        رقم القرار: {{ d.signed_decision.decision_number }}
+                      </span>
+                    {% endif %}
+                    {% if d.signed_decision.decision_date %}
+                      <small class="text-muted ms-2">بتاريخ {{ d.signed_decision.decision_date|date:"Y-m-d" }}</small>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="fw-bold text-navy">الجلسة رقم {{ d.signed_decision.session.session_number }}</span>
+                    <small class="d-block text-muted">{{ d.signed_decision.session.date|date:"Y-m-d" }}</small>
+                  </td>
+                  <td>
+                    <span class="small">{{ d.sent_at|date:"Y-m-d" }}</span>
+                    <small class="d-block text-muted">{{ d.sent_at|date:"H:i" }}</small>
+                    <small class="text-muted d-block">بواسطة: {{ d.sent_by.full_name|default:"الأمانة العامة" }}</small>
+                  </td>
+                  <td>
+                    {% if d.is_viewed %}
+                      <span class="badge bg-success-subtle text-success border border-success px-2 py-1 mb-1">
+                        تم الاطلاع
+                      </span>
+                      <small class="d-block text-muted">{{ d.viewed_at|date:"Y-m-d H:i" }}</small>
+                      <small class="d-block text-muted">المطّلع: {{ d.viewed_by.full_name }}</small>
+                      {% if d.view_count > 1 %}
+                        <span class="badge bg-secondary-subtle text-secondary small">مشاهدات: {{ d.view_count }}</span>
+                      {% endif %}
+                    {% else %}
+                      <span class="badge bg-warning text-dark px-2 py-1 pulse-warning">
+                        جديد • لم يُطّلع عليه
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="d-flex justify-content-center gap-1">
+                      <a href="{% url 'council:view_signed_decision_file' d.pk %}" target="_blank" class="btn btn-sm btn-primary fw-bold px-3">
+                        معاينة / تنزيل القرار الموقّع
+                      </a>
+                      <a href="{% url 'council:topic_detail' d.signed_decision.topic.pk %}" class="btn btn-sm btn-outline-secondary">
+                        تفاصيل
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center py-5">
+          <div class="text-muted fs-1 mb-3">📭</div>
+          <h5 class="text-muted fw-bold">لا توجد قرارات رسمية مرسلة لهذه الكلية حالياً</h5>
+          <p class="text-muted small">عند اعتماد وتوقيع أي قرارات تخص {{ seat.name }} وتوزيعها من قِبل الأمانة العامة، ستظهر هنا فوراً.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

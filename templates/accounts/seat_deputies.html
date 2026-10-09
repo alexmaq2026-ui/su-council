@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} – مجلس الجامعة{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- Breadcrumb & Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-1">
+          <li class="breadcrumb-item"><a href="{% url 'accounts:dashboard' %}" class="text-decoration-none text-navy">لوحة التحكم</a></li>
+          <li class="breadcrumb-item active" aria-current="page">إدارة الممثلين بالإنابة</li>
+        </ol>
+      </nav>
+      <h3 class="fw-bold text-navy mb-0">إدارة الممثلين بالإنابة لمقعد: {{ seat.name }}</h3>
+      <p class="text-muted small mb-0">تحديد وتفويض نواب العميد أو الممثلين الحاضرين بالإنابة في جلسات المجلس وتعيين كلمات مرورهم المستقلة.</p>
+    </div>
+
+    <!-- If multiple seats (e.g. for superadmin) -->
+    {% if user_seats.count > 1 %}
+      <div class="d-flex align-items-center gap-2">
+        <span class="small fw-bold text-muted">اختر المقعد:</span>
+        <form method="GET" class="d-inline">
+          <select name="seat_id" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for s in user_seats %}
+              <option value="{{ s.id }}" {% if s.id == seat.id %}selected{% endif %}>
+                {{ s.order }}. {{ s.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Column 1: Current Seat & Deputies Status (6 cols) -->
+    <div class="col-12 col-lg-6">
+      
+      <!-- Primary Rep Card -->
+      <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+        <div class="card-header bg-navy text-white p-3 d-flex justify-content-between align-items-center" style="background: #1B365D;">
+          <h6 class="fw-bold mb-0 text-white">الممثل الأول والأصيل (رئيس الجهة / العميد)</h6>
+          <span class="badge bg-success">أصيل</span>
+        </div>
+        <div class="card-body p-4 bg-light">
+          {% if seat.primary_rep %}
+            <h5 class="fw-bold text-navy mb-1" style="color: #1B365D;">{{ seat.primary_rep.full_name }}</h5>
+            <div class="text-muted small mb-2">{{ seat.primary_rep.official_title|default:seat.primary_rep.get_title_display }}</div>
+            <div class="small text-secondary">اسم المستخدم: <code>{{ seat.primary_rep.username }}</code></div>
+          {% else %}
+            <div class="alert alert-warning mb-0 small">لم يُعين ممثل أول لهذا المقعد.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Current Deputies Card -->
+      <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-header bg-white p-3 border-bottom d-flex justify-content-between align-items-center">
+          <h6 class="fw-bold text-navy mb-0" style="color: #1B365D;">الممثلون بالإنابة المعتمدون حالياً</h6>
+          <span class="badge bg-gold text-dark" style="background: #B08414;">حد أقصى نائبان</span>
+        </div>
+        <div class="card-body p-4">
+          
+          <!-- Deputy 1 -->
+          <div class="border rounded-3 p-3 mb-3 {% if seat.deputy_rep_1 %}bg-white border-primary{% else %}bg-light{% endif %}">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="fw-bold text-navy" style="color: #1B365D;">الممثل بالإنابة الأول (نائب 1)</span>
+              {% if seat.deputy_rep_1 %}
+                <span class="badge bg-warning text-dark">معتمد</span>
+              {% else %}
+                <span class="badge bg-secondary">شاغر</span>
+              {% endif %}
+            </div>
+            {% if seat.deputy_rep_1 %}
+              <div class="fw-bold text-dark">{{ seat.deputy_rep_1.full_name }}</div>
+              <div class="small text-muted">{{ seat.deputy_rep_1.official_title|default:seat.deputy_rep_1.get_title_display }}</div>
+              <div class="small text-muted">اسم المستخدم: <code>{{ seat.deputy_rep_1.username }}</code></div>
+            {% else %}
+              <div class="small text-muted">لا يوجد ممثل بالإنابة مسجل في هذه الخانة.</div>
+            {% endif %}
+          </div>
+
+          <!-- Deputy 2 -->
+          <div class="border rounded-3 p-3 {% if seat.deputy_rep_2 %}bg-white border-primary{% else %}bg-light{% endif %}">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="fw-bold text-navy" style="color: #1B365D;">الممثل بالإنابة الثاني (نائب 2)</span>
+              {% if seat.deputy_rep_2 %}
+                <span class="badge bg-warning text-dark">معتمد</span>
+              {% else %}
+                <span class="badge bg-secondary">شاغر</span>
+              {% endif %}
+            </div>
+            {% if seat.deputy_rep_2 %}
+              <div class="fw-bold text-dark">{{ seat.deputy_rep_2.full_name }}</div>
+              <div class="small text-muted">{{ seat.deputy_rep_2.official_title|default:seat.deputy_rep_2.get_title_display }}</div>
+              <div class="small text-muted">اسم المستخدم: <code>{{ seat.deputy_rep_2.username }}</code></div>
+            {% else %}
+              <div class="small text-muted">لا يوجد ممثل بالإنابة مسجل في هذه الخانة.</div>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Column 2: Management & Assignment Forms (6 cols) -->
+    <div class="col-12 col-lg-6">
+
+      <!-- Form 1: Assign from Existing Users -->
+      <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-header bg-white p-3 border-bottom">
+          <h6 class="fw-bold text-navy mb-0" style="color: #1B365D;">تعيين نواب من مستخدمي النظام الحاليين</h6>
+        </div>
+        <div class="card-body p-4">
+          
+          <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_deputies">
+            <input type="hidden" name="seat_id" value="{{ seat.id }}">
+
+            <div class="mb-3">
+              <label for="id_deputy_rep_1" class="form-label fw-bold small text-navy">الممثل بالإنابة الأول:</label>
+              <select name="deputy_rep_1" id="id_deputy_rep_1" class="form-select">
+                <option value="">-- تفريغ الخانة (بدون نائب) --</option>
+                {% for u in eligible_users %}
+                  <option value="{{ u.id }}" {% if seat.deputy_rep_1_id == u.id %}selected{% endif %}>
+                    {{ u.full_name }} ({{ u.official_title|default:u.department|default:u.username }})
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="id_deputy_rep_2" class="form-label fw-bold small text-navy">الممثل بالإنابة الثاني:</label>
+              <select name="deputy_rep_2" id="id_deputy_rep_2" class="form-select">
+                <option value="">-- تفريغ الخانة (بدون نائب) --</option>
+                {% for u in eligible_users %}
+                  <option value="{{ u.id }}" {% if seat.deputy_rep_2_id == u.id %}selected{% endif %}>
+                    {{ u.full_name }} ({{ u.official_title|default:u.department|default:u.username }})
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <button type="submit" class="btn btn-navy text-white px-4 py-2" style="background: #1B365D;">
+              حفظ وتحديث الممثلين
+            </button>
+          </form>
+
+        </div>
+      </div>
+
+      <!-- Form 2: Quick Create New Deputy User -->
+      <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-header bg-white p-3 border-bottom">
+          <h6 class="fw-bold text-navy mb-0" style="color: #1B365D;">إنشاء حساب جديد لنائب العميد / الممثل</h6>
+        </div>
+        <div class="card-body p-4">
+          <p class="small text-muted mb-3">يمكنك إنشاء مستخدم جديد وتعيين كلمة مرور شخصية له وإدراجه كنائب فوراً:</p>
+
+          <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_deputy">
+            <input type="hidden" name="seat_id" value="{{ seat.id }}">
+
+            <div class="mb-3">
+              <label class="form-label fw-bold small text-navy">الاسم الكامل:</label>
+              <input type="text" name="full_name" class="form-control" placeholder="مثال: د. محمد علي أحمد" required>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-bold small text-navy">اسم المستخدم للدخول:</label>
+                <input type="text" name="username" class="form-control" placeholder="مثال: vice_eng_acad" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold small text-navy">كلمة المرور الشخصية (الافتراضية: 123456):</label>
+                <input type="password" name="password" class="form-control" value="123456" placeholder="123456" required>
+              </div>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-bold small text-navy">الصفة الرسمية:</label>
+                <input type="text" name="official_title" class="form-control" placeholder="مثال: نائب العميد للشؤون الأكاديمية">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-bold small text-navy">خانة التعيين بالمقعد:</label>
+                <select name="slot" class="form-select">
+                  <option value="1">الممثل بالإنابة 1</option>
+                  <option value="2">الممثل بالإنابة 2</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-outline-navy px-4 py-2" style="border-color: #1B365D; color: #1B365D;">
+              إنشاء الحساب وتعيينه نائباً
+            </button>
+          </form>
+
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

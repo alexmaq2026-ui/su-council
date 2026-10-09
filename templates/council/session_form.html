@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-calendar-plus"></i>{{ page_title }}
+      </h1>
+      <div class="page-subtitle">إدخال بيانات الجلسة وموعد ومكان الانعقاد</div>
+    </div>
+    <div>
+      <a href="{% url 'council:session_list' %}" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-arrow-right me-1"></i>العودة للجلسات
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-10 col-lg-8">
+    <div class="uc-card shadow-sm">
+      <div class="uc-card-header">
+        <h5><i class="bi bi-info-circle"></i>بيانات الجلسة</h5>
+      </div>
+      <div class="uc-card-body p-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {{ form|crispy }}
+          <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+            <a href="{% url 'council:session_list' %}" class="btn btn-outline-secondary">إلغاء</a>
+            <button type="submit" class="btn btn-navy">
+              <i class="bi bi-check2-circle me-1"></i>حفظ الجلسة
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

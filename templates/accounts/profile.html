@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}الملف الشخصي – مجلس الجامعة{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div class="container-fluid px-3 px-md-4">
+    <div class="d-flex align-items-center gap-3">
+      <div class="page-header-icon">
+        <i class="bi bi-person-circle"></i>
+      </div>
+      <div>
+        <h1 class="page-title mb-0">الملف الشخصي</h1>
+        <small class="text-muted">معلومات حسابك وصلاحياتك</small>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- ── Profile Card ── -->
+  <div class="col-12 col-md-5 col-lg-4">
+    <div class="uc-card text-center">
+      <div class="uc-card-body py-4">
+
+        <!-- Avatar -->
+        <div class="user-avatar-xl mx-auto mb-3">
+          {{ user.avatar_initials|default:"?" }}
+        </div>
+
+        <h4 class="fw-bold mb-1">{{ user.full_name }}</h4>
+        {% if user.title and user.title != 'اخرى' %}
+          <div class="text-muted mb-2">{{ user.get_title_display }}</div>
+        {% elif user.department %}
+          <div class="text-muted mb-2">{{ user.department }}</div>
+        {% endif %}
+
+        {% if user.email %}
+        <div class="text-muted small mb-3">
+          <i class="bi bi-envelope me-1"></i>{{ user.email }}
+        </div>
+        {% endif %}
+
+        <!-- Status -->
+        {% if user.is_active %}
+        <span class="badge uc-badge-active mb-3">
+          <i class="bi bi-circle-fill me-1" style="font-size:0.4rem;"></i>حساب نشط
+        </span>
+        {% endif %}
+
+        <hr>
+
+        <!-- Account Info -->
+        <div class="text-start">
+          <div class="d-flex justify-content-between py-2 border-bottom">
+            <span class="text-muted small">اسم المستخدم</span>
+            <code class="small">{{ user.username }}</code>
+          </div>
+          {% if user.date_joined %}
+          <div class="d-flex justify-content-between py-2 border-bottom">
+            <span class="text-muted small">تاريخ الانضمام</span>
+            <span class="small">{{ user.date_joined|date:"j/n/Y" }}</span>
+          </div>
+          {% endif %}
+          {% if user.last_login %}
+          <div class="d-flex justify-content-between py-2">
+            <span class="text-muted small">آخر دخول</span>
+            <span class="small">{{ user.last_login|date:"j/n/Y" }}</span>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if user.is_super or user.can_change_password %}
+        <hr>
+
+        <!-- Actions -->
+        <a href="{% url 'change-password' %}" class="btn btn-outline-navy w-100 mb-2">
+          <i class="bi bi-shield-lock me-2"></i>تغيير كلمة المرور
+        </a>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Permissions Card ── -->
+  <div class="col-12 col-md-7 col-lg-8">
+
+    <div class="uc-card mb-4">
+      <div class="uc-card-header d-flex justify-content-between align-items-center">
+        <span>
+          <i class="bi bi-shield-shaded me-2"></i>
+          صلاحياتك في النظام
+        </span>
+        {% if not user.is_super %}
+        <span class="badge bg-navy">{{ user.granted_permissions_count }} / 58 صلاحية</span>
+        {% endif %}
+      </div>
+      <div class="uc-card-body">
+        {% if user.is_super %}
+        <div class="alert alert-warning d-flex align-items-center gap-2 rounded-3 mb-0">
+          <i class="bi bi-shield-fill-check fs-4 text-warning"></i>
+          <div>
+            <strong>مدير النظام الأعلى</strong>
+            <div class="small text-muted">تمتلك جميع الصلاحيات في النظام (58 / 58) بلا قيود.</div>
+          </div>
+        </div>
+        {% elif user.has_any_permission and permission %}
+        <div class="d-flex flex-wrap gap-2">
+          {% for perm_label in permission.get_permissions_list %}
+          <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 fw-semibold">
+            <i class="bi bi-check-circle-fill me-1"></i>{{ perm_label }}
+          </span>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-secondary d-flex align-items-center gap-2 rounded-3 mb-0">
+          <i class="bi bi-shield-lock fs-4 text-secondary"></i>
+          <div>
+            <strong>لا توجد صلاحيات ممنوحة (0 / 57)</strong>
+            <div class="small text-muted">لم يقم مسؤول النظام بمنحك أي صلاحيات حتى الآن.</div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

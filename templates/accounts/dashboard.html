@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}لوحة التحكم – مجلس الجامعة{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="d-flex align-items-center gap-3">
+      <div class="page-header-icon text-gold">
+        <i class="bi bi-speedometer2 fs-3"></i>
+      </div>
+      <div>
+        <h1 class="page-title mb-1">لوحة التحكم الرئيسية</h1>
+        <div class="page-subtitle">
+          <i class="bi bi-person-check text-gold me-1"></i>
+          مرحباً، {{ user.full_name }}
+        </div>
+      </div>
+    </div>
+    <div class="text-white-50 small">
+      <i class="bi bi-calendar3 text-gold me-1"></i>
+      <span id="dashboard-date"></span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{% if not user.has_any_permission %}
+<!-- ══════════════════════════════════════════
+     ZERO-PERMISSION STATE (لا توجد صلاحيات ممنوحة)
+══════════════════════════════════════════ -->
+<div class="uc-card my-4 border-0 shadow-sm">
+  <div class="uc-card-body py-5 px-4 text-center">
+    <div class="mx-auto mb-3 d-flex align-items-center justify-content-center rounded-circle"
+         style="width: 84px; height: 84px; background: rgba(220, 53, 69, 0.1); color: #dc3545;">
+      <i class="bi bi-shield-lock-fill" style="font-size: 2.5rem;"></i>
+    </div>
+    <h4 class="fw-bold text-navy mb-2">لا توجد صلاحيات ممنوحة لحسابك حالياً</h4>
+    <p class="text-muted mx-auto mb-4" style="max-width: 580px; line-height: 1.8;">
+      مرحباً بك <strong>{{ user.full_name }}</strong>. حسابك مسجّل ونشط في نظام مجلس الجامعة، ولكن لم يتم منحك أي صلاحية لعرض الشاشات أو تنفيذ العمليات حتى الآن.
+      <br>
+      يرجى التواصل مع <strong>مسؤول النظام (الأدمين)</strong> لتخويلك بالصلاحيات المقررة لك.
+    </p>
+    <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-3 bg-light border text-secondary small">
+      <i class="bi bi-key-fill text-warning"></i>
+      <span>إجمالي الصلاحيات الممنوحة: <strong>0 من 58</strong></span>
+    </div>
+  </div>
+</div>
+
+{% else %}
+
+<!-- ══════════════════════════════════════════
+     STATISTICS CARDS
+══════════════════════════════════════════ -->
+{% if user.is_super or user.can_view_sessions or user.can_view_topics %}
+<div class="row g-3 mb-4">
+
+  {% if user.is_super or user.can_view_sessions %}
+  <!-- Total Sessions -->
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background: rgba(15,52,96,0.12); color:#0f3460;">
+        <i class="bi bi-calendar3"></i>
+      </div>
+      <div class="stat-value">{{ total_sessions|default:"0" }}</div>
+      <div class="stat-label">إجمالي الجلسات</div>
+      <div class="stat-footer">
+        <i class="bi bi-arrow-left me-1"></i>
+        <a href="{% url 'council:session_list' %}" class="stat-link">عرض الكل</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Sessions -->
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background: rgba(25,135,84,0.12); color:#198754;">
+        <i class="bi bi-play-circle"></i>
+      </div>
+      <div class="stat-value" style="color:#198754;">{{ active_sessions|default:"0" }}</div>
+      <div class="stat-label">الجلسات النشطة</div>
+      <div class="stat-footer">
+        <i class="bi bi-circle-fill me-1" style="font-size:0.5rem; color:#198754;"></i>
+        <span class="text-success">نشطة الآن</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if user.is_super or user.can_view_topics %}
+  <!-- Total Topics -->
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background: rgba(13,110,253,0.12); color:#0d6efd;">
+        <i class="bi bi-list-ul"></i>
+      </div>
+      <div class="stat-value" style="color:#0d6efd;">{{ total_topics|default:"0" }}</div>
+      <div class="stat-label">إجمالي المواضيع</div>
+      <div class="stat-footer">
+        <i class="bi bi-folder me-1 text-primary"></i>
+        <span class="text-muted">جميع الجلسات</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Voted Topics -->
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background: rgba(201,168,76,0.15); color:#c9a84c;">
+        <i class="bi bi-check2-circle"></i>
+      </div>
+      <div class="stat-value" style="color:#c9a84c;">{{ voted_topics|default:"0" }}</div>
+      <div class="stat-label">مواضيع مُصوَّت عليها</div>
+      <div class="stat-footer">
+        <i class="bi bi-check-all me-1" style="color:#c9a84c;"></i>
+        <span class="text-muted">تم التصويت</span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════
+     QUICK ACTIONS
+══════════════════════════════════════════ -->
+{% if user.is_super or user.can_add_session or user.can_view_sessions or user.can_search_minutes or user.can_search_person or user.can_view_correspondence or user.can_manage_delegates %}
+<div class="uc-card mb-4">
+  <div class="uc-card-header">
+    <i class="bi bi-lightning-charge me-2"></i>
+    الإجراءات السريعة
+  </div>
+  <div class="uc-card-body">
+    <div class="row g-3">
+
+      {% if user.is_super or user.can_add_session %}
+      <div class="col-6 col-md-3">
+        <a href="{% url 'council:session_create' %}" class="quick-action-btn">
+          <div class="quick-action-icon bg-navy-soft">
+            <i class="bi bi-plus-circle text-navy"></i>
+          </div>
+          <span>جلسة جديدة</span>
+        </a>
+      </div>
+      {% endif %}
+
+      {% if user.is_super or user.can_view_sessions %}
+      <div class="col-6 col-md-3">
+        <a href="{% url 'council:session_list' %}" class="quick-action-btn">
+          <div class="quick-action-icon bg-blue-soft">
+            <i class="bi bi-calendar3 text-primary"></i>
+          </div>
+          <span>كل الجلسات</span>
+        </a>
+      </div>
+      {% endif %}
+
+      {% if user.is_super or user.can_search_minutes or user.can_search_person %}
+      <div class="col-6 col-md-3">
+        <a href="{% url 'search_engine:search' %}" class="quick-action-btn">
+          <div class="quick-action-icon" style="background:rgba(201,168,76,0.14);">
+            <i class="bi bi-search text-gold"></i>
+          </div>
+          <span>البحث الذكي الشامل</span>
+        </a>
+      </div>
+      {% endif %}
+
+      {% if user.is_super or user.can_view_correspondence %}
+      <div class="col-6 col-md-3">
+        <a href="{% url 'council:entity_correspondence' %}" class="quick-action-btn">
+          <div class="quick-action-icon" style="background:rgba(25,135,84,0.12);">
+            <i class="bi bi-inbox-fill text-success"></i>
+          </div>
+          <span>مراسلات الكليات</span>
+        </a>
+      </div>
+      {% endif %}
+
+      {% if user.is_super or user.can_manage_delegates %}
+      <div class="col-6 col-md-3">
+        <a href="{% url 'accounts:seat_deputies' %}" class="quick-action-btn">
+          <div class="quick-action-icon" style="background:rgba(13,202,240,0.12);">
+            <i class="bi bi-people-fill text-info"></i>
+          </div>
+          <span>الممثلون بالإنابة</span>
+        </a>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════
+     RECENT SESSIONS
+══════════════════════════════════════════ -->
+{% if user.is_super or user.can_view_sessions %}
+<div class="uc-card">
+  <div class="uc-card-header d-flex align-items-center justify-content-between">
+    <span>
+      <i class="bi bi-clock-history me-2"></i>
+      آخر الجلسات
+    </span>
+    <a href="{% url 'council:session_list' %}" class="btn btn-sm btn-outline-navy">
+      عرض الكل <i class="bi bi-arrow-left ms-1"></i>
+    </a>
+  </div>
+  <div class="uc-card-body p-0">
+
+    {% if recent_sessions %}
+    <!-- Desktop Table -->
+    <div class="d-none d-md-block">
+      <div class="table-responsive">
+        <table class="table uc-table mb-0">
+          <thead>
+            <tr>
+              <th>رقم الجلسة</th>
+              <th>التاريخ</th>
+              <th>الحالة</th>
+              <th>عدد المواضيع</th>
+              <th class="text-center">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for session in recent_sessions %}
+            <tr>
+              <td>
+                <span class="badge-session-num">#{{ session.session_number }}</span>
+                {% if session.title %}
+                  <div class="small text-muted mt-1">{{ session.title|truncatechars:40 }}</div>
+                {% endif %}
+              </td>
+              <td>
+                <i class="bi bi-calendar3 me-1 text-muted"></i>
+                {{ session.date|date:"j/n/Y" }}
+              </td>
+              <td>
+                {% if session.status == 'active' %}
+                  <span class="badge uc-badge-active">نشطة</span>
+                {% elif session.status == 'draft' %}
+                  <span class="badge uc-badge-draft">مسودة</span>
+                {% elif session.status == 'closed' %}
+                  <span class="badge uc-badge-closed">مغلقة</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ session.get_status_display }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="fw-semibold">{{ session.topics.count }}</span>
+                <span class="text-muted">موضوع</span>
+              </td>
+              <td class="text-center">
+                <a href="{% url 'council:session_detail' pk=session.pk %}"
+                   class="btn btn-sm btn-outline-primary py-0 px-2 me-1" style="font-size: 0.78rem;">
+                  عرض
+                </a>
+                {% if user.is_super or user.can_edit_session %}
+                {% if not session.is_frozen %}
+                <a href="{% url 'council:session_edit' pk=session.pk %}"
+                   class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.78rem;">
+                  تعديل
+                </a>
+                {% endif %}
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Mobile Cards -->
+    <div class="d-md-none p-3">
+      {% for session in recent_sessions %}
+      <div class="mobile-session-card mb-3 p-3 rounded-3 border">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <span class="badge-session-num">#{{ session.session_number }}</span>
+          {% if session.status == 'active' %}
+            <span class="badge uc-badge-active">نشطة</span>
+          {% elif session.status == 'draft' %}
+            <span class="badge uc-badge-draft">مسودة</span>
+          {% elif session.status == 'closed' %}
+            <span class="badge uc-badge-closed">مغلقة</span>
+          {% endif %}
+        </div>
+        <div class="small text-muted mb-2">
+          <i class="bi bi-calendar3 me-1"></i>{{ session.date|date:"j/n/Y" }}
+          <span class="mx-2">·</span>
+          <i class="bi bi-list-ul me-1"></i>{{ session.topics.count }} موضوع
+        </div>
+        <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-sm btn-outline-navy w-100">
+          <i class="bi bi-eye me-1"></i>عرض الجلسة
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="empty-state py-5">
+      <i class="bi bi-calendar-x empty-icon"></i>
+      <h5>لا توجد جلسات متاحة للعرض</h5>
+      {% if user.is_super or user.can_add_session %}
+      <p class="text-muted">ابدأ بإنشاء أول جلسة للمجلس</p>
+      <a href="{% url 'council:session_create' %}" class="btn btn-navy">
+        <i class="bi bi-plus-circle me-2"></i>إنشاء جلسة
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Dashboard date
+  const dateEl = document.getElementById('dashboard-date');
+  if (dateEl) {
+    const now = new Date();
+    dateEl.textContent = now.toLocaleDateString('ar-SA', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  }
+</script>
+{% endblock %}

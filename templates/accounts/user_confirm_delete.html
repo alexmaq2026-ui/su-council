@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}حذف المستخدم: {{ target_user.full_name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header py-3">
+  <div class="page-header-inner">
+    <div>
+      <h1 class="page-title text-danger fs-5 mb-0">حذف مستخدم من النظام</h1>
+      <div class="page-subtitle small">{{ target_user.full_name }} ({{ target_user.get_title_display }})</div>
+    </div>
+    <div>
+      <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-light btn-sm">العودة للمستخدمين</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-7 col-lg-5">
+    <div class="uc-card border-danger shadow-sm">
+      <div class="uc-card-header bg-danger text-white py-2 px-3">
+        <h6 class="mb-0 fw-bold">تأكيد حذف الحساب</h6>
+      </div>
+      <div class="uc-card-body p-4 text-center">
+        <div class="user-avatar-lg mb-2 text-danger border border-danger mx-auto">
+          {{ target_user.avatar_initials|default:"!" }}
+        </div>
+        <h5 class="fw-bold mb-1 text-navy">{{ target_user.full_name }}</h5>
+        <div class="text-muted small mb-3">
+          اسم المستخدم: <code>@{{ target_user.username }}</code> · {{ target_user.get_title_display }}
+          {% if target_user.department %} · {{ target_user.department }}{% endif %}
+        </div>
+
+        <div class="alert alert-danger text-start small mb-3 p-2" role="alert">
+          <strong>تنبيه:</strong> الحذف النهائي يزيل حساب هذا المستخدم وبياناته وصلاحياته نهائياً من قاعدة البيانات.
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="d-flex flex-column gap-2">
+            <!-- Permanent Delete Button -->
+            <button type="submit" name="action_type" value="permanent_delete" class="btn btn-danger btn-sm py-2 fw-bold">
+              نعم، احذف المستخدم نهائياً من النظام
+            </button>
+
+            <!-- Soft Deactivate Button -->
+            <button type="submit" name="action_type" value="deactivate" class="btn btn-outline-warning btn-sm py-2 text-dark">
+              تعطيل الحساب فقط (إيقاف الدخول مؤقتاً)
+            </button>
+
+            <!-- Cancel -->
+            <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm py-2">
+              إلغاء والعودة
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

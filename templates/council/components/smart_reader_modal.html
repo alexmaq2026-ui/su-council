@@ -1,0 +1,467 @@
+<!-- Smart Audio Reader Component (المقترح م7: القراءة الذكية والصوت العصبي السحابي) -->
+<style>
+  .smart-reader-overlay {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.2);
+    border-top: 4px solid #1B365D;
+    z-index: 1060;
+    transform: translateY(105%);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .smart-reader-overlay.show {
+    transform: translateY(0);
+  }
+  .smart-reader-content-box {
+    max-height: 240px;
+    overflow-y: auto;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-size: 1.15rem;
+    line-height: 1.9;
+    color: #1e293b;
+    scroll-behavior: smooth;
+  }
+  .reader-chunk {
+    display: inline;
+    padding: 3px 6px;
+    margin: 2px 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  .reader-chunk:hover {
+    background-color: #f1f5f9;
+    text-decoration: underline;
+  }
+  .reader-chunk.active-reading {
+    background-color: #fef08a !important;
+    color: #854d0e !important;
+    font-weight: 700;
+    box-shadow: 0 0 10px rgba(234, 179, 8, 0.45);
+    border-right: 4px solid #ca8a04;
+    padding-right: 8px;
+  }
+  .reader-btn-speed {
+    font-size: 0.85rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+  .reader-btn-speed.active {
+    background-color: #1B365D !important;
+    color: #ffffff !important;
+    border-color: #1B365D !important;
+    font-weight: bold;
+  }
+</style>
+
+<div id="smartReaderOverlay" class="smart-reader-overlay">
+  <div class="container-fluid px-4 py-3">
+    <!-- Top Bar: Title + Status + Mode + Close -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center pb-2 mb-2 border-bottom">
+      <div class="d-flex align-items-center gap-3">
+        <span class="badge bg-primary px-3 py-2 fs-6">قارئ المجلس الذكي</span>
+        <h6 id="smartReaderTargetTitle" class="mb-0 fw-bold text-dark text-truncate" style="max-width: 450px;">
+          جاري تحميل النص...
+        </h6>
+        <span id="smartReaderStatusBadge" class="badge bg-secondary px-2 py-1">جاهز للقراءة</span>
+      </div>
+
+      <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+        <!-- Voice Mode Switcher -->
+        <div class="btn-group btn-group-sm">
+          <button type="button" id="btnModeNeural" class="btn btn-outline-primary active" onclick="setReaderMode('cloud_neural')">
+            صوت عصبي سحابي
+          </button>
+          <button type="button" id="btnModeLocal" class="btn btn-outline-secondary" onclick="setReaderMode('browser_local')">
+            صوت محلي (المتصفح)
+          </button>
+        </div>
+        <button type="button" class="btn btn-outline-danger btn-sm px-3 fw-bold" onclick="closeSmartReader()">
+          إغلاق القارئ
+        </button>
+      </div>
+    </div>
+
+    <!-- Middle: Synchronized Visual Reading Box -->
+    <div class="row mb-2">
+      <div class="col-12">
+        <div id="smartReaderTextBox" class="smart-reader-content-box">
+          <div class="text-center text-muted py-4">انقر على زر "تشغيل القراءة" لبدء الاستماع المتزامن مع النص.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Controls: Progress + Buttons (Explicit Arabic Text) -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center pt-1">
+      <!-- Main Action Buttons -->
+      <div class="d-flex align-items-center gap-2 mb-2 mb-md-0">
+        <button type="button" id="btnReaderPlay" class="btn btn-success fw-bold px-4 shadow-sm" onclick="startSmartReader()">
+          تشغيل القراءة
+        </button>
+        <button type="button" id="btnReaderPause" class="btn btn-warning fw-bold px-3 d-none text-dark" onclick="pauseSmartReader()">
+          إيقاف مؤقت
+        </button>
+        <button type="button" id="btnReaderResume" class="btn btn-primary fw-bold px-3 d-none" onclick="resumeSmartReader()">
+          استئناف القراءة
+        </button>
+        <button type="button" id="btnReaderStop" class="btn btn-secondary fw-bold px-3" onclick="stopSmartReader()">
+          إيقاف تام
+        </button>
+      </div>
+
+      <!-- Speed Control Buttons -->
+      <div class="d-flex align-items-center gap-1 mb-2 mb-md-0">
+        <span class="text-muted small fw-bold me-2">السرعة:</span>
+        <button type="button" class="btn btn-outline-secondary reader-btn-speed" onclick="setReaderSpeed(0.75, this)">0.75x بطيء</button>
+        <button type="button" class="btn btn-outline-secondary reader-btn-speed" onclick="setReaderSpeed(0.85, this)">0.85x هادئ</button>
+        <button type="button" class="btn btn-outline-secondary reader-btn-speed active" onclick="setReaderSpeed(1.0, this)">1.0x طبيعي</button>
+        <button type="button" class="btn btn-outline-secondary reader-btn-speed" onclick="setReaderSpeed(1.25, this)">1.25x سريع</button>
+        <button type="button" class="btn btn-outline-secondary reader-btn-speed" onclick="setReaderSpeed(1.5, this)">1.5x سريع جداً</button>
+      </div>
+
+      <!-- Progress & Chunk Counter -->
+      <div class="d-flex align-items-center gap-3">
+        <div style="width: 140px;">
+          <div class="progress" style="height: 8px;">
+            <div id="smartReaderProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width: 0%;"></div>
+          </div>
+        </div>
+        <span id="smartReaderProgressText" class="small fw-bold text-muted">0 / 0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Smart Audio Reader Controller
+let smartReaderState = {
+  active: false,
+  paused: false,
+  mode: 'cloud_neural', // 'cloud_neural' or 'browser_local'
+  speed: 1.0,
+  chunks: [],
+  currentIndex: 0,
+  totalChunks: 0,
+  targetTitle: '',
+  sessionId: null,
+  topicId: null,
+  audioElement: null,
+  synthUtterance: null
+};
+
+// Initialize HTML5 Audio Element for Cloud Neural mode
+if (!smartReaderState.audioElement) {
+  smartReaderState.audioElement = new Audio();
+  smartReaderState.audioElement.onended = function() {
+    advanceToNextChunk();
+  };
+  smartReaderState.audioElement.onerror = function() {
+    console.warn("Cloud Neural audio error, falling back to local speech");
+    playChunkLocal(smartReaderState.chunks[smartReaderState.currentIndex]);
+  };
+}
+
+function openSmartReader(params) {
+  smartReaderState.sessionId = params.sessionId || null;
+  smartReaderState.topicId = params.topicId || null;
+  
+  const overlay = document.getElementById('smartReaderOverlay');
+  overlay.classList.add('show');
+  
+  document.getElementById('smartReaderStatusBadge').className = 'badge bg-warning text-dark px-2 py-1';
+  document.getElementById('smartReaderStatusBadge').innerText = 'جاري تحضير النص...';
+  
+  let url = '/api/smart-reader/data/?';
+  if (params.topicId) url += 'topic_id=' + params.topicId;
+  else if (params.sessionId) url += 'session_id=' + params.sessionId;
+  
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) {
+        alert(data.error || 'تعذر تحميل النص للقراءة الذكية');
+        closeSmartReader();
+        return;
+      }
+      
+      smartReaderState.chunks = data.chunks;
+      smartReaderState.totalChunks = data.total_chunks;
+      smartReaderState.targetTitle = data.title;
+      smartReaderState.currentIndex = 0;
+      
+      document.getElementById('smartReaderTargetTitle').innerText = data.title;
+      document.getElementById('smartReaderProgressText').innerText = `0 / ${data.total_chunks}`;
+      document.getElementById('smartReaderProgressBar').style.width = '0%';
+      document.getElementById('smartReaderStatusBadge').className = 'badge bg-success px-2 py-1';
+      document.getElementById('smartReaderStatusBadge').innerText = 'جاهز للقراءة';
+      
+      renderChunksInBox(data.chunks);
+    })
+    .catch(err => {
+      console.error(err);
+      alert('خطأ في الاتصال بخدمة القراءة الذكية');
+      closeSmartReader();
+    });
+}
+
+function closeSmartReader() {
+  stopSmartReader();
+  document.getElementById('smartReaderOverlay').classList.remove('show');
+}
+
+function renderChunksInBox(chunks) {
+  const box = document.getElementById('smartReaderTextBox');
+  box.innerHTML = '';
+  
+  chunks.forEach((chunk, i) => {
+    const span = document.createElement('span');
+    span.id = 'chunk_dom_' + i;
+    span.className = 'reader-chunk' + (chunk.is_header ? ' fw-bold d-block my-2 text-primary' : '');
+    span.innerText = chunk.text + ' ';
+    span.title = 'انقر للاستماع من هذه الفقرة مباشرة';
+    span.onclick = function() {
+      jumpToChunk(i);
+    };
+    box.appendChild(span);
+  });
+}
+
+function setReaderMode(mode) {
+  smartReaderState.mode = mode;
+  document.getElementById('btnModeNeural').classList.toggle('active', mode === 'cloud_neural');
+  document.getElementById('btnModeLocal').classList.toggle('active', mode === 'browser_local');
+  
+  if (smartReaderState.active && !smartReaderState.paused) {
+    playCurrentChunk();
+  }
+}
+
+function setReaderSpeed(speed, btn) {
+  smartReaderState.speed = speed;
+  document.querySelectorAll('.reader-btn-speed').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  
+  if (smartReaderState.audioElement) {
+    smartReaderState.audioElement.playbackRate = speed;
+  }
+  if (smartReaderState.active && !smartReaderState.paused && smartReaderState.mode === 'browser_local') {
+    // Restart local utterance with new rate
+    window.speechSynthesis.cancel();
+    playChunkLocal(smartReaderState.chunks[smartReaderState.currentIndex]);
+  }
+}
+
+function startSmartReader() {
+  if (smartReaderState.chunks.length === 0) return;
+  
+  smartReaderState.active = true;
+  smartReaderState.paused = false;
+  
+  document.getElementById('btnReaderPlay').classList.add('d-none');
+  document.getElementById('btnReaderPause').classList.remove('d-none');
+  document.getElementById('btnReaderResume').classList.add('d-none');
+  document.getElementById('smartReaderStatusBadge').className = 'badge bg-primary px-2 py-1';
+  document.getElementById('smartReaderStatusBadge').innerText = 'جاري القراءة الآن...';
+  
+  // Log audit
+  logReaderUsage();
+  
+  playCurrentChunk();
+}
+
+function pauseSmartReader() {
+  smartReaderState.paused = true;
+  
+  if (smartReaderState.mode === 'cloud_neural' && smartReaderState.audioElement) {
+    smartReaderState.audioElement.pause();
+  } else {
+    window.speechSynthesis.pause();
+  }
+  
+  document.getElementById('btnReaderPause').classList.add('d-none');
+  document.getElementById('btnReaderResume').classList.remove('d-none');
+  document.getElementById('smartReaderStatusBadge').className = 'badge bg-warning text-dark px-2 py-1';
+  document.getElementById('smartReaderStatusBadge').innerText = 'متوقف مؤقتاً';
+}
+
+function resumeSmartReader() {
+  smartReaderState.paused = false;
+  
+  if (smartReaderState.mode === 'cloud_neural' && smartReaderState.audioElement && smartReaderState.audioElement.src) {
+    smartReaderState.audioElement.play();
+  } else if (window.speechSynthesis.paused) {
+    window.speechSynthesis.resume();
+  } else {
+    playCurrentChunk();
+  }
+  
+  document.getElementById('btnReaderResume').classList.add('d-none');
+  document.getElementById('btnReaderPause').classList.remove('d-none');
+  document.getElementById('smartReaderStatusBadge').className = 'badge bg-primary px-2 py-1';
+  document.getElementById('smartReaderStatusBadge').innerText = 'جاري القراءة الآن...';
+}
+
+function stopSmartReader() {
+  smartReaderState.active = false;
+  smartReaderState.paused = false;
+  
+  if (smartReaderState.audioElement) {
+    smartReaderState.audioElement.pause();
+    smartReaderState.audioElement.currentTime = 0;
+  }
+  window.speechSynthesis.cancel();
+  
+  // Clear visual highlights
+  document.querySelectorAll('.reader-chunk').forEach(el => el.classList.remove('active-reading'));
+  
+  document.getElementById('btnReaderPlay').classList.remove('d-none');
+  document.getElementById('btnReaderPause').classList.add('d-none');
+  document.getElementById('btnReaderResume').classList.add('d-none');
+  document.getElementById('smartReaderStatusBadge').className = 'badge bg-secondary px-2 py-1';
+  document.getElementById('smartReaderStatusBadge').innerText = 'متوقف';
+}
+
+function jumpToChunk(index) {
+  smartReaderState.currentIndex = index;
+  if (!smartReaderState.active) {
+    startSmartReader();
+  } else {
+    smartReaderState.paused = false;
+    document.getElementById('btnReaderResume').classList.add('d-none');
+    document.getElementById('btnReaderPause').classList.remove('d-none');
+    playCurrentChunk();
+  }
+}
+
+function playCurrentChunk() {
+  if (smartReaderState.currentIndex >= smartReaderState.chunks.length) {
+    stopSmartReader();
+    document.getElementById('smartReaderStatusBadge').className = 'badge bg-success px-2 py-1';
+    document.getElementById('smartReaderStatusBadge').innerText = 'اكتملت القراءة';
+    return;
+  }
+  
+  const chunk = smartReaderState.chunks[smartReaderState.currentIndex];
+  updateVisualHighlight(smartReaderState.currentIndex);
+  
+  if (smartReaderState.mode === 'cloud_neural') {
+    playChunkNeural(chunk);
+  } else {
+    playChunkLocal(chunk);
+  }
+}
+
+function updateVisualHighlight(index) {
+  document.querySelectorAll('.reader-chunk').forEach(el => el.classList.remove('active-reading'));
+  const currentDom = document.getElementById('chunk_dom_' + index);
+  if (currentDom) {
+    currentDom.classList.add('active-reading');
+    // Auto-scroll inside text box
+    currentDom.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  
+  // Update progress
+  const total = smartReaderState.totalChunks;
+  const current = index + 1;
+  const pct = Math.round((current / total) * 100);
+  document.getElementById('smartReaderProgressBar').style.width = pct + '%';
+  document.getElementById('smartReaderProgressText').innerText = `${current} / ${total} (${pct}%)`;
+}
+
+function playChunkNeural(chunk) {
+  // Call server synthesis endpoint
+  fetch('/api/smart-reader/synthesize/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({
+      text: chunk.text,
+      speed: smartReaderState.speed
+    })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success && res.audio_url) {
+      smartReaderState.audioElement.src = res.audio_url;
+      smartReaderState.audioElement.playbackRate = smartReaderState.speed;
+      smartReaderState.audioElement.play().catch(e => {
+        console.warn("Autoplay audio blocked, falling back to local speech");
+        playChunkLocal(chunk);
+      });
+    } else {
+      // Local fallback
+      playChunkLocal(chunk);
+    }
+  })
+  .catch(err => {
+    console.warn("Neural synthesis fetch failed, falling back to local speech:", err);
+    playChunkLocal(chunk);
+  });
+}
+
+function playChunkLocal(chunk) {
+  window.speechSynthesis.cancel();
+  
+  const utterance = new SpeechSynthesisUtterance(chunk.text);
+  utterance.lang = 'ar-SA';
+  utterance.rate = smartReaderState.speed;
+  
+  utterance.onend = function() {
+    advanceToNextChunk();
+  };
+  
+  utterance.onerror = function(e) {
+    console.warn("Local speech error:", e);
+    advanceToNextChunk();
+  };
+  
+  window.speechSynthesis.speak(utterance);
+}
+
+function advanceToNextChunk() {
+  if (!smartReaderState.active || smartReaderState.paused) return;
+  smartReaderState.currentIndex++;
+  playCurrentChunk();
+}
+
+function logReaderUsage() {
+  fetch('/api/smart-reader/log/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({
+      session_id: smartReaderState.sessionId,
+      topic_id: smartReaderState.topicId,
+      target_title: smartReaderState.targetTitle,
+      voice_mode: smartReaderState.mode,
+      speed: smartReaderState.speed,
+      chunks_count: smartReaderState.totalChunks
+    })
+  }).catch(e => console.log(e));
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+</script>

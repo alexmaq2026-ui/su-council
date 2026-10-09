@@ -1,0 +1,688 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ topic.title }} – الجلسة {{ session.session_number }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <a href="{% url 'council:session_detail' pk=session.pk %}" class="badge rounded-pill text-decoration-none px-3 py-2" style="background: rgba(255,255,255,0.16); color: #fff; font-weight: 600; font-size: 0.82rem;">
+          <i class="bi bi-arrow-right me-1"></i>الجلسة رقم ({{ session.session_number }}) — {{ session.title }}
+        </a>
+        <span class="uc-badge badge-{{ topic.status }} px-3 py-1" style="font-size: 0.82rem;">
+          {{ topic.get_clear_status_display }}
+        </span>
+      </div>
+      <h1 class="page-title mb-1">
+        {{ topic.get_category_display }} <span class="opacity-50 mx-1">›</span> <span style="color: #f3c65f;">{{ topic.ordinal_label }}</span>
+      </h1>
+      <div class="page-subtitle d-flex flex-wrap align-items-center gap-3 mt-1">
+        <span><i class="bi bi-calendar-event me-1"></i>تاريخ الجلسة: {{ session.date }}</span>
+        {% if topic.presenting_entity %}
+          <span><i class="bi bi-building me-1"></i>الجهة العارضة: {{ topic.presenting_entity }}</span>
+        {% endif %}
+        {% if topic.memo_number %}
+          <span><i class="bi bi-file-earmark-text me-1"></i>مذكرة رقم: {{ topic.memo_number }}{% if topic.memo_date %} ({{ topic.memo_date }}){% endif %}</span>
+        {% endif %}
+      </div>
+    </div>
+    
+    <div class="d-flex flex-wrap gap-2">
+      {% if user_can_use_smart_reader %}
+        <button type="button" class="btn btn-warning text-dark btn-sm fw-bold shadow-sm" onclick="openSmartReader({topicId: {{ topic.pk }}})">
+          🎙️ استماع بالقراءة الذكية للموضوع
+        </button>
+      {% endif %}
+      {% if user.can_view_sessions %}
+        <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-light btn-sm">
+          <i class="bi bi-arrow-right me-1"></i>جدول الأعمال
+        </a>
+      {% endif %}
+      {% if user_can_edit_topic %}
+        <a href="{% url 'council:topic_edit' pk=topic.pk %}" class="btn btn-outline-light btn-sm">
+          <i class="bi bi-pencil me-1"></i>تعديل
+        </a>
+      {% endif %}
+      {% if user_can_add_table %}
+        <a href="{% url 'council:table_create' topic_pk=topic.pk %}" class="btn btn-gold btn-sm">
+          إضافة جدول للموضوع
+        </a>
+      {% endif %}
+      {% if user_can_delete_topic %}
+        <a href="{% url 'council:topic_delete' pk=topic.pk %}" class="btn btn-outline-danger btn-sm text-white border-white">
+          <i class="bi bi-trash me-1"></i>حذف
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Right Side in RTL: Content & Media (7 Cols) -->
+  <div class="col-12 col-lg-7">
+
+    <!-- Main Topic Statement Card -->
+    <div class="uc-card shadow-sm mb-4" style="border-right: 5px solid #1e3a5f;">
+      <div class="uc-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0"><i class="bi bi-journal-bookmark-fill me-1"></i>نص الموضوع المعروض على المجلس</h5>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <span class="badge rounded-pill px-3 py-2" style="background-color: #1e3a5f; color: #fff; font-size: 0.78rem;">
+            {{ topic.get_category_display }} · {{ topic.ordinal_label }}
+          </span>
+          <span class="uc-badge badge-{{ topic.status }}">{{ topic.get_clear_status_display }}</span>
+        </div>
+      </div>
+      <div class="uc-card-body p-4">
+        <div class="fs-5 fw-bold text-navy" style="line-height: 1.9; text-align: justify;">
+          {{ topic.title }}
+        </div>
+        {% if topic.memo_number or topic.presenting_entity or topic.target_seats.all %}
+          <hr class="my-3 opacity-25">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            {% if topic.presenting_entity %}
+              <span class="badge bg-light text-navy border px-3 py-2">
+                <i class="bi bi-building me-1"></i>الجهة العارضة: {{ topic.presenting_entity }}
+              </span>
+            {% endif %}
+            {% if topic.memo_number %}
+              <span class="badge bg-light text-dark border px-3 py-2">
+                <i class="bi bi-hash me-1"></i>مذكرة رقم: {{ topic.memo_number }}{% if topic.memo_date %} بتاريخ {{ topic.memo_date }}{% endif %}
+              </span>
+            {% endif %}
+            {% for st in topic.target_seats.all %}
+              <span class="badge bg-warning text-dark px-3 py-2">
+                <i class="bi bi-diagram-3 me-1"></i>{{ st.name }}
+              </span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Background & Rationale (only shown when non-empty) -->
+    {% if topic.background and topic.background.strip %}
+    <div class="uc-card shadow-sm mb-4">
+      <div class="uc-card-header">
+        <h5><i class="bi bi-file-text"></i>حيثيات وخلفية الموضوع</h5>
+      </div>
+      <div class="uc-card-body p-4">
+        <div class="fs-6" style="white-space: pre-line; line-height: 1.8;">
+          {{ topic.background }}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Embedded Topic Tables (Dynamic & Math-Enabled) -->
+    {% if topic.tables.all %}
+      {% for tbl in topic.tables.all %}
+        <div class="uc-card shadow-sm mb-4">
+          <div class="uc-card-header d-flex justify-content-between align-items-center bg-navy text-white">
+            <h6 class="mb-0 fw-bold">{{ tbl.title|default:tbl.get_table_type_display }}</h6>
+            <div class="d-flex gap-2 align-items-center">
+              <span class="badge bg-gold text-dark">{{ tbl.get_rows_count }} سجل</span>
+              {% if user_can_edit_table %}
+                <a href="{% url 'council:table_edit' pk=tbl.pk %}" class="btn btn-sm btn-light py-0 px-2" style="font-size: 0.75rem;">تعديل الجدول</a>
+              {% endif %}
+              {% if user_can_delete_table %}
+                <a href="{% url 'council:table_delete' pk=tbl.pk %}" class="btn btn-sm btn-outline-light py-0 px-2" style="font-size: 0.75rem;" onclick="return confirm('هل أنت متأكد من حذف هذا الجدول؟')">حذف</a>
+              {% endif %}
+            </div>
+          </div>
+          <div class="uc-card-body p-0 table-responsive">
+            <table class="table table-bordered table-striped table-hover mb-0 text-center align-middle" style="font-size: 0.85rem;">
+              <thead class="table-light">
+                <tr>
+                  {% for h in tbl.headers %}
+                    <th class="py-2 px-2 fw-bold text-navy border">{{ h }}</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in tbl.rows_data %}
+                  <tr>
+                    {% for cell in row %}
+                      <td class="py-2 px-2 border">{{ cell|default:"—" }}</td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+              {% if tbl.get_formatted_total_row %}
+                <tfoot class="table-warning fw-bold border-top border-dark">
+                  <tr>
+                    {% for cell in tbl.get_formatted_total_row %}
+                      <td class="py-2 px-2 border">{{ cell }}</td>
+                    {% endfor %}
+                  </tr>
+                </tfoot>
+              {% endif %}
+            </table>
+          </div>
+          {% if tbl.notes %}
+            <div class="p-2 px-3 bg-light border-top small text-muted">
+              ملاحظة: {{ tbl.notes }}
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      {% if user_can_add_table %}
+        <div class="uc-card shadow-sm mb-4 text-center p-3 border-dashed">
+          <p class="text-muted small mb-2">لا يوجد جدول بيانات ملحق بهذا الموضوع بعد.</p>
+          <a href="{% url 'council:table_create' topic_pk=topic.pk %}" class="btn btn-outline-navy btn-sm">
+            إضافة جدول للموضوع
+          </a>
+        </div>
+      {% endif %}
+    {% endif %}
+
+    <!-- Priorities & Proposals -->
+    {% if topic.priorities %}
+      <div class="uc-card shadow-sm mb-4">
+        <div class="uc-card-header">
+          <h5><i class="bi bi-check2-circle"></i>الأولويات والمقترحات المرفوعة</h5>
+        </div>
+        <div class="uc-card-body p-4">
+          <div class="fs-6 text-dark" style="white-space: pre-line; line-height: 1.8;">
+            {{ topic.priorities }}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Mentioned Beneficiaries / Persons -->
+    {% if topic.mentioned_persons %}
+      <div class="uc-card shadow-sm mb-4">
+        <div class="uc-card-header">
+          <h5><i class="bi bi-people"></i>الأشخاص والمستفيدون المذكورون</h5>
+        </div>
+        <div class="uc-card-body p-3">
+          <div class="d-flex flex-wrap gap-2">
+            {% for person in topic.mentioned_persons.split %}
+              <span class="badge bg-light text-navy border p-2 px-3 fs-6">
+                <i class="bi bi-person me-1 text-gold"></i>{{ person }}
+              </span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Attachments / Scanner Files -->
+    <div class="uc-card shadow-sm mb-4">
+      <div class="uc-card-header d-flex justify-content-between align-items-center">
+        <h5><i class="bi bi-paperclip"></i>أوليات ومستندات الموضوع (Scanner / PDFs)</h5>
+        <span class="badge bg-gold text-dark">{{ topic.attachments.count }} ملف</span>
+      </div>
+      <div class="uc-card-body p-3">
+        {% if topic.attachments.all %}
+          {% if user_can_view_attachments %}
+            <div class="d-flex flex-column gap-2 mb-3">
+              {% for att in topic.attachments.all %}
+                <div class="attachment-item">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="attachment-icon">
+                      {% if att.is_pdf %}
+                        <i class="bi bi-file-earmark-pdf"></i>
+                      {% elif att.is_image %}
+                        <i class="bi bi-file-earmark-image"></i>
+                      {% else %}
+                        <i class="bi bi-file-earmark"></i>
+                      {% endif %}
+                    </div>
+                    <div>
+                      <a href="{{ att.file.url }}" target="_blank" class="fw-bold text-navy text-decoration-none">
+                        {{ att.file_name }}
+                      </a>
+                      <div class="text-muted small">
+                        {{ att.description|default:"مستند مرفق" }} · {{ att.uploaded_at|date:"Y-m-d H:i" }}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="d-flex gap-2 align-items-center">
+                    <a href="{{ att.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary" title="معاينة وتحميل">
+                      <i class="bi bi-eye me-1"></i>معاينة
+                    </a>
+                    {% if user_can_delete_attachments %}
+                      <form method="post" action="{% url 'council:attachment_delete' pk=att.pk %}" onsubmit="return confirm('هل أنت متأكد من حذف هذا المرفق؟')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger btn-icon">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-muted text-center py-3 mb-3">توجد أوليات مرفقة، ولكن لا تملك صلاحية استعراض أو تحميل المرفقات.</p>
+          {% endif %}
+        {% else %}
+          <p class="text-muted text-center py-3 mb-3">لا توجد أوليات أو مرفقات مسحوبة لهذا الموضوع بعد.</p>
+        {% endif %}
+
+        {% if user_can_upload_attachments %}
+          <div class="p-3 bg-light rounded-3 border">
+            <h6 class="fw-bold mb-2"><i class="bi bi-cloud-arrow-up me-1 text-gold"></i>رفع مستند جديد (سحب إسكانر)</h6>
+            <form method="post" action="{% url 'council:attachment_upload' topic_pk=topic.pk %}" enctype="multipart/form-data" class="row g-2 align-items-center">
+              {% csrf_token %}
+              <div class="col-12 col-md-6">
+                <input type="file" name="file" class="form-control form-control-sm" required>
+              </div>
+              <div class="col-12 col-md-4">
+                <input type="text" name="description" class="form-control form-control-sm" placeholder="وصف المستند (اختياري)">
+              </div>
+              <div class="col-12 col-md-2">
+                <button type="submit" class="btn btn-navy btn-sm w-100">
+                  <i class="bi bi-upload me-1"></i>رفع
+                </button>
+              </div>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Audio Recording Panel (Hall Discussion Recording) -->
+    {% if user_can_record_audio or user_can_listen_audio %}
+    <div class="uc-card shadow-sm mb-4">
+      <div class="uc-card-header d-flex justify-content-between align-items-center">
+        <h5><i class="bi bi-mic"></i>تسجيل نقاش قاعة المجلس حول الموضوع</h5>
+        <span class="badge bg-danger">{{ topic.recordings.count }} تسجيل</span>
+      </div>
+      <div class="uc-card-body p-4">
+        
+        <!-- Recorder UI -->
+        {% if user_can_record_audio %}
+        <div class="recorder-panel mb-4 p-4 text-center border rounded-4 bg-light">
+          <div class="record-waveform mb-2" id="record-waveform" style="display: none;">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+          
+          <button type="button" class="record-btn" id="record-btn" data-topic-id="{{ topic.pk }}" title="انقر لبدء / إيقاف التسجيل">
+            <i class="bi bi-mic-fill"></i>
+          </button>
+          
+          <div class="record-timer my-2" id="record-timer">00:00</div>
+          <div class="text-muted small fw-bold" id="record-status">جاهز لتسجيل نقاش القاعة</div>
+          
+          <div class="mt-3 col-md-6 mx-auto">
+            <input type="text" id="recording-label" class="form-control form-control-sm text-center" placeholder="تسمية التسجيل (مثال: مداخلة الأمين العام)">
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Existing Recordings -->
+        {% if user_can_listen_audio %}
+        <h6 class="fw-bold text-navy mb-3"><i class="bi bi-collection-play me-1"></i>التسجيلات المحفوظة:</h6>
+        <div id="recordings-list" class="d-flex flex-column gap-2">
+          {% for rec in topic.recordings.all %}
+            <div class="attachment-item">
+              <div class="d-flex align-items-center gap-2 flex-grow-1">
+                <div class="attachment-icon bg-danger text-white"><i class="bi bi-mic-fill"></i></div>
+                <div>
+                  <div class="fw-bold">{{ rec.label|default:"تسجيل نقاش الموضوع" }}</div>
+                  <small class="text-muted">{{ rec.get_duration_display }} · {{ rec.recorded_at|date:"Y-m-d H:i" }}</small>
+                </div>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <audio controls src="{{ rec.audio_file.url }}" style="height: 36px; max-width: 200px;"></audio>
+                {% if user_can_delete_audio %}
+                  <form method="post" action="{% url 'council:recording_delete' pk=rec.pk %}" onsubmit="return confirm('حذف هذا التسجيل الصوتي؟')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger btn-icon">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+          {% empty %}
+            <p class="text-muted small text-center py-2 empty-state-rec">لم يتم تسجيل أي مقطع صوتي لهذا الموضوع حتى الآن.</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right Side: Voting Panel & Decision (5 Cols) -->
+  <div class="col-12 col-lg-5">
+    
+    <!-- 🗳️ THE CORE VOTING PANEL (Responsive & Mobile-Ready) -->
+    <div class="vote-panel mb-4 shadow-sm border border-2 border-primary border-opacity-25 rounded-4">
+      <div class="vote-panel-title d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-check2-square text-primary"></i>منظومة التصويت على الموضوع</span>
+        {% if user_vote %}
+          <span class="badge bg-{{ user_vote.get_choice_color }} p-2">
+            تم تصويتك: {{ user_vote.get_choice_icon }} {{ user_vote.get_choice_display }}
+          </span>
+        {% endif %}
+      </div>
+
+      {% if topic.is_voting_open %}
+        {% if user_can_vote %}
+          <div class="mb-4">
+            <p class="small text-muted mb-3">اختر قرارك من بين المحاور الثلاثة أدناه، مع إمكانية إضافة سبب أو ملاحظة اختيارية:</p>
+          
+          <div class="vote-buttons-grid">
+            <button type="button" class="vote-btn vote-btn-approve {% if user_vote.choice == 'approve' %}selected{% endif %}" data-choice="approve">
+              <i class="bi bi-check-circle-fill"></i>
+              <span>موافقة</span>
+            </button>
+
+            <button type="button" class="vote-btn vote-btn-reject {% if user_vote.choice == 'reject' %}selected{% endif %}" data-choice="reject">
+              <i class="bi bi-x-circle-fill"></i>
+              <span>رفض</span>
+            </button>
+
+            <button type="button" class="vote-btn vote-btn-reserve {% if user_vote.choice == 'reserve' %}selected{% endif %}" data-choice="reserve">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              <span>تحفظ</span>
+            </button>
+          </div>
+
+          <input type="hidden" id="vote-choice-input" value="{{ user_vote.choice|default:'' }}">
+
+          <!-- Optional Notes / Reasons Field -->
+          <div class="mb-3" id="vote-notes-wrapper" style="{% if user_vote.choice != 'reject' and user_vote.choice != 'reserve' and not user_vote %}display:none;{% endif %}">
+            <label for="vote-notes" class="form-label small fw-bold text-navy">
+              سبب الرفض أو التحفظ / ملاحظات التصويت (اختياري):
+            </label>
+            <textarea id="vote-notes" class="vote-notes-field" placeholder="اكتب أسباب التحفظ أو الرفض أو أي ملاحظات أخرى...">{{ user_vote.notes|default:'' }}</textarea>
+          </div>
+
+          <button type="button" id="vote-submit-btn" class="btn btn-navy w-100 py-3 fw-bold fs-6 rounded-3 shadow" data-topic-id="{{ topic.pk }}">
+            <i class="bi bi-send-check me-2"></i>{% if user_vote %}تعديل التصويت وتأكيده{% else %}اعتماد التصويت{% endif %}
+          </button>
+        </div>
+      {% else %}
+        <div class="alert alert-secondary d-flex align-items-center gap-2 mb-3">
+          <i class="bi bi-lock-fill fs-5"></i>
+          <span class="small">خاصية التصويت تتطلب منح صلاحية (حق التصويت) من قِبل المسؤول المخوّل.</span>
+        </div>
+      {% endif %}
+      {% else %}
+        <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+          <i class="bi bi-clock-history fs-5 text-warning"></i>
+          <span class="small"><strong>باب التصويت مغلق حالياً لهذا الموضوع.</strong> يتم فتح وإغلاق التصويت بإشارة وتوجيه من رئيس المجلس في الجلسة الحية.</span>
+        </div>
+      {% endif %}
+
+      <!-- Live Vote Statistics -->
+      <div class="p-3 bg-light rounded-3 border">
+        <h6 class="fw-bold text-navy mb-3 d-flex justify-content-between align-items-center">
+          <span>نتائج التصويت الإجمالية</span>
+          <span class="badge bg-secondary" id="count-total">{{ vote_summary.total }} صوت</span>
+        </h6>
+
+        <div class="mb-2">
+          <div class="d-flex justify-content-between small fw-semibold">
+            <span class="text-success"><i class="bi bi-check-circle me-1"></i>الموافقون</span>
+            <span id="count-approve">{{ vote_summary.approve }}</span>
+          </div>
+          <div class="vote-result-bar">
+            <div class="vote-result-fill approve" id="bar-approve" style="width: {% if vote_summary.total %}{% widthratio vote_summary.approve vote_summary.total 100 %}{% else %}0{% endif %}%;"></div>
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <div class="d-flex justify-content-between small fw-semibold">
+            <span class="text-danger"><i class="bi bi-x-circle me-1"></i>الرافضون</span>
+            <span id="count-reject">{{ vote_summary.reject }}</span>
+          </div>
+          <div class="vote-result-bar">
+            <div class="vote-result-fill reject" id="bar-reject" style="width: {% if vote_summary.total %}{% widthratio vote_summary.reject vote_summary.total 100 %}{% else %}0{% endif %}%;"></div>
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <div class="d-flex justify-content-between small fw-semibold">
+            <span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>المتحفظون</span>
+            <span id="count-reserve">{{ vote_summary.reserve }}</span>
+          </div>
+          <div class="vote-result-bar">
+            <div class="vote-result-fill reserve" id="bar-reserve" style="width: {% if vote_summary.total %}{% widthratio vote_summary.reserve vote_summary.total 100 %}{% else %}0{% endif %}%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Votes Details Table -->
+      {% if topic.votes.all and user_can_view_vote_details %}
+        <div class="mt-3">
+          <button class="btn btn-sm btn-link text-decoration-none p-0 text-navy fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#votesDetailsList">
+            <i class="bi bi-chevron-down me-1"></i>عرض تفاصيل أصوات الأعضاء والملاحظات ({{ topic.votes.count }})
+          </button>
+          
+          <div class="collapse mt-2" id="votesDetailsList">
+            <div class="list-group list-group-flush border rounded-3 small">
+              {% for v in topic.votes.all %}
+                <div class="list-group-item p-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">{{ v.member.full_name }}</span>
+                    <span class="badge bg-{{ v.get_choice_color }}">{{ v.get_choice_icon }} {{ v.get_choice_display }}</span>
+                  </div>
+                  {% if v.notes %}
+                    <div class="text-muted mt-1 bg-white p-2 rounded border" style="font-size: 0.8rem;">
+                      <em>{{ v.notes }}</em>
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- 📝 FINAL DECISION PANEL (Secretary-General Authority) -->
+    <div class="uc-card shadow-sm mb-4 border-gold">
+      <div class="uc-card-header bg-navy text-white d-flex justify-content-between align-items-center">
+        <h5><i class="bi bi-file-earmark-check text-gold"></i>القرار النهائي للمجلس</h5>
+        <div class="d-flex gap-1">
+          {% if user_can_draft_decision %}
+            <a href="{% url 'council:decision_edit' topic_pk=topic.pk %}" class="btn btn-sm btn-gold">
+              <i class="bi bi-pencil-square me-1"></i>{% if has_decision %}تعديل القرار{% else %}صياغة القرار{% endif %}
+            </a>
+          {% endif %}
+          {% if has_decision and user_can_delete_decision %}
+            <form method="post" action="{% url 'council:decision_delete' topic_pk=topic.pk %}" onsubmit="return confirm('هل أنت متأكد من حذف صياغة القرار؟')">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger text-white border-white" title="حذف صياغة القرار">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+      <div class="uc-card-body p-4">
+        {% if has_decision %}
+          <div class="p-3 bg-gold-pale rounded-3 border border-gold mb-2">
+            <div class="fw-bold text-navy mb-2 fs-6">نص القرار المعتمد:</div>
+            <div class="fs-6" style="white-space: pre-line; line-height: 1.8;">
+              {{ decision.decision_text }}
+            </div>
+            <div class="text-muted small mt-3 pt-2 border-top border-warning border-opacity-50 d-flex justify-content-between">
+              <span>صاغه: {{ decision.drafted_by.full_name|default:"الأمين العام" }}</span>
+              <span>{{ decision.drafted_at|date:"Y-m-d H:i" }}</span>
+            </div>
+          </div>
+        {% else %}
+          <div class="text-center py-4 text-muted">
+            <i class="bi bi-hourglass-split display-4 text-gold mb-2 d-block"></i>
+            <h6 class="fw-bold">لم تتم صياغة القرار النهائي بعد</h6>
+            <p class="small mb-3">يقوم الأمين العام أو من يخوّله بصياغة القرار بناءً على النقاش والتصويت.</p>
+            {% if user_can_draft_decision %}
+              <a href="{% url 'council:decision_edit' topic_pk=topic.pk %}" class="btn btn-navy btn-sm">
+                <i class="bi bi-pen me-1"></i>صياغة القرار الآن
+              </a>
+            {% endif %}
+          </div>
+        {% endif %}
+    <!-- 🏛️ SIGNED DECISION & FACULTY DISPATCH PANEL (Phase 4) -->
+    <div class="uc-card shadow-sm mb-4 border-2 border-primary border-opacity-50">
+      <div class="uc-card-header bg-navy text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold">📜 مستند القرار الموقّع رسميًا وتعميمه على الكليات (المرحلة الرابعة)</h5>
+        {% if topic.signed_decision %}
+          <span class="badge bg-success">تم رفع النسخة الموقّعة</span>
+        {% else %}
+          <span class="badge bg-secondary">بانتظار الرفع بعد التوقيع</span>
+        {% endif %}
+      </div>
+
+      <div class="uc-card-body p-4">
+        {% if topic.signed_decision %}
+          <div class="p-3 bg-light rounded-3 border mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom">
+              <div>
+                <span class="fw-bold text-navy fs-6">
+                  القرار الإداري رقم: {{ topic.signed_decision.decision_number|default:"غير مرقم" }}
+                </span>
+                {% if topic.signed_decision.decision_date %}
+                  <span class="text-muted small ms-2">بتاريخ {{ topic.signed_decision.decision_date|date:"Y-m-d" }}</span>
+                {% endif %}
+              </div>
+              {% if user_can_view_attachments or user_can_send_decisions or user_can_upload_signed %}
+              <div class="d-flex gap-2">
+                <a href="{{ topic.signed_decision.signed_file.url }}" target="_blank" class="btn btn-sm btn-primary fw-bold px-3">
+                  معاينة وتحميل القرار الموقّع
+                </a>
+              </div>
+              {% endif %}
+            </div>
+
+            <div class="small text-muted mb-2">
+              <span>القائم بالرفع: <strong>{{ topic.signed_decision.uploaded_by.full_name|default:"الأمانة العامة" }}</strong></span>
+              • <span>تاريخ الرفع: {{ topic.signed_decision.uploaded_at|date:"Y-m-d H:i" }}</span>
+              {% if topic.signed_decision.notes %}
+                <div class="mt-1">ملاحظات الأمانة: <em>{{ topic.signed_decision.notes }}</em></div>
+              {% endif %}
+            </div>
+
+            <!-- الكليات والجهات المعنية وحالة الإرسال -->
+            <div class="mt-3">
+              <h6 class="fw-bold text-navy small mb-2">حالة تعميم القرار على الكليات المعنية:</h6>
+              {% if topic.target_seats.all %}
+                <div class="row g-2">
+                  {% for seat in topic.target_seats.all %}
+                    <div class="col-md-6">
+                      <div class="p-2 rounded border bg-white d-flex justify-content-between align-items-center small">
+                        <span class="fw-bold">{{ seat.name }}</span>
+                        {% if topic.signed_decision.dispatches.all %}
+                          <span class="badge bg-success-subtle text-success border border-success">تم التعميم</span>
+                        {% else %}
+                          <span class="badge bg-warning text-dark">بانتظار التعميم</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="text-muted small mb-0">لم تُحدد كليات معنية بهذا الموضوع بعد.</p>
+              {% endif %}
+            </div>
+
+            <!-- زر إرسال القرار للأمانة العامة -->
+            {% if user_can_send_decisions %}
+              <div class="mt-3 pt-3 border-top d-flex justify-content-between align-items-center">
+                <button type="button" class="btn btn-sm btn-success fw-bold px-4" onclick="dispatchDecision({{ topic.pk }})">
+                  إرسال وتعميم القرار الآن للكليات المعنية
+                </button>
+                <span class="small text-muted">
+                  ملخص الوصول: {{ topic.signed_decision.get_dispatches_summary.viewed }} من {{ topic.signed_decision.get_dispatches_summary.total }} جهة اطّلعت عليه
+                </span>
+              </div>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="text-center py-3 text-muted">
+            <p class="small mb-3">بعد اعتماد القرار النهائي وتوقيعه وختمه رسمياً، تقوم الأمانة العامة بسحبه ضوئياً ورفعه هنا ليتم تعميمه تلقائياً على الكليات المعنية.</p>
+          </div>
+        {% endif %}
+
+        <!-- نموذج رفع أو تحديث القرار الموقّع للمخوّلين -->
+        {% if user_can_upload_signed %}
+          <div class="p-3 bg-white rounded-3 border mt-3">
+            <h6 class="fw-bold text-navy mb-2">
+              {% if topic.signed_decision %}تحديث مستند القرار الموقّع أو تعديل الكليات المعنية{% else %}رفع مستند القرار الموقّع رسميًا وتحديد الكليات المستلمة{% endif %}
+            </h6>
+            <form method="post" action="{% url 'council:upload_signed_decision' topic_pk=topic.pk %}" enctype="multipart/form-data">
+              {% csrf_token %}
+              <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                  <label class="form-label small text-muted">ملف القرار الموقّع (PDF أو صورة عالية الجودة):</label>
+                  <input type="file" name="signed_file" class="form-control form-control-sm" {% if not topic.signed_decision %}required{% endif %}>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small text-muted">رقم القرار الإداري:</label>
+                  <input type="text" name="decision_number" class="form-control form-control-sm" value="{{ topic.signed_decision.decision_number|default:'' }}" placeholder="مثال: ق/2026/14">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small text-muted">تاريخ التوقيع:</label>
+                  <input type="date" name="decision_date" class="form-control form-control-sm" value="{{ topic.signed_decision.decision_date|date:'Y-m-d'|default:'' }}">
+                </div>
+              </div>
+
+              <!-- اختيار الكليات والجهات المعنية -->
+              <div class="mb-2">
+                <label class="form-label small text-muted">الكليات والجهات المعنية بالقرار (ستصل المراسلة لها وحدها):</label>
+                <div class="p-2 border rounded bg-light" style="max-height: 140px; overflow-y: auto;">
+                  <div class="row g-1">
+                    {% for s in all_seats %}
+                      <div class="col-md-4 col-sm-6">
+                        <div class="form-check small">
+                          <input class="form-check-input" type="checkbox" name="target_seats" value="{{ s.pk }}" id="seat_check_{{ s.pk }}" {% if s in topic.target_seats.all %}checked{% endif %}>
+                          <label class="form-check-label" for="seat_check_{{ s.pk }}">
+                            {{ s.name }}
+                          </label>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-end">
+                <button type="submit" class="btn btn-navy btn-sm px-4 fw-bold">
+                  {% if topic.signed_decision %}حفظ التعديلات{% else %}رفع القرار واعتماد الكليات المعنية{% endif %}
+                </button>
+              </div>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <script>
+    function dispatchDecision(topicPk) {
+      if (!confirm('هل أنت متأكد من رغبتك في إرسال وتعميم القرار الموقّع رسميًا على كافة الكليات والجهات المعنية؟')) return;
+      fetch('/council/topics/' + topicPk + '/signed-decision/dispatch/', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: ''
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          alert(data.message);
+          location.reload();
+        } else {
+          alert(data.error || 'حدث خطأ أثناء الإرسال.');
+        }
+      })
+      .catch(err => alert('تعذر الاتصال بالخادم.'));
+    }
+    </script>
+  </div>
+</div>
+{% endblock %}

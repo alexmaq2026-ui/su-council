@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block title %}مركز التنبيهات والإشعارات | نظام مجلس الجامعة{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-lg-4" dir="rtl">
+
+  <!-- Header -->
+  <div class="card shadow-sm border-0 mb-4 bg-white rounded-4 overflow-hidden">
+    <div class="card-body p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge bg-navy text-white px-3 py-1">مركز التنبيهات</span>
+            {% if unread_count > 0 %}
+              <span class="badge bg-danger px-2 py-1">{{ unread_count }} غير مقروء</span>
+            {% else %}
+              <span class="badge bg-success px-2 py-1">تمت قراءة كافة التنبيهات</span>
+            {% endif %}
+          </div>
+          <h3 class="fw-bold mb-1 text-navy">
+            <i class="bi bi-bell-fill text-gold me-2"></i>التنبيهات والإشعارات الشخصية
+          </h3>
+          <p class="text-muted small mb-0">
+            سجل كافة التنبيهات الموجهة إليكم بخصوص الجلسات، فتح الاطلاع المسبق، القرارات الموجهة، وتوجيهات الرئاسة.
+          </p>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          {% if unread_count > 0 %}
+            <button type="button" class="btn btn-sm btn-outline-navy fw-bold" onclick="markAllNotifsAsRead(event)">
+              <i class="bi bi-check2-all me-1"></i>تحديد الكل كمقروء
+            </button>
+          {% endif %}
+          <a href="/dashboard/" class="btn btn-outline-secondary btn-sm px-3">
+            لوحة التحكم
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter tabs -->
+  <div class="d-flex gap-2 mb-3">
+    <a href="?status=all" class="btn btn-sm {% if status_filter == 'all' %}btn-navy{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+      الكل ({{ total_count }})
+    </a>
+    <a href="?status=unread" class="btn btn-sm {% if status_filter == 'unread' %}btn-danger{% else %}btn-outline-danger{% endif %} rounded-pill px-3">
+      غير المقروءة ({{ unread_count }})
+    </a>
+    <a href="?status=read" class="btn btn-sm {% if status_filter == 'read' %}btn-secondary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+      المقروءة
+    </a>
+  </div>
+
+  <!-- Notification list -->
+  <div class="card shadow-sm border-0 rounded-4 overflow-hidden bg-white">
+    <div class="card-body p-0">
+      {% if page_obj %}
+        <div class="list-group list-group-flush">
+          {% for n in page_obj %}
+            <div class="list-group-item p-3 d-flex flex-wrap justify-content-between align-items-center gap-3 {% if not n.is_read %}bg-light border-start border-primary border-4{% endif %}">
+              <div class="d-flex align-items-start gap-3 flex-grow-1">
+                <div class="rounded-circle p-2 d-flex align-items-center justify-content-center {% if not n.is_read %}bg-primary bg-opacity-10 text-primary{% else %}bg-secondary bg-opacity-10 text-muted{% endif %}" style="width: 42px; height: 42px; min-width: 42px;">
+                  {% if n.category == 'session_publishing' %}
+                    <i class="bi bi-book-half fs-5"></i>
+                  {% elif n.category == 'session_live' %}
+                    <i class="bi bi-broadcast fs-5 text-danger"></i>
+                  {% elif n.category == 'decision_dispatch' %}
+                    <i class="bi bi-file-earmark-check-fill fs-5 text-success"></i>
+                  {% elif n.category == 'exit_permit' %}
+                    <i class="bi bi-box-arrow-right fs-5 text-warning"></i>
+                  {% else %}
+                    <i class="bi bi-info-circle-fill fs-5"></i>
+                  {% endif %}
+                </div>
+
+                <div>
+                  <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <strong class="text-navy">{{ n.title }}</strong>
+                    <span class="badge bg-light text-dark border small" style="font-size: 0.72rem;">{{ n.get_category_display }}</span>
+                    {% if not n.is_read %}
+                      <span class="badge bg-danger small" style="font-size: 0.7rem;">جديد</span>
+                    {% endif %}
+                  </div>
+                  <div class="text-muted small" style="font-size: 0.85rem; line-height: 1.5;">
+                    {{ n.message }}
+                  </div>
+                  <div class="text-muted mt-1" style="font-size: 0.72rem;">
+                    <i class="bi bi-clock me-1"></i>{{ n.created_at|date:"Y-m-d H:i" }}
+                    {% if n.read_at %} · <span>تمت القراءة في: {{ n.read_at|date:"Y-m-d H:i" }}</span>{% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex gap-2 align-items-center">
+                {% if n.target_url %}
+                  <a href="{{ n.target_url }}" class="btn btn-sm btn-navy px-3 fw-bold" onclick="markNotifRead({{ n.id }}, null, '{{ n.target_url }}')">
+                    فتح الإجراء ←
+                  </a>
+                {% endif %}
+                {% if not n.is_read %}
+                  <button type="button" class="btn btn-sm btn-outline-secondary" onclick="markNotifRead({{ n.id }}, event, null); this.closest('.list-group-item').classList.remove('bg-light', 'border-start', 'border-primary', 'border-4'); this.remove();">
+                    تعليم كمقروء
+                  </button>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+          <div class="p-3 bg-light d-flex justify-content-center border-top">
+            <nav>
+              <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                  <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}">السابق</a></li>
+                {% endif %}
+                <li class="page-item active"><span class="page-link">{{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span></li>
+                {% if page_obj.has_next %}
+                  <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}">التالي</a></li>
+                {% endif %}
+              </ul>
+            </nav>
+          </div>
+        {% endif %}
+
+      {% else %}
+        <div class="text-center py-5">
+          <div class="text-muted fs-1 mb-2">🔔</div>
+          <h5 class="text-muted fw-bold">لا توجد تنبيهات مطابقة</h5>
+          <p class="text-muted small">ستظهر هنا أي تنبيهات واردة إليك مستقبلاً.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

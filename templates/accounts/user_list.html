@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{% block title %}إدارة المستخدمين – مجلس الجامعة{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Compact & Elegant Custom Styles for User List ── */
+.btn-action-perm {
+  color: #0f3460 !important;
+  background-color: #f0f4f8 !important;
+  border: 1px solid #cbd5e1 !important;
+  padding: 0.2rem 0.55rem !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+  line-height: 1.3 !important;
+}
+.btn-action-perm:hover {
+  background-color: #0f3460 !important;
+  color: #ffffff !important;
+  border-color: #0f3460 !important;
+}
+
+.btn-action-edit {
+  color: #334155 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  padding: 0.2rem 0.55rem !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+  line-height: 1.3 !important;
+}
+.btn-action-edit:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+.btn-action-delete {
+  color: #dc2626 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #fca5a5 !important;
+  padding: 0.2rem 0.55rem !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+  line-height: 1.3 !important;
+}
+.btn-action-delete:hover {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+}
+
+/* Status Badges */
+.status-badge-active {
+  background-color: #dcfce7 !important;
+  color: #15803d !important;
+  border: 1px solid #86efac !important;
+  border-radius: 4px !important;
+  padding: 0.2rem 0.55rem !important;
+  font-size: 0.76rem !important;
+  font-weight: 600 !important;
+  display: inline-block !important;
+  white-space: nowrap !important;
+}
+
+.status-badge-inactive {
+  background-color: #fee2e2 !important;
+  color: #b91c1c !important;
+  border: 1px solid #fca5a5 !important;
+  border-radius: 4px !important;
+  padding: 0.2rem 0.55rem !important;
+  font-size: 0.76rem !important;
+  font-weight: 600 !important;
+  display: inline-block !important;
+  white-space: nowrap !important;
+}
+
+/* Permission Badges - Crisp, Compact, No Icons */
+.perm-badge {
+  border-radius: 4px !important;
+  padding: 0.18rem 0.48rem !important;
+  font-size: 0.74rem !important;
+  font-weight: 600 !important;
+  display: inline-block !important;
+  white-space: nowrap !important;
+  line-height: 1.3 !important;
+}
+
+.perm-super {
+  background: #0f3460 !important;
+  color: #f1c40f !important;
+  border: 1px solid #d4af37 !important;
+}
+
+.perm-vote {
+  background-color: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border: 1px solid #bfdbfe !important;
+}
+
+.perm-draft {
+  background-color: #faf5ff !important;
+  color: #7e22ce !important;
+  border: 1px solid #e9d5ff !important;
+}
+
+.perm-grant {
+  background-color: #fefce8 !important;
+  color: #a16207 !important;
+  border: 1px solid #fef08a !important;
+}
+
+.perm-add {
+  background-color: #f0fdf4 !important;
+  color: #15803d !important;
+  border: 1px solid #bbf7d0 !important;
+}
+
+.perm-edit {
+  background-color: #f0f9ff !important;
+  color: #0369a1 !important;
+  border: 1px solid #bae6fd !important;
+}
+
+.perm-delete {
+  background-color: #fef2f2 !important;
+  color: #b91c1c !important;
+  border: 1px solid #fecaca !important;
+}
+
+.perm-attendance {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+}
+
+.perm-scanner {
+  background-color: #f8fafc !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+.perm-audio {
+  background-color: #fff7ed !important;
+  color: #c2410c !important;
+  border: 1px solid #fed7aa !important;
+}
+
+.perm-export {
+  background-color: #eef2ff !important;
+  color: #4338ca !important;
+  border: 1px solid #c7d2fe !important;
+}
+
+.perm-none {
+  background-color: #f8fafc !important;
+  color: #64748b !important;
+  border: 1px dashed #cbd5e1 !important;
+}
+</style>
+{% endblock %}
+
+{% block page_header %}
+<div class="page-header py-3">
+  <div class="container-fluid px-3 px-md-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div>
+        <h1 class="page-title fs-5 mb-0">إدارة المستخدمين والصلاحيات</h1>
+        <small class="text-muted">{{ users|length }} مستخدم مسجّل</small>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        {% if user.is_super or user.can_import_members or user.can_manage_users or user.can_grant %}
+        <a href="{% url 'accounts:member_import' %}" class="btn btn-gold btn-sm">استيراد أعضاء</a>
+        {% endif %}
+        {% if user.is_super or user.can_manage_users or user.can_grant %}
+        <a href="{% url 'accounts:user_create' %}" class="btn btn-navy btn-sm">إضافة مستخدم</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Live Search & Filter Bar ── -->
+<div class="uc-card mb-3">
+  <div class="uc-card-body py-2 px-3">
+    <div class="row g-2 align-items-center">
+      <div class="col-12 col-md-4">
+        <input
+          type="text"
+          id="live-search-input"
+          class="form-control form-control-sm"
+          placeholder="ابحث بالاسم، اللقب، أو اسم المستخدم..."
+          autocomplete="off"
+        >
+      </div>
+      <div class="col-12 col-md-4">
+        <select class="form-select form-select-sm" id="category-filter">
+          <option value="">الموقع في بوابة الدخول – الكل</option>
+          <option value="presidency_office">مكتب رئيس الجامعة والمستشارون والمساعدون</option>
+          <option value="vice_presidents">نواب رئيس الجامعة</option>
+          <option value="deans">عمداء الكليات</option>
+          <option value="secretariat_admin">الأمانة العامة وإدارة المجلس</option>
+          <option value="representatives">ممثلو النقابة وأعضاء هيئة التدريس</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <select class="form-select form-select-sm" id="status-filter">
+          <option value="">الحالة – الكل</option>
+          <option value="active">نشط</option>
+          <option value="inactive">غير نشط</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-2 text-md-end">
+        <span class="text-muted small">
+          <span id="search-count">{{ users|length }}</span> نتيجة
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Users Table ── -->
+<div class="uc-card">
+  <div class="uc-card-body p-0">
+    {% if users %}
+    <div class="table-responsive">
+      <table class="table uc-table table-mobile-cards mb-0" id="users-table">
+        <thead>
+          <tr>
+            <th>الاسم</th>
+            <th class="d-none d-md-table-cell">الموقع والصفة في المجلس</th>
+            <th class="d-none d-lg-table-cell">اسم المستخدم</th>
+            <th>الصلاحيات</th>
+            <th class="d-none d-sm-table-cell">الحالة</th>
+            <th class="text-center">إجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody">
+          {% for u in users %}
+          <tr class="user-row"
+              data-name="{{ u.full_name|lower }}"
+              data-username="{{ u.username|lower }}"
+              data-title="{{ u.official_title|default:u.get_title_display|lower }} {{ u.department|lower }}"
+              data-category="{{ u.get_effective_login_category }}"
+              data-status="{% if u.is_active %}active{% else %}inactive{% endif %}">
+
+            <!-- Name & avatar -->
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="user-avatar-sm flex-shrink-0">{{ u.avatar_initials|default:"?" }}</div>
+                <div>
+                  <div class="fw-semibold">{{ u.full_name }}</div>
+                  <div class="small text-muted d-md-none">
+                    {{ u.official_title|default:u.get_title_display }}
+                    <span class="badge perm-badge perm-scanner ms-1">{{ u.get_effective_login_category_display }}</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Category, Title & College -->
+            <td class="d-none d-md-table-cell">
+              <div class="mb-1">
+                <span class="badge perm-badge perm-scanner">{{ u.get_effective_login_category_display }}</span>
+              </div>
+              <span class="text-navy fw-medium">{{ u.official_title|default:u.get_title_display }}</span>
+              {% if u.department and u.department not in u.official_title %}
+                <small class="text-muted d-block" style="font-size: 0.78rem;">{{ u.department }}</small>
+              {% endif %}
+            </td>
+
+            <!-- Username -->
+            <td class="d-none d-lg-table-cell">
+              <code class="text-secondary">{{ u.username }}</code>
+            </td>
+
+            <!-- Permissions badges (Compact & Pure Text) -->
+            <td>
+              <div class="d-flex flex-wrap gap-1 align-items-center">
+                {% if u.is_super %}
+                  <span class="badge perm-badge perm-super" title="مدير النظام الأعلى (58 / 58)">مدير النظام الأعلى (58/58)</span>
+                {% elif u.has_any_permission %}
+                  <span class="badge perm-badge perm-export" title="إجمالي الصلاحيات الممنوحة">{{ u.granted_permissions_count }} / 58 صلاحية</span>
+                  {% if u.can_vote %}
+                    <span class="badge perm-badge perm-vote" title="حق التصويت في المجلس">تصويت</span>
+                  {% endif %}
+                  {% if u.can_draft_decision %}
+                    <span class="badge perm-badge perm-draft" title="صياغة واعتماد القرارات">صياغة</span>
+                  {% endif %}
+                  {% if u.can_manage_attendance %}
+                    <span class="badge perm-badge perm-attendance" title="إدارة ورصد كشف الحضور">حضور</span>
+                  {% endif %}
+                  {% if u.can_grant_permissions %}
+                    <span class="badge perm-badge perm-grant" title="تخويل وإدارة الصلاحيات">تخويل</span>
+                  {% endif %}
+                {% else %}
+                  <span class="badge perm-badge perm-none" title="لا توجد صلاحيات ممنوحة (0 / 58)">لا صلاحيات (0/58)</span>
+                {% endif %}
+              </div>
+            </td>
+
+            <!-- Status -->
+            <td class="d-none d-sm-table-cell">
+              {% if u.is_active %}
+                <span class="badge status-badge-active" title="الحساب نشط">نشط</span>
+              {% else %}
+                <span class="badge status-badge-inactive" title="الحساب معطّل">غير نشط</span>
+              {% endif %}
+            </td>
+
+            <!-- Actions (Compact, Clean, Elegant, Text-Only) -->
+            <td class="text-center">
+              <div class="d-inline-flex gap-1 align-items-center flex-nowrap">
+                {% if user.can_grant_permissions or user.is_super %}
+                <a href="{% url 'accounts:user_permissions' u.pk %}"
+                   class="btn-action-perm"
+                   title="تحديد وإدارة الصلاحيات">الصلاحيات</a>
+                {% endif %}
+                {% if user.is_super or user.can_manage_users or user.can_grant_permissions %}
+                <a href="{% url 'accounts:user_edit' u.pk %}"
+                   class="btn-action-edit"
+                   title="تعديل بيانات المستخدم">تعديل</a>
+                {% endif %}
+                {% if u != user %}
+                  {% if user.is_super or user.can_manage_users or user.can_grant_permissions and u.manager == user %}
+                  <button type="button"
+                          class="btn-action-delete"
+                          title="حذف أو تعطيل المستخدم"
+                          onclick="confirmDelete('{% url 'accounts:user_delete' u.pk %}', '{{ u.full_name }}')">حذف</button>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty search state -->
+    <div id="no-results-row" class="empty-state py-4 d-none text-center">
+      <h6 class="text-muted">لا توجد نتائج</h6>
+      <p class="text-muted small">جرّب البحث بكلمات مختلفة</p>
+    </div>
+
+    {% else %}
+    <div class="empty-state py-5 text-center">
+      <h5>لا يوجد مستخدمون</h5>
+      <p class="text-muted">لم يتم تسجيل أي مستخدمين بعد</p>
+      {% if user.is_super %}
+      <a href="{% url 'accounts:user_create' %}" class="btn btn-navy btn-sm">إضافة مستخدم</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Delete Confirmation Modal (Clean, Compact, No Icons) ── -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content uc-modal shadow-sm">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title fw-bold text-danger">تأكيد حذف الحساب</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body py-3">
+        <p class="mb-2">هل أنت متأكد من حذف المستخدم <strong id="delete-user-name"></strong>؟</p>
+        <p class="text-muted small mb-0">يمكنك اختيار الحذف النهائي لإزالة الحساب نهائياً، أو التعطيل المؤقت لإيقاف الدخول.</p>
+      </div>
+      <div class="modal-footer border-0 pt-0 d-flex justify-content-between">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+        <form id="delete-form" method="post" class="d-flex gap-2 m-0">
+          {% csrf_token %}
+          <button type="submit" name="action_type" value="deactivate" class="btn btn-warning btn-sm">تعطيل مؤقت</button>
+          <button type="submit" name="action_type" value="permanent_delete" class="btn btn-danger btn-sm">حذف نهائي</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Live Search & Filter ──
+const searchInput    = document.getElementById('live-search-input');
+const categoryFilter = document.getElementById('category-filter');
+const statusFilter   = document.getElementById('status-filter');
+const rows           = document.querySelectorAll('.user-row');
+const noResults      = document.getElementById('no-results-row');
+const countEl        = document.getElementById('search-count');
+
+function filterUsers() {
+  const query    = searchInput.value.toLowerCase().trim();
+  const category = categoryFilter ? categoryFilter.value : '';
+  const status   = statusFilter.value;
+  let visible    = 0;
+
+  rows.forEach(row => {
+    const name     = row.dataset.name     || '';
+    const username = row.dataset.username || '';
+    const title    = row.dataset.title    || '';
+    const rowCat   = row.dataset.category || '';
+    const rowStat  = row.dataset.status   || '';
+
+    const matchesSearch   = !query    || name.includes(query) || username.includes(query) || title.includes(query);
+    const matchesCategory = !category || rowCat === category;
+    const matchesStatus   = !status   || rowStat === status;
+
+    if (matchesSearch && matchesCategory && matchesStatus) {
+      row.style.display = '';
+      visible++;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  countEl.textContent = visible;
+  if (noResults) {
+    noResults.classList.toggle('d-none', visible > 0);
+  }
+}
+
+if (searchInput)    searchInput.addEventListener('input', filterUsers);
+if (categoryFilter) categoryFilter.addEventListener('change', filterUsers);
+if (statusFilter)   statusFilter.addEventListener('change', filterUsers);
+
+// ── Delete Modal Trigger ──
+function confirmDelete(url, userName) {
+  const form = document.getElementById('delete-form');
+  const nameEl = document.getElementById('delete-user-name');
+  if (form && nameEl) {
+    form.action = url;
+    nameEl.textContent = userName;
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    modal.show();
+  }
+}
+</script>
+{% endblock %}

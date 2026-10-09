@@ -1,0 +1,378 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}لوحة الصلاحيات الذكية: {{ target_user.full_name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <span class="badge bg-gold text-dark fw-bold">لوحة الصلاحيات الذكية</span>
+        <span class="badge bg-light text-navy">{{ target_user.get_title_display }}</span>
+      </div>
+      <h1 class="page-title">
+        تحديد صلاحيات: {{ target_user.full_name }}
+      </h1>
+      <div class="page-subtitle">
+        اسم المستخدم: <code class="text-white bg-dark px-2 py-1 rounded">@{{ target_user.username }}</code>
+        {% if target_user.department %} · الجهة: {{ target_user.department }}{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-light btn-sm">العودة لقائمة المستخدمين</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="permissions-matrix-form" novalidate>
+  {% csrf_token %}
+
+  <!-- Top Overview & Master Controls -->
+  <div class="row g-3 mb-4">
+    <!-- User Info & Live Counter Card -->
+    <div class="col-12 col-lg-5">
+      <div class="uc-card h-100 shadow-sm p-3">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="user-avatar-lg bg-navy text-gold fw-bold border border-gold">
+            {{ target_user.avatar_initials|default:"?" }}
+          </div>
+          <div>
+            <h5 class="fw-bold mb-1 text-navy">{{ target_user.full_name }}</h5>
+            <div class="small text-muted">{{ target_user.get_title_display }}</div>
+            {% if target_user.manager %}
+              <div class="small text-muted">
+                <i class="bi bi-person-check me-1"></i>المسؤول المباشر: <strong>{{ target_user.manager.full_name }}</strong>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="p-3 bg-light rounded-3 border d-flex align-items-center justify-content-between">
+          <div>
+            <div class="small text-muted fw-bold">إجمالي الصلاحيات الممنوحة:</div>
+            <div class="fs-4 fw-bold text-navy" id="live-granted-count">0 / 58</div>
+          </div>
+          <div id="granted-status-badge">
+            <span class="badge bg-secondary p-2">لا توجد صلاحيات</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🌟 THE MASTER CHECKBOX (منح الكل دفعة واحدة) & Quick Presets -->
+    <div class="col-12 col-lg-7">
+      <div class="uc-card h-100 shadow-sm p-4 border-2 border-primary border-opacity-25 bg-gold-pale">
+        
+        <!-- MASTER CHECKBOX -->
+        <div class="p-3 bg-white rounded-3 border border-2 border-gold shadow-sm mb-3">
+          <div class="form-check form-switch fs-5 d-flex align-items-center justify-content-between m-0">
+            <label class="form-check-label fw-bold text-navy cursor-pointer" for="master-select-all" style="cursor: pointer;">
+              منح كافة صلاحيات النظام دفعة واحدة (شامل - 57 صلاحية)
+            </label>
+            <input class="form-check-input" type="checkbox" id="master-select-all" style="cursor: pointer; width: 2.8em; height: 1.4em;">
+          </div>
+          <div class="small text-muted mt-1 pe-1">
+            تفعيل هذا الخيار يقوم فوراً بتحديد كافة صناديق الشاشات والأزرار بالأسفل دفعة واحدة للمستخدم.
+          </div>
+        </div>
+
+        <!-- Role Presets (قوالب جاهزة بنقرة زر) -->
+        <div>
+          <div class="small fw-bold text-navy mb-2">تطبيق قالب دور قياسي سريع (اختياري):</div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary preset-btn" data-preset="council_member">عضو مجلس (عرض + تصويت + مداخلات)</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary preset-btn" data-preset="secretary">الأمين العام / المقرر</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary preset-btn" data-preset="director">مدير الإدارة المساعدة</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary preset-btn" data-preset="data_entry">مدخل بيانات ومذكرات</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary preset-btn" data-preset="scanner_staff">موظف الإسكانر والمرفقات</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="clear-all-btn">تفريغ الكل (صفر صلاحيات)</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Detailed Permission Matrix Groups -->
+  <div class="row g-4 mb-4">
+    {% for group in permission_groups %}
+      <div class="col-12 col-md-6 col-xl-6">
+        <div class="uc-card h-100 shadow-sm border">
+          <!-- Group Header with Group-Select-All -->
+          <div class="uc-card-header d-flex justify-content-between align-items-center py-2 px-3">
+            <span class="fw-bold fs-6">
+              <i class="bi {{ group.icon }} me-2 text-gold"></i>{{ group.title }}
+            </span>
+            <div class="form-check form-check-inline m-0">
+              <input class="form-check-input group-select-all" type="checkbox" id="group-all-{{ group.id }}" data-group="{{ group.id }}" title="تحديد/إلغاء كل عمليات هذه المجموعة">
+              <label class="form-check-label text-white small" for="group-all-{{ group.id }}">الكل</label>
+            </div>
+          </div>
+
+          <!-- Group Operations Checkboxes -->
+          <div class="uc-card-body p-3">
+            <div class="d-flex flex-column gap-3">
+              {% for field_name, field_title, field_help in group.fields %}
+                <div class="p-2 px-3 rounded-3 bg-light border hover-shadow transition-all">
+                  <div class="form-check form-switch fs-5 d-flex align-items-center justify-content-between m-0">
+                    <div>
+                      <label class="form-check-label fw-bold text-navy fs-6" for="id_{{ field_name }}" style="cursor: pointer;">
+                        {{ field_title }}
+                      </label>
+                      <div class="text-muted small" style="font-size: 0.78rem;">
+                        {{ field_help }}
+                      </div>
+                    </div>
+                    <input class="form-check-input perm-checkbox group-{{ group.id }}" type="checkbox" name="{{ field_name }}" id="id_{{ field_name }}" style="cursor: pointer; width: 2.4em; height: 1.25em;">
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- Notes & Save Bar -->
+  <div class="uc-card shadow-sm p-4 mb-4">
+    <div class="mb-3">
+      <label for="{{ form.notes.id_for_label }}" class="form-label fw-bold text-navy">
+        <i class="bi bi-chat-left-text me-1 text-gold"></i>ملاحظات التخويل الإداري (اختياري):
+      </label>
+      {{ form.notes }}
+      <small class="text-muted">مستند التخويل، رقم القرار الإداري، أو توجيهات المسؤول المخوّل.</small>
+    </div>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center pt-3 border-top gap-3">
+      <div class="small text-muted">
+        {% if permission_obj.granted_by %}
+          آخر تخويل بواسطة: <strong>{{ permission_obj.granted_by.full_name }}</strong> بتاريخ {{ permission_obj.granted_at|date:"Y-m-d H:i" }}
+        {% else %}
+          لم يتم تخويل هذا المستخدم مسبقاً (صلاحيات صفر حالياً).
+        {% endif %}
+      </div>
+      
+      <div class="d-flex gap-2">
+        <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm px-3">إلغاء</a>
+        <button type="submit" class="btn btn-navy btn-sm px-4 fw-bold">اعتماد وحفظ الصلاحيات</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const masterBox = document.getElementById('master-select-all');
+  const allCheckboxes = document.querySelectorAll('.perm-checkbox');
+  const liveCountEl = document.getElementById('live-granted-count');
+  const statusBadge = document.getElementById('granted-status-badge');
+  const totalCount = allCheckboxes.length;
+
+  // Direct boolean injection for guaranteed state accuracy across all 57 permissions
+  const activeFields = [
+    {% if permission_obj.can_view_sessions %}'can_view_sessions',{% endif %}
+    {% if permission_obj.can_view_draft_sessions %}'can_view_draft_sessions',{% endif %}
+    {% if permission_obj.can_add_session %}'can_add_session',{% endif %}
+    {% if permission_obj.can_edit_session %}'can_edit_session',{% endif %}
+    {% if permission_obj.can_delete_session %}'can_delete_session',{% endif %}
+    {% if permission_obj.can_view_attendance %}'can_view_attendance',{% endif %}
+    {% if permission_obj.can_manage_attendance %}'can_manage_attendance',{% endif %}
+    {% if permission_obj.can_export_minutes %}'can_export_minutes',{% endif %}
+    {% if permission_obj.can_verify_integrity %}'can_verify_integrity',{% endif %}
+    {% if permission_obj.can_view_topics %}'can_view_topics',{% endif %}
+    {% if permission_obj.can_add_topic %}'can_add_topic',{% endif %}
+    {% if permission_obj.can_edit_topic %}'can_edit_topic',{% endif %}
+    {% if permission_obj.can_delete_topic %}'can_delete_topic',{% endif %}
+    {% if permission_obj.can_change_topic_status %}'can_change_topic_status',{% endif %}
+    {% if permission_obj.can_import_topics %}'can_import_topics',{% endif %}
+    {% if permission_obj.can_add_table %}'can_add_table',{% endif %}
+    {% if permission_obj.can_edit_table %}'can_edit_table',{% endif %}
+    {% if permission_obj.can_delete_table %}'can_delete_table',{% endif %}
+    {% if permission_obj.can_view_attachments %}'can_view_attachments',{% endif %}
+    {% if permission_obj.can_upload_attachments %}'can_upload_attachments',{% endif %}
+    {% if permission_obj.can_delete_attachments %}'can_delete_attachments',{% endif %}
+    {% if permission_obj.can_listen_audio %}'can_listen_audio',{% endif %}
+    {% if permission_obj.can_record_audio %}'can_record_audio',{% endif %}
+    {% if permission_obj.can_delete_audio %}'can_delete_audio',{% endif %}
+    {% if permission_obj.can_vote %}'can_vote',{% endif %}
+    {% if permission_obj.can_view_vote_details %}'can_view_vote_details',{% endif %}
+    {% if permission_obj.can_draft_decision %}'can_draft_decision',{% endif %}
+    {% if permission_obj.can_delete_decision %}'can_delete_decision',{% endif %}
+    {% if permission_obj.can_upload_signed_decision %}'can_upload_signed_decision',{% endif %}
+    {% if permission_obj.can_send_decisions %}'can_send_decisions',{% endif %}
+    {% if permission_obj.can_view_correspondence %}'can_view_correspondence',{% endif %}
+    {% if permission_obj.can_view_dispatch_log %}'can_view_dispatch_log',{% endif %}
+    {% if permission_obj.can_manage_users %}'can_manage_users',{% endif %}
+    {% if permission_obj.can_import_members %}'can_import_members',{% endif %}
+    {% if permission_obj.can_grant_permissions %}'can_grant_permissions',{% endif %}
+    {% if permission_obj.can_manage_delegates %}'can_manage_delegates',{% endif %}
+    {% if permission_obj.can_change_password %}'can_change_password',{% endif %}
+    {% if permission_obj.can_advance_session_stage %}'can_advance_session_stage',{% endif %}
+    {% if permission_obj.can_reopen_frozen_session %}'can_reopen_frozen_session',{% endif %}
+    {% if permission_obj.can_approve_new_session %}'can_approve_new_session',{% endif %}
+    {% if permission_obj.can_view_live_session %}'can_view_live_session',{% endif %}
+    {% if permission_obj.can_start_session_live %}'can_start_session_live',{% endif %}
+    {% if permission_obj.can_set_topic_timer %}'can_set_topic_timer',{% endif %}
+    {% if permission_obj.can_manage_speak_requests %}'can_manage_speak_requests',{% endif %}
+    {% if permission_obj.can_request_speak %}'can_request_speak',{% endif %}
+    {% if permission_obj.can_control_recording %}'can_control_recording',{% endif %}
+    {% if permission_obj.can_request_exit_permit %}'can_request_exit_permit',{% endif %}
+    {% if permission_obj.can_approve_exit_permit %}'can_approve_exit_permit',{% endif %}
+    {% if permission_obj.can_view_projector %}'can_view_projector',{% endif %}
+    {% if permission_obj.can_view_analytics %}'can_view_analytics',{% endif %}
+    {% if permission_obj.can_search_minutes %}'can_search_minutes',{% endif %}
+    {% if permission_obj.can_search_person %}'can_search_person',{% endif %}
+    {% if permission_obj.can_view_notifications %}'can_view_notifications',{% endif %}
+    {% if permission_obj.can_view_notification_log %}'can_view_notification_log',{% endif %}
+    {% if permission_obj.can_manage_sms_template %}'can_manage_sms_template',{% endif %}
+    {% if permission_obj.can_use_smart_reader %}'can_use_smart_reader',{% endif %}
+    {% if permission_obj.can_manage_smart_reader %}'can_manage_smart_reader',{% endif %}
+    {% if permission_obj.can_view_audit_log %}'can_view_audit_log',{% endif %}
+  ];
+
+  activeFields.forEach(f => {
+    const el = document.getElementById('id_' + f);
+    if (el) el.checked = true;
+  });
+
+  function updateCounters() {
+    let checkedCount = 0;
+    allCheckboxes.forEach(cb => {
+      if (cb.checked) checkedCount++;
+    });
+
+    liveCountEl.textContent = `${checkedCount} / ${totalCount}`;
+
+    if (checkedCount === 0) {
+      statusBadge.innerHTML = '<span class="badge bg-secondary p-2">لا توجد صلاحيات</span>';
+      masterBox.checked = false;
+      masterBox.indeterminate = false;
+    } else if (checkedCount === totalCount) {
+      statusBadge.innerHTML = '<span class="badge bg-success p-2">كافة الصلاحيات ممنوحة (شامل)</span>';
+      masterBox.checked = true;
+      masterBox.indeterminate = false;
+    } else {
+      statusBadge.innerHTML = `<span class="badge bg-primary p-2">مخصصة (${checkedCount})</span>`;
+      masterBox.checked = false;
+      masterBox.indeterminate = true;
+    }
+
+    // Update group checkboxes state
+    document.querySelectorAll('.group-select-all').forEach(groupCb => {
+      const gId = groupCb.dataset.group;
+      const groupBoxes = document.querySelectorAll(`.group-${gId}`);
+      const gChecked = Array.from(groupBoxes).filter(b => b.checked).length;
+      if (gChecked === groupBoxes.length && groupBoxes.length > 0) {
+        groupCb.checked = true;
+        groupCb.indeterminate = false;
+      } else if (gChecked === 0) {
+        groupCb.checked = false;
+        groupCb.indeterminate = false;
+      } else {
+        groupCb.checked = false;
+        groupCb.indeterminate = true;
+      }
+    });
+  }
+
+  // Master Checkbox handler
+  masterBox.addEventListener('change', () => {
+    const isChecked = masterBox.checked;
+    allCheckboxes.forEach(cb => {
+      cb.checked = isChecked;
+    });
+    updateCounters();
+  });
+
+  // Group Select All handlers
+  document.querySelectorAll('.group-select-all').forEach(groupCb => {
+    groupCb.addEventListener('change', () => {
+      const gId = groupCb.dataset.group;
+      document.querySelectorAll(`.group-${gId}`).forEach(cb => {
+        cb.checked = groupCb.checked;
+      });
+      updateCounters();
+    });
+  });
+
+  // Individual checkbox handler
+  allCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateCounters);
+  });
+
+  // Clear All Button
+  document.getElementById('clear-all-btn').addEventListener('click', () => {
+    allCheckboxes.forEach(cb => cb.checked = false);
+    updateCounters();
+  });
+
+  // Presets Mapping
+  const presets = {
+    council_member: [
+      'can_view_sessions', 'can_view_topics', 'can_view_attendance',
+      'can_view_attachments', 'can_listen_audio', 'can_view_live_session',
+      'can_vote', 'can_view_vote_details', 'can_request_speak',
+      'can_request_exit_permit', 'can_view_correspondence',
+      'can_view_notifications', 'can_use_smart_reader', 'can_change_password'
+    ],
+    secretary: [
+      'can_view_sessions', 'can_view_draft_sessions', 'can_view_topics',
+      'can_view_attendance', 'can_manage_attendance', 'can_export_minutes',
+      'can_verify_integrity', 'can_view_attachments', 'can_listen_audio',
+      'can_vote', 'can_view_vote_details', 'can_draft_decision', 'can_delete_decision',
+      'can_upload_signed_decision', 'can_send_decisions', 'can_view_correspondence',
+      'can_view_dispatch_log', 'can_add_table', 'can_edit_table',
+      'can_advance_session_stage', 'can_view_live_session', 'can_start_session_live',
+      'can_set_topic_timer', 'can_manage_speak_requests', 'can_control_recording',
+      'can_approve_exit_permit', 'can_view_projector', 'can_view_analytics',
+      'can_search_minutes', 'can_search_person', 'can_view_notifications',
+      'can_view_notification_log', 'can_use_smart_reader', 'can_view_audit_log',
+      'can_change_password'
+    ],
+    director: [
+      'can_view_sessions', 'can_view_draft_sessions', 'can_add_session', 'can_edit_session',
+      'can_view_attendance', 'can_manage_attendance', 'can_export_minutes', 'can_verify_integrity',
+      'can_view_topics', 'can_add_topic', 'can_edit_topic', 'can_change_topic_status', 'can_import_topics',
+      'can_add_table', 'can_edit_table', 'can_delete_table',
+      'can_view_attachments', 'can_upload_attachments',
+      'can_listen_audio', 'can_record_audio', 'can_control_recording',
+      'can_upload_signed_decision', 'can_send_decisions', 'can_view_correspondence', 'can_view_dispatch_log',
+      'can_manage_users', 'can_import_members', 'can_grant_permissions', 'can_manage_delegates',
+      'can_advance_session_stage', 'can_view_live_session', 'can_view_projector', 'can_view_analytics',
+      'can_search_minutes', 'can_search_person', 'can_view_notifications',
+      'can_view_notification_log', 'can_use_smart_reader', 'can_view_audit_log', 'can_change_password'
+    ],
+    data_entry: [
+      'can_view_sessions', 'can_view_draft_sessions', 'can_view_topics',
+      'can_add_topic', 'can_edit_topic', 'can_import_topics',
+      'can_add_table', 'can_edit_table',
+      'can_manage_users', 'can_import_members', 'can_change_password'
+    ],
+    scanner_staff: [
+      'can_view_sessions', 'can_view_draft_sessions', 'can_view_topics',
+      'can_view_attachments', 'can_upload_attachments', 'can_delete_attachments',
+      'can_change_password'
+    ],
+  };
+
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pKey = btn.dataset.preset;
+      const targetFields = presets[pKey] || [];
+      allCheckboxes.forEach(cb => cb.checked = false);
+      targetFields.forEach(f => {
+        const el = document.getElementById('id_' + f);
+        if (el) el.checked = true;
+      });
+      updateCounters();
+    });
+  });
+
+  updateCounters();
+});
+</script>
+{% endblock %}

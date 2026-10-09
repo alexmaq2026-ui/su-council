@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header" style="background: linear-gradient(135deg, #1B365D 0%, #25497B 100%); padding: 1.5rem 0; color: white;">
+  <div class="container-fluid px-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div>
+      <h2 class="fw-bold mb-1 text-white">{{ page_title }}</h2>
+      <div class="small text-white-50">{{ session.title|default:"جلسة مجلس الجامعة" }} · تاريخ الانعقاد: {{ session.date }}</div>
+    </div>
+    <div>
+      <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-light btn-sm px-3">
+        العودة للجلسة
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-xl-11">
+      
+      <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        
+        <!-- Card Header with Action Buttons -->
+        <div class="card-header bg-white p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <h5 class="fw-bold text-navy mb-0" style="color: #1B365D;">كشف رصد حضور وغياب أعضاء المجلس والممثلين</h5>
+            <small class="text-muted">التمييز بين الحضور الأصيل والإنابة وتوثيق الحالات بالألوان الخمسة المعتمدة.</small>
+          </div>
+          
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="setAllAttendance('present_primary')">
+              تحديد الكل (أصيل)
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setAllAttendance('unrecorded')">
+              تحديد الكل (لم يُرصد)
+            </button>
+          </div>
+        </div>
+
+        <div class="card-body p-0">
+          <form method="post" id="attendance-form">
+            {% csrf_token %}
+            
+            <div class="table-responsive">
+              <table class="table table-hover table-striped mb-0 align-middle">
+                <thead class="table-dark" style="background: #1B365D;">
+                  <tr>
+                    <th style="width: 45px;" class="text-center">#</th>
+                    <th style="min-width: 180px;">اسم العضو / رئيس الجهة</th>
+                    <th style="min-width: 200px;">الجهة والمقعد بالمجلس</th>
+                    <th style="min-width: 380px;">حالة الحضور والتمثيل</th>
+                    <th style="min-width: 180px;">بيانات النائب (في حال الإنابة)</th>
+                    <th style="min-width: 180px;">ملاحظات / عذر</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in member_attendance %}
+                    <tr>
+                      <td class="text-center fw-bold text-muted">{{ forloop.counter }}</td>
+                      
+                      <!-- Member Name -->
+                      <td>
+                        <div class="fw-bold text-navy" style="color: #1B365D;">{{ item.member.full_name }}</div>
+                        <small class="text-muted" style="font-size: 0.76rem;">{{ item.member.official_title|default:item.member.get_title_display }}</small>
+                      </td>
+
+                      <!-- Entity Seat -->
+                      <td>
+                        {% if item.seat %}
+                          <span class="badge bg-light text-dark border fw-bold">{{ item.seat.name }}</span>
+                          <div class="text-muted" style="font-size: 0.72rem;">مقعد {{ item.seat.order }} – {{ item.seat.get_seat_type_display }}</div>
+                        {% else %}
+                          <span class="text-muted small">{{ item.member.department|default:"عضو مجلس" }}</span>
+                        {% endif %}
+                      </td>
+
+                      <!-- 5 Attendance Statuses -->
+                      <td>
+                        <div class="btn-group w-100" role="group">
+                          <!-- 1. Present Primary (أصيل) -->
+                          <input type="radio" class="btn-check attendance-radio" name="status_{{ item.member.pk }}" id="primary_{{ item.member.pk }}" value="present_primary" {% if item.status == 'present_primary' or item.status == 'present' and not item.is_proxy %}checked{% endif %} onchange="toggleProxyInput({{ item.member.pk }})">
+                          <label class="btn btn-sm btn-outline-success" for="primary_{{ item.member.pk }}" title="حضر شخصياً">حاضر (أصيل)</label>
+
+                          <!-- 2. Present Deputy (إنابة) -->
+                          <input type="radio" class="btn-check attendance-radio" name="status_{{ item.member.pk }}" id="deputy_{{ item.member.pk }}" value="present_deputy" {% if item.status == 'present_deputy' or item.is_proxy %}checked{% endif %} onchange="toggleProxyInput({{ item.member.pk }})">
+                          <label class="btn btn-sm btn-outline-warning text-dark" for="deputy_{{ item.member.pk }}" title="حضر نائب عنه">حاضر (إنابة)</label>
+
+                          <!-- 3. Excused (بعذر) -->
+                          <input type="radio" class="btn-check attendance-radio" name="status_{{ item.member.pk }}" id="excused_{{ item.member.pk }}" value="excused" {% if item.status == 'excused' %}checked{% endif %} onchange="toggleProxyInput({{ item.member.pk }})">
+                          <label class="btn btn-sm btn-outline-warning" for="excused_{{ item.member.pk }}" title="اعتذار رسمي">بعذر</label>
+
+                          <!-- 4. Unexcused (بدون عذر) -->
+                          <input type="radio" class="btn-check attendance-radio" name="status_{{ item.member.pk }}" id="unexcused_{{ item.member.pk }}" value="unexcused" {% if item.status == 'unexcused' or item.status == 'absent' %}checked{% endif %} onchange="toggleProxyInput({{ item.member.pk }})">
+                          <label class="btn btn-sm btn-outline-danger" for="unexcused_{{ item.member.pk }}" title="غياب غير مبرر">بدون عذر</label>
+
+                          <!-- 5. Unrecorded (لم يرصد) -->
+                          <input type="radio" class="btn-check attendance-radio" name="status_{{ item.member.pk }}" id="unrec_{{ item.member.pk }}" value="unrecorded" {% if item.status == 'unrecorded' %}checked{% endif %} onchange="toggleProxyInput({{ item.member.pk }})">
+                          <label class="btn btn-sm btn-outline-secondary" for="unrec_{{ item.member.pk }}" title="لم يُرصد بعد">لم يُرصد</label>
+                        </div>
+                      </td>
+
+                      <!-- Proxy Details -->
+                      <td>
+                        <div id="proxy_box_{{ item.member.pk }}">
+                          <input type="text" name="proxy_name_{{ item.member.pk }}" value="{{ item.proxy_name }}" class="form-control form-control-sm" placeholder="اسم الممثل بالإنابة..." {% if item.status != 'present_deputy' and not item.is_proxy %}style="opacity: 0.6;"{% endif %}>
+                        </div>
+                      </td>
+
+                      <!-- Notes -->
+                      <td>
+                        <input type="text" name="notes_{{ item.member.pk }}" value="{{ item.notes }}" class="form-control form-control-sm" placeholder="ملاحظة اختيارية...">
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Footer Save Buttons -->
+            <div class="p-3 bg-light d-flex justify-content-between align-items-center border-top">
+              <span class="text-muted small">إجمالي أعضاء المجلس: {{ member_attendance|length }} عضواً</span>
+              <div class="d-flex gap-2">
+                <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-secondary px-3">إلغاء</a>
+                <button type="submit" class="btn btn-navy px-4 text-white" style="background: #1B365D;">
+                  حفظ وتأكيد كشف الحضور
+                </button>
+              </div>
+            </div>
+
+          </form>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+function setAllAttendance(status) {
+  document.querySelectorAll(`.attendance-radio[value="${status}"]`).forEach(radio => {
+    radio.checked = true;
+    const memberId = radio.id.split('_')[1];
+    toggleProxyInput(memberId);
+  });
+}
+
+function toggleProxyInput(memberId) {
+  const deputyRadio = document.getElementById(`deputy_${memberId}`);
+  const proxyInput = document.querySelector(`input[name="proxy_name_${memberId}"]`);
+  if (!proxyInput) return;
+
+  if (deputyRadio && deputyRadio.checked) {
+    proxyInput.style.opacity = '1';
+    proxyInput.focus();
+  } else {
+    proxyInput.style.opacity = '0.6';
+  }
+}
+</script>
+{% endblock %}

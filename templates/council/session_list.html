@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+
+{% block title %}الجلسات – مجلس الجامعة{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-calendar3 text-gold me-2"></i>جلسات مجلس الجامعة
+      </h1>
+      <div class="page-subtitle">استعراض ومتابعة جلسات ومحاضر المجلس ومراحل دورة حياتها</div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if user.can_add_session %}
+        <a href="{% url 'council:session_create' %}" class="btn btn-gold btn-sm fw-bold">
+          + جلسة جديدة
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- لوحة مراجعة طلبات فتح الجلسات الجديدة (لأصحاب صلاحية الموافقة) -->
+{% if can_approve and pending_requests %}
+  <div class="card mb-4 border-0 shadow-sm rounded-4 overflow-hidden">
+    <div class="card-header bg-warning bg-opacity-10 border-bottom border-warning d-flex align-items-center justify-content-between p-3">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-exclamation-circle-fill text-warning me-2"></i>طلبات فتح جلسة جديدة بانتظار موافقتك ({{ pending_requests.count }})
+      </h6>
+      <span class="badge bg-warning text-dark">يتطلب قرارك</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="list-group list-group-flush">
+        {% for req in pending_requests %}
+          <div class="list-group-item p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <div class="fw-bold">{{ req.requested_by.full_name }} ({{ req.requested_by.display_title }})</div>
+              <div class="text-muted small">
+                بشأن الجلسة السابقة رقم <strong>{{ req.previous_session.session_number }}</strong> · تاريخ الطلب: {{ req.created_at|date:"Y-m-d H:i" }}
+              </div>
+              <div class="mt-1 small bg-light p-2 rounded-2 text-dark border">
+                <strong>السبب والمبرر:</strong> {{ req.reason }}
+              </div>
+            </div>
+            <form method="post" action="{% url 'council:new_session_request_review' pk=req.pk %}" class="d-flex gap-2">
+              {% csrf_token %}
+              <button type="submit" name="decision" value="approve" class="btn btn-sm btn-success fw-bold px-3">
+                موافقة
+              </button>
+              <button type="submit" name="decision" value="reject" class="btn btn-sm btn-outline-danger px-3">
+                رفض
+              </button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<!-- تنبيه حالة طلبات فتح الجلسة الخاصة بالمستخدم -->
+{% if my_requests %}
+  {% for mr in my_requests %}
+    {% if mr.status == 'approved' and not mr.used %}
+      <div class="alert alert-success d-flex justify-content-between align-items-center mb-4 rounded-4 shadow-sm p-3">
+        <div>
+          <strong>تمت الموافقة على طلبك لفتح جلسة جديدة!</strong>
+          <span class="small text-muted d-block">بواسطة: {{ mr.reviewed_by.full_name|default:"رئيس الجامعة" }}</span>
+        </div>
+        <a href="{% url 'council:session_create' %}" class="btn btn-success btn-sm fw-bold">
+          إنشاء الجلسة الآن
+        </a>
+      </div>
+    {% elif mr.status == 'pending' %}
+      <div class="alert alert-info d-flex align-items-center gap-2 mb-4 rounded-4 shadow-sm p-3">
+        <i class="bi bi-hourglass-split fs-4 text-info"></i>
+        <div>
+          <strong>طلبك لفتح جلسة جديدة قيد المراجعة لدى رئيس الجامعة.</strong>
+          <span class="small text-muted d-block">قُدِّم بتاريخ {{ mr.created_at|date:"Y-m-d H:i" }}</span>
+        </div>
+      </div>
+    {% elif mr.status == 'rejected' %}
+      <div class="alert alert-danger d-flex align-items-center gap-2 mb-4 rounded-4 shadow-sm p-3">
+        <i class="bi bi-x-circle fs-4 text-danger"></i>
+        <div>
+          <strong>تم الاعتذار عن فتح جلسة جديدة في الوقت الحالي.</strong>
+          {% if mr.review_notes %}<span class="small d-block text-danger">الملاحظة: {{ mr.review_notes }}</span>{% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+<!-- Filters Bar -->
+<div class="uc-card shadow-sm mb-4">
+  <div class="uc-card-body p-3">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-12 col-md-5">
+        <div class="input-group">
+          <span class="input-group-text bg-light text-navy"><i class="bi bi-funnel-fill"></i></span>
+          <select name="status" class="form-select" onchange="this.form.submit()">
+            <option value="">جميع مراحل وحالات الجلسات</option>
+            {% for code, label in status_choices %}
+              <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="input-group">
+          <span class="input-group-text bg-light text-navy"><i class="bi bi-calendar-range"></i></span>
+          <select name="year" class="form-select" onchange="this.form.submit()">
+            <option value="">جميع السنوات الأكاديمية</option>
+            {% for y in all_years %}
+              <option value="{{ y }}" {% if year_filter == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="col-12 col-md-3 text-md-end">
+        {% if status_filter or year_filter %}
+          <a href="{% url 'council:session_list' %}" class="btn btn-outline-secondary btn-sm">
+            إلغاء التصفية
+          </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Sessions Grid -->
+{% if page_obj.object_list %}
+  <div class="row g-4">
+    {% for s in page_obj.object_list %}
+      <div class="col-12 col-md-6 col-lg-6">
+        <div class="session-card h-100 d-flex flex-column shadow-sm rounded-4 overflow-hidden border">
+          <div class="session-card-header p-3 bg-navy text-white d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              <span class="session-number-badge">الجلسة رقم {{ s.session_number }}</span>
+              <span class="badge bg-{{ s.get_status_color }}">{{ s.get_status_icon }} {{ s.get_status_display }}</span>
+            </div>
+            <div class="text-white text-opacity-75 small">
+              <i class="bi bi-calendar-event me-1"></i>{{ s.date }}
+            </div>
+          </div>
+          
+          <div class="session-card-body p-3 flex-grow-1 d-flex flex-column justify-content-between bg-white">
+            <div>
+              <h5 class="fw-bold mb-2">
+                <a href="{% url 'council:session_detail' pk=s.pk %}" class="text-navy text-decoration-none">
+                  {{ s.title|default:"جلسة مجلس الجامعة" }}
+                </a>
+              </h5>
+              <div class="text-muted small mb-3">
+                {% if s.location %}<i class="bi bi-geo-alt me-1 text-gold"></i>{{ s.location }} · {% endif %}
+                {% if s.academic_year %}<i class="bi bi-mortarboard me-1 text-gold"></i>العام: {{ s.academic_year }}{% endif %}
+              </div>
+
+              <!-- Quick stats -->
+              <div class="row g-2 mb-3 text-center">
+                <div class="col-4">
+                  <div class="p-2 bg-light rounded-3">
+                    <div class="fw-bold fs-5 text-navy">{{ s.topics.count }}</div>
+                    <div class="small text-muted">موضوع</div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="p-2 bg-light rounded-3">
+                    <div class="fw-bold fs-5 text-success">{{ s.get_stats.voted }}</div>
+                    <div class="small text-muted">تم التصويت</div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="p-2 bg-light rounded-3">
+                    <div class="fw-bold fs-5 text-warning">{{ s.get_stats.pending }}</div>
+                    <div class="small text-muted">في الانتظار</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer actions -->
+            <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-auto">
+              <div class="d-flex gap-1">
+                {% if user.can_export_minutes %}
+                  <a href="{% url 'council:session_export' pk=s.pk %}" class="btn btn-sm btn-outline-primary" title="تصدير إلى Word">
+                    تصدير Word
+                  </a>
+                {% endif %}
+                {% if user.can_manage_attendance %}
+                  <a href="{% url 'council:session_attendance' pk=s.pk %}" class="btn btn-sm btn-outline-secondary" title="كشف الحضور">
+                    الحضور
+                  </a>
+                {% endif %}
+              </div>
+              <a href="{% url 'council:session_detail' pk=s.pk %}" class="btn btn-sm btn-navy">
+                تفاصيل الجلسة ←
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+    <nav class="mt-4 d-flex justify-content-center">
+      <ul class="pagination">
+        {% if page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}">السابق</a>
+          </li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+          <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+            <a class="page-link" href="?page={{ num }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}">{{ num }}</a>
+          </li>
+        {% endfor %}
+        {% if page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if year_filter %}&year={{ year_filter }}{% endif %}">التالي</a>
+          </li>
+        {% endif %}
+      </ul>
+    </nav>
+  {% endif %}
+
+{% else %}
+  <div class="empty-state p-5 bg-white rounded-4 border text-center">
+    <i class="bi bi-calendar-x display-3 text-muted mb-3"></i>
+    <h4 class="fw-bold">لا توجد جلسات مطابقة</h4>
+    <p class="text-muted">لم يتم العثور على أي جلسات وفق معايير التصفية المحددة.</p>
+    {% if user.can_add_session %}
+      <a href="{% url 'council:session_create' %}" class="btn btn-navy mt-2">
+        + إنشاء أول جلسة
+      </a>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

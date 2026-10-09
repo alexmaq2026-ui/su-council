@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block title %}صلاحيات {{ target_user.full_name }} – مجلس الجامعة{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div class="container-fluid px-3 px-md-4">
+    <div class="d-flex align-items-center gap-3">
+      <div class="page-header-icon">
+        <i class="bi bi-key"></i>
+      </div>
+      <div>
+        <h1 class="page-title mb-0">إدارة صلاحيات: {{ target_user.full_name }}</h1>
+        <small class="text-muted">
+          <a href="{% url 'user-list' %}" class="text-muted text-decoration-none">
+            <i class="bi bi-people me-1"></i>المستخدمون
+          </a>
+          <i class="bi bi-chevron-left mx-1" style="font-size:0.7rem;"></i>
+          الصلاحيات
+        </small>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- ── User Info Card ── -->
+  <div class="col-12">
+    <div class="uc-card border-start border-4 border-navy">
+      <div class="uc-card-body">
+        <div class="d-flex align-items-center gap-4 flex-wrap">
+          <!-- Avatar -->
+          <div class="user-avatar-xl flex-shrink-0">
+            {{ target_user.avatar_initials|default:"?" }}
+          </div>
+          <!-- Info -->
+          <div class="flex-grow-1">
+            <h4 class="fw-bold mb-1">{{ target_user.full_name }}</h4>
+            <div class="text-muted mb-1">
+              <i class="bi bi-briefcase me-1"></i>{{ target_user.get_title_display }}
+            </div>
+            {% if target_user.email %}
+            <div class="text-muted small">
+              <i class="bi bi-envelope me-1"></i>{{ target_user.email }}
+            </div>
+            {% endif %}
+          </div>
+          <!-- Status badge -->
+          <div>
+            {% if target_user.is_active %}
+              <span class="badge uc-badge-active fs-6">
+                <i class="bi bi-circle-fill me-1" style="font-size:0.4rem;"></i>نشط
+              </span>
+            {% else %}
+              <span class="badge uc-badge-closed fs-6">معطّل</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Permissions Form ── -->
+  <div class="col-12 col-lg-8">
+    <div class="uc-card">
+      <div class="uc-card-header">
+        <i class="bi bi-shield-shaded me-2"></i>
+        الصلاحيات المتاحة
+      </div>
+      <div class="uc-card-body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <!-- ── Permission Toggles ── -->
+          <div class="row g-3 mb-4">
+
+            <!-- can_add -->
+            <div class="col-12 col-sm-6">
+              <div class="perm-toggle-card {% if form.can_add.value %}active{% endif %}" id="card-can_add">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="perm-icon perm-icon-add">
+                      <i class="bi bi-plus-lg"></i>
+                    </div>
+                    <div>
+                      <div class="fw-semibold">إضافة</div>
+                      <small class="text-muted">إنشاء جلسات ومواضيع</small>
+                    </div>
+                  </div>
+                  <div class="form-check form-switch mb-0">
+                    <input
+                      type="checkbox"
+                      name="{{ form.can_add.html_name }}"
+                      id="{{ form.can_add.id_for_label }}"
+                      class="form-check-input perm-switch"
+                      role="switch"
+                      {% if form.can_add.value %}checked{% endif %}
+                      onchange="toggleCard(this, 'card-can_add')"
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- can_edit -->
+            <div class="col-12 col-sm-6">
+              <div class="perm-toggle-card {% if form.can_edit.value %}active{% endif %}" id="card-can_edit">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="perm-icon perm-icon-edit">
+                      <i class="bi bi-pencil"></i>
+                    </div>
+                    <div>
+                      <div class="fw-semibold">تعديل</div>
+                      <small class="text-muted">تعديل البيانات والجلسات</small>
+                    </div>
+                  </div>
+                  <div class="form-check form-switch mb-0">
+                    <input
+                      type="checkbox"
+                      name="{{ form.can_edit.html_name }}"
+                      id="{{ form.can_edit.id_for_label }}"
+                      class="form-check-input perm-switch"
+                      role="switch"
+                      {% if form.can_edit.value %}checked{% endif %}
+                      onchange="toggleCard(this, 'card-can_edit')"
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- can_delete -->
+            <div class="col-12 col-sm-6">
+              <div class="perm-toggle-card {% if form.can_delete.value %}active{% endif %}" id="card-can_delete">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="perm-icon perm-icon-delete">
+                      <i class="bi bi-trash"></i>
+                    </div>
+                    <div>
+                      <div class="fw-semibold">حذف</div>
+                      <small class="text-muted">حذف السجلات والملفات</small>
+                    </div>
+                  </div>
+                  <div class="form-check form-switch mb-0">
+                    <input
+                      type="checkbox"
+                      name="{{ form.can_delete.html_name }}"
+                      id="{{ form.can_delete.id_for_label }}"
+                      class="form-check-input perm-switch"
+                      role="switch"
+                      {% if form.can_delete.value %}checked{% endif %}
+                      onchange="toggleCard(this, 'card-can_delete')"
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- can_vote -->
+            <div class="col-12 col-sm-6">
+              <div class="perm-toggle-card {% if form.can_vote.value %}active{% endif %}" id="card-can_vote">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="perm-icon perm-icon-vote">
+                      <i class="bi bi-check2-circle"></i>
+                    </div>
+                    <div>
+                      <div class="fw-semibold">تصويت</div>
+                      <small class="text-muted">التصويت على المواضيع</small>
+                    </div>
+                  </div>
+                  <div class="form-check form-switch mb-0">
+                    <input
+                      type="checkbox"
+                      name="{{ form.can_vote.html_name }}"
+                      id="{{ form.can_vote.id_for_label }}"
+                      class="form-check-input perm-switch"
+                      role="switch"
+                      {% if form.can_vote.value %}checked{% endif %}
+                      onchange="toggleCard(this, 'card-can_vote')"
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- can_draft_decision -->
+            <div class="col-12 col-sm-6">
+              <div class="perm-toggle-card {% if form.can_draft_decision.value %}active{% endif %}" id="card-can_draft">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="perm-icon perm-icon-draft">
+                      <i class="bi bi-file-text"></i>
+                    </div>
+                    <div>
+                      <div class="fw-semibold">صياغة القرارات</div>
+                      <small class="text-muted">كتابة وتعديل القرارات</small>
+                    </div>
+                  </div>
+                  <div class="form-check form-switch mb-0">
+                    <input
+                      type="checkbox"
+                      name="{{ form.can_draft_decision.html_name }}"
+                      id="{{ form.can_draft_decision.id_for_label }}"
+                      class="form-check-input perm-switch"
+                      role="switch"
+                      {% if form.can_draft_decision.value %}checked{% endif %}
+                      onchange="toggleCard(this, 'card-can_draft')"
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- can_grant_permissions -->
+            <div class="col-12 col-sm-6">
+              <div class="perm-toggle-card {% if form.can_grant_permissions.value %}active{% endif %}" id="card-can_grant">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="perm-icon perm-icon-grant">
+                      <i class="bi bi-key"></i>
+                    </div>
+                    <div>
+                      <div class="fw-semibold">تخويل الصلاحيات</div>
+                      <small class="text-muted">إدارة صلاحيات المستخدمين</small>
+                    </div>
+                  </div>
+                  <div class="form-check form-switch mb-0">
+                    <input
+                      type="checkbox"
+                      name="{{ form.can_grant_permissions.html_name }}"
+                      id="{{ form.can_grant_permissions.id_for_label }}"
+                      class="form-check-input perm-switch"
+                      role="switch"
+                      {% if form.can_grant_permissions.value %}checked{% endif %}
+                      onchange="toggleCard(this, 'card-can_grant')"
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          <!-- /Permission Toggles -->
+
+          <!-- Notes -->
+          {% if form.notes %}
+          <div class="mb-4">
+            <label for="{{ form.notes.id_for_label }}" class="form-label fw-semibold">
+              <i class="bi bi-sticky me-1 text-warning"></i>ملاحظات
+            </label>
+            <textarea
+              name="{{ form.notes.html_name }}"
+              id="{{ form.notes.id_for_label }}"
+              class="form-control {% if form.notes.errors %}is-invalid{% endif %}"
+              rows="3"
+              placeholder="ملاحظات حول الصلاحيات الممنوحة..."
+            >{{ form.notes.value|default:'' }}</textarea>
+            {% if form.notes.errors %}
+              <div class="invalid-feedback">{{ form.notes.errors.0 }}</div>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          <!-- Actions -->
+          <div class="d-flex gap-2 justify-content-end pt-3 border-top">
+            <a href="{% url 'user-list' %}" class="btn btn-outline-secondary">
+              <i class="bi bi-x me-1"></i>إلغاء
+            </a>
+            <button type="submit" class="btn btn-navy">
+              <i class="bi bi-shield-check me-2"></i>حفظ الصلاحيات
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Permission Summary Sidebar ── -->
+  <div class="col-12 col-lg-4">
+    <div class="uc-card sticky-top" style="top:80px;">
+      <div class="uc-card-header">
+        <i class="bi bi-info-circle me-2"></i>
+        الصلاحيات الحالية
+      </div>
+      <div class="uc-card-body">
+        <div id="perm-summary">
+          <div class="perm-summary-item d-flex align-items-center gap-2 py-2 border-bottom" id="sum-can_add">
+            <i class="bi bi-circle{% if target_user.can_add %}-fill text-success{% else %} text-muted{% endif %}" id="icon-can_add"></i>
+            <span>إضافة</span>
+          </div>
+          <div class="perm-summary-item d-flex align-items-center gap-2 py-2 border-bottom" id="sum-can_edit">
+            <i class="bi bi-circle{% if target_user.can_edit %}-fill text-success{% else %} text-muted{% endif %}" id="icon-can_edit"></i>
+            <span>تعديل</span>
+          </div>
+          <div class="perm-summary-item d-flex align-items-center gap-2 py-2 border-bottom" id="sum-can_delete">
+            <i class="bi bi-circle{% if target_user.can_delete %}-fill text-success{% else %} text-muted{% endif %}" id="icon-can_delete"></i>
+            <span>حذف</span>
+          </div>
+          <div class="perm-summary-item d-flex align-items-center gap-2 py-2 border-bottom" id="sum-can_vote">
+            <i class="bi bi-circle{% if target_user.can_vote %}-fill text-success{% else %} text-muted{% endif %}" id="icon-can_vote"></i>
+            <span>تصويت</span>
+          </div>
+          <div class="perm-summary-item d-flex align-items-center gap-2 py-2 border-bottom" id="sum-can_draft">
+            <i class="bi bi-circle{% if target_user.can_draft_decision %}-fill text-success{% else %} text-muted{% endif %}" id="icon-can_draft"></i>
+            <span>صياغة القرارات</span>
+          </div>
+          <div class="perm-summary-item d-flex align-items-center gap-2 py-2" id="sum-can_grant">
+            <i class="bi bi-circle{% if target_user.can_grant_permissions %}-fill text-success{% else %} text-muted{% endif %}" id="icon-can_grant"></i>
+            <span>تخويل الصلاحيات</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Toggle card active state + update summary icon
+function toggleCard(checkbox, cardId) {
+  const card = document.getElementById(cardId);
+  if (card) card.classList.toggle('active', checkbox.checked);
+
+  // Map card id to icon id
+  const iconMap = {
+    'card-can_add':    'icon-can_add',
+    'card-can_edit':   'icon-can_edit',
+    'card-can_delete': 'icon-can_delete',
+    'card-can_vote':   'icon-can_vote',
+    'card-can_draft':  'icon-can_draft',
+    'card-can_grant':  'icon-can_grant',
+  };
+  const iconId = iconMap[cardId];
+  if (iconId) {
+    const icon = document.getElementById(iconId);
+    if (icon) {
+      if (checkbox.checked) {
+        icon.classList.add('bi-circle-fill', 'text-success');
+        icon.classList.remove('text-muted');
+        icon.classList.remove('bi-circle');
+      } else {
+        icon.classList.remove('bi-circle-fill', 'text-success');
+        icon.classList.add('text-muted', 'bi-circle');
+      }
+    }
+  }
+}
+</script>
+{% endblock %}

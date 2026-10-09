@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}حذف الموضوع: {{ topic.title|truncatechars:30 }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <h1 class="page-title text-danger">
+        <i class="bi bi-trash"></i>حذف موضوع من جدول الأعمال
+      </h1>
+      <div class="page-subtitle">{{ topic.session.title }} (الجلسة رقم {{ topic.session.session_number }})</div>
+    </div>
+    <div>
+      <a href="{% url 'council:topic_detail' pk=topic.pk %}" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-arrow-right me-1"></i>العودة للموضوع
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-6">
+    <div class="uc-card border-danger shadow-sm">
+      <div class="uc-card-header bg-danger text-white">
+        <h5><i class="bi bi-exclamation-triangle"></i>تأكيد حذف الموضوع</h5>
+      </div>
+      <div class="uc-card-body p-4 text-center">
+        <i class="bi bi-file-earmark-x display-3 text-danger mb-3 d-block"></i>
+        <h4 class="fw-bold mb-2">{{ topic.title }}</h4>
+        <p class="text-danger mb-4">
+          هل أنت متأكد من حذف هذا الموضوع؟ سيتم حذف جميع المرفقات والتسجيلات والتصويتات والقرار المرتبط به نهائياً.
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          <div class="d-flex justify-content-center gap-3">
+            <a href="{% url 'council:topic_detail' pk=topic.pk %}" class="btn btn-outline-secondary px-4">إلغاء</a>
+            <button type="submit" class="btn btn-danger px-4">
+              <i class="bi bi-trash me-1"></i>نعم، احذف الموضوع
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

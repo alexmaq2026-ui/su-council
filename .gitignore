@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Django & Local Data
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+*.sqlite3
+media/
+staticfiles/
+backups/
+جلسات مصدرة من النظام/
+ملفات مساعدة/
+
+# Local Documents & Scratch
+*.pdf
+*.docx
+ملاجظة*.txt
+file
+
+# Environment
+.env
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
+desktop.ini
+.DS_Store

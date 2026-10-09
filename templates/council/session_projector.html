@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>شاشة العرض بالقاعة – {{ session }} | مجلس جامعة صنعاء</title>
+  <!-- Bootstrap 5 RTL -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+  <style>
+    body {
+      background-color: #0d1b2a;
+      color: #ffffff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+    }
+    .header-bar {
+      background: #1b263b;
+      border-bottom: 2px solid #e0a96d;
+      padding: 12px 30px;
+    }
+    .badge-gold {
+      background-color: #e0a96d;
+      color: #0d1b2a;
+      font-weight: bold;
+    }
+    .main-card {
+      background: #1b263b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+    }
+    .speaker-card {
+      background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
+      border: 2px solid #f1c40f;
+    }
+    .timer-badge {
+      font-size: 2.2rem;
+      font-family: monospace;
+      letter-spacing: 2px;
+      color: #f1c40f;
+    }
+    .pulse-warning {
+      animation: pulseAnim 1.2s infinite;
+    }
+    @keyframes pulseAnim {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.02); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =========================================================================
+       شريط ترويسة شاشة القاعة
+       ========================================================================= -->
+  <header class="header-bar d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-3">
+      <div class="text-warning fw-bold fs-4">🏛️ جامعة صنعاء</div>
+      <div class="border-end pe-3 text-light">مجلس الجامعة – وقائع الجلسة المنعقدة</div>
+    </div>
+    <div class="d-flex align-items-center gap-4">
+      <div class="text-end">
+        <span class="d-block fw-bold fs-5 text-light">{{ session }}</span>
+        <small class="text-warning opacity-75">
+          {{ session.hijri_date|default:"" }} • {{ session.date|date:"Y-m-d" }}
+        </small>
+      </div>
+      <button type="button" id="proj-smart-reader-btn" class="btn btn-warning text-dark fw-bold btn-sm shadow-sm" style="display: {% if active_topic %}inline-block{% else %}none{% endif %};" onclick="openSmartReader({topicId: '{{ active_topic.id|default:0 }}'})">
+        🎙️ القراءة الذكية للموضوع
+      </button>
+      <div id="quorum-badge" class="badge {% if quorum_info.is_achieved %}bg-success{% else %}bg-danger pulse-warning{% endif %} fs-6 px-3 py-2">
+        {% if quorum_info.is_achieved %}
+          النصاب مكتمل ({{ quorum_info.present_count }}/{{ quorum_info.total_seats }})
+        {% else %}
+          ⚠️ النصاب غير مكتمل ({{ quorum_info.present_count }}/{{ quorum_info.total_seats }})
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       محتوى الشاشة الرئيسي
+       ========================================================================= -->
+  <div class="container-fluid px-4 py-4">
+
+    <!-- شريط المتحدث الحالي (يظهر عند الإذن لأحد الأعضاء) -->
+    <div id="projector-speaker-card" class="card speaker-card shadow mb-4" style="display: {% if active_speaker %}block{% else %}none{% endif %};">
+      <div class="card-body p-3 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-3">
+          <span class="fs-1">🎙️</span>
+          <div>
+            <span class="badge bg-warning text-dark fw-bold mb-1">المنصة • يتحدث الآن بإذن رئيس المجلس</span>
+            <h3 class="mb-0 fw-bold text-white" id="proj-speaker-name">{% if active_speaker %}{{ active_speaker.member.full_name }}{% endif %}</h3>
+            <span class="text-warning fs-6" id="proj-speaker-seat">{% if active_speaker %}{{ active_speaker.seat.name|default:active_speaker.member.department }}{% endif %}</span>
+          </div>
+        </div>
+        <div class="text-end">
+          <span class="text-warning fs-2 fw-bold font-monospace" id="proj-speaker-timer">00:00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- بطاقة الموضوع المعروض حالياً -->
+    <div class="card main-card shadow-lg p-4 mb-4">
+      <div class="d-flex justify-content-between align-items-start mb-3 border-bottom pb-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge badge-gold px-3 py-1 fs-6" id="proj-topic-category">{{ active_topic.get_category_display|default:"جدول الأعمال" }}</span>
+            <span class="badge bg-secondary px-3 py-1 fs-6" id="proj-topic-ordinal">{{ active_topic.ordinal_label|default:"" }}</span>
+            <span id="proj-topic-status-badge" class="badge {% if active_topic.display_state.display_status == 'voting' %}bg-success{% elif active_topic.display_state.display_status == 'shown' %}bg-info text-dark{% else %}bg-secondary{% endif %} fs-6 px-3 py-1">
+              {{ active_topic.display_state.get_display_status_display|default:"معروض للنقاش" }}
+            </span>
+          </div>
+          <h2 class="fw-bold mb-2 text-white" id="proj-topic-title">{{ active_topic.title|default:"بانتظار عرض الموضوع على المنصة" }}</h2>
+          <div class="text-warning opacity-75 fs-6" id="proj-topic-meta">
+            {% if active_topic.presenting_entity %}الجهة العارضة: {{ active_topic.presenting_entity }}{% endif %}
+            {% if active_topic.memo_number %} • مذكرة رقم: {{ active_topic.memo_number }}{% endif %}
+            {% if active_topic.memo_date %} بتاريخ: {{ active_topic.memo_date }}{% endif %}
+          </div>
+        </div>
+
+        <!-- المؤقت التنازلي التفاعلي -->
+        <div id="proj-timer-container" class="text-center bg-dark p-3 rounded border border-warning" style="min-width: 200px; display: {% if active_topic.display_state.timer_started_at and active_topic.display_state.get_remaining_seconds > 0 %}block{% else %}none{% endif %};">
+          <small class="text-muted d-block mb-1">المؤقت التنازلي للمناقشة</small>
+          <div id="proj-timer-digits" class="timer-badge">00:00</div>
+        </div>
+      </div>
+
+      <!-- حيثيات الموضوع والقرار -->
+      <div class="row g-4">
+        <div class="col-lg-8">
+          <h5 class="text-warning fw-bold mb-2">الحيثيات والخلفية الإدارية والقانونية:</h5>
+          <div class="p-3 rounded bg-dark bg-opacity-50 text-light fs-5 lh-lg mb-3" id="proj-topic-background" style="white-space: pre-line;">
+            {{ active_topic.background|default:"يتم استعراض الموضوع ومناقشته حالياً بين أعضاء المجلس." }}
+          </div>
+
+          <div id="proj-decision-box" class="p-3 rounded border border-success bg-success bg-opacity-25 text-white" style="display: {% if active_topic and active_topic.has_decision %}block{% else %}none{% endif %};">
+            <h6 class="text-warning fw-bold mb-1">⚖️ القرار المعتمد من المجلس:</h6>
+            <div id="proj-decision-text" class="fs-5 fw-bold" style="white-space: pre-line;">{% if active_topic and active_topic.has_decision %}{{ active_topic.decision.decision_text }}{% endif %}</div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <!-- نتائج التصويت الحية -->
+          <div id="proj-voting-results-card" class="card bg-dark bg-opacity-75 border-secondary p-3">
+            <h5 class="text-warning fw-bold mb-3 border-bottom pb-2">
+              🗳️ مؤشر التصويت الحي
+            </h5>
+            <div id="proj-voting-status-text" class="text-center py-2 mb-2">
+              {% if active_topic.display_state.display_status == 'voting' %}
+                <span class="badge bg-success fs-5 px-3 py-2 w-100">باب التصويت مفتوح الآن</span>
+              {% elif active_topic.display_state.display_status == 'closed' %}
+                <span class="badge bg-dark border border-warning text-warning fs-5 px-3 py-2 w-100">اكتمل التصويت وأُغلقت النتائج</span>
+              {% else %}
+                <span class="badge bg-secondary fs-6 px-3 py-2 w-100">التصويت غير مفتوح حالياً</span>
+              {% endif %}
+            </div>
+
+            <!-- أشرطة النسب المئوية -->
+            <div class="mb-3">
+              <div class="d-flex justify-content-between small mb-1">
+                <span class="text-success fw-bold">الموافقون:</span>
+                <span id="proj-app-label" class="fw-bold text-success">0 (0%)</span>
+              </div>
+              <div class="progress" style="height: 18px;">
+                <div id="proj-app-bar" class="progress-bar bg-success" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="d-flex justify-content-between small mb-1">
+                <span class="text-warning fw-bold">المتحفظون:</span>
+                <span id="proj-res-label" class="fw-bold text-warning">0 (0%)</span>
+              </div>
+              <div class="progress" style="height: 18px;">
+                <div id="proj-res-bar" class="progress-bar bg-warning text-dark" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="d-flex justify-content-between small mb-1">
+                <span class="text-danger fw-bold">المعترضون / الرافضون:</span>
+                <span id="proj-rej-label" class="fw-bold text-danger">0 (0%)</span>
+              </div>
+              <div class="progress" style="height: 18px;">
+                <div id="proj-rej-bar" class="progress-bar bg-danger" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <div class="text-center pt-2 border-top text-muted small">
+              إجمالي الأصوات المدلى بها: <strong id="proj-total-votes" class="text-white">{{ active_topic.votes.count|default:0 }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Polling Script -->
+  <script>
+    const SESSION_ID = {{ session.pk }};
+    let currentProjTopicId = {{ active_topic.pk|default:0 }};
+
+    function pollProjector() {
+      fetch(`/api/sessions/${SESSION_ID}/speak/queue/`)
+        .then(res => res.json())
+        .then(data => {
+          if (!data.ok) return;
+
+          // 1. المتحدث الحالي
+          const spCard = document.getElementById('projector-speaker-card');
+          if (data.active_speaker) {
+            spCard.style.display = 'block';
+            document.getElementById('proj-speaker-name').innerText = data.active_speaker.name;
+            document.getElementById('proj-speaker-seat').innerText = data.active_speaker.seat;
+            const mins = Math.floor(data.active_speaker.elapsed_seconds / 60);
+            const secs = data.active_speaker.elapsed_seconds % 60;
+            document.getElementById('proj-speaker-timer').innerText =
+              `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+          } else {
+            spCard.style.display = 'none';
+          }
+
+          // 2. النصاب القانوني
+          if (data.quorum_info) {
+            const q = data.quorum_info;
+            const qb = document.getElementById('quorum-badge');
+            if (q.is_achieved) {
+              qb.className = 'badge bg-success fs-6 px-3 py-2';
+              qb.innerText = `النصاب مكتمل (${q.present_count}/${q.total_seats})`;
+            } else {
+              qb.className = 'badge bg-danger pulse-warning fs-6 px-3 py-2';
+              qb.innerText = `⚠️ النصاب غير مكتمل (${q.present_count}/${q.total_seats})`;
+            }
+          }
+
+          // 3. الموضوع المعروض حالياً والتصويت والمؤقت والقرار
+          const tid = data.active_topic_id || currentProjTopicId;
+          if (tid && data.topics_state && data.topics_state[String(tid)]) {
+            currentProjTopicId = tid;
+            const t = data.topics_state[String(tid)];
+
+            document.getElementById('proj-topic-category').innerText = t.category_label || '';
+            document.getElementById('proj-topic-ordinal').innerText = t.ordinal_label || '';
+            document.getElementById('proj-topic-title').innerText = t.title || '';
+
+            let metaParts = [];
+            if (t.presenting_entity) metaParts.push(`الجهة العارضة: ${t.presenting_entity}`);
+            if (t.memo_number) metaParts.push(`مذكرة رقم: ${t.memo_number}`);
+            if (t.memo_date) metaParts.push(`بتاريخ: ${t.memo_date}`);
+            document.getElementById('proj-topic-meta').innerText = metaParts.join(' • ');
+
+            document.getElementById('proj-topic-background').innerText =
+              t.background || 'يتم استعراض الموضوع ومناقشته حالياً بين أعضاء المجلس.';
+
+            const readerBtn = document.getElementById('proj-smart-reader-btn');
+            if (readerBtn) {
+              readerBtn.style.display = 'inline-block';
+              readerBtn.setAttribute('onclick', `openSmartReader({topicId: '${t.id}'})`);
+            }
+
+            // حالة العرض
+            const stBadge = document.getElementById('proj-topic-status-badge');
+            if (stBadge) {
+              stBadge.innerText = t.display_status_label;
+              stBadge.className = `badge fs-6 px-3 py-1 ` +
+                (t.display_status === 'voting' ? 'bg-success' :
+                (t.display_status === 'shown' ? 'bg-info text-dark' :
+                (t.display_status === 'closed' ? 'bg-dark border border-warning text-warning' : 'bg-secondary')));
+            }
+
+            // حالة باب التصويت
+            const vStatus = document.getElementById('proj-voting-status-text');
+            if (vStatus) {
+              if (t.display_status === 'voting') {
+                vStatus.innerHTML = '<span class="badge bg-success fs-5 px-3 py-2 w-100">باب التصويت مفتوح الآن</span>';
+              } else if (t.display_status === 'closed') {
+                vStatus.innerHTML = '<span class="badge bg-dark border border-warning text-warning fs-5 px-3 py-2 w-100">اكتمل التصويت وأُغلقت النتائج</span>';
+              } else {
+                vStatus.innerHTML = '<span class="badge bg-secondary fs-6 px-3 py-2 w-100">التصويت غير مفتوح حالياً</span>';
+              }
+            }
+
+            // المؤقت
+            const tContainer = document.getElementById('proj-timer-container');
+            const tDigits = document.getElementById('proj-timer-digits');
+            if (t.timer_running && t.remaining_seconds > 0) {
+              tContainer.style.display = 'block';
+              const m = Math.floor(t.remaining_seconds / 60);
+              const s = t.remaining_seconds % 60;
+              tDigits.innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+              tDigits.className = t.remaining_seconds < 60 ? 'timer-badge text-danger pulse-warning' : 'timer-badge text-warning';
+            } else {
+              tContainer.style.display = 'none';
+            }
+
+            // بارات التصويت
+            if (t.percentages && t.summary) {
+              document.getElementById('proj-app-bar').style.width = `${t.percentages.approve_pct}%`;
+              document.getElementById('proj-res-bar').style.width = `${t.percentages.reserve_pct}%`;
+              document.getElementById('proj-rej-bar').style.width = `${t.percentages.reject_pct}%`;
+
+              document.getElementById('proj-app-label').innerText = `${t.summary.approve} (${t.percentages.approve_pct}%)`;
+              document.getElementById('proj-res-label').innerText = `${t.summary.reserve} (${t.percentages.reserve_pct}%)`;
+              document.getElementById('proj-rej-label').innerText = `${t.summary.reject} (${t.percentages.reject_pct}%)`;
+              document.getElementById('proj-total-votes').innerText = t.summary.total;
+            }
+
+            // القرار المعتمد
+            const decBox = document.getElementById('proj-decision-box');
+            const decText = document.getElementById('proj-decision-text');
+            if (t.has_decision && t.decision_text) {
+              decBox.style.display = 'block';
+              decText.innerText = t.decision_text;
+            } else {
+              decBox.style.display = 'none';
+            }
+          }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      pollProjector();
+      setInterval(pollProjector, 2500);
+    });
+  </script>
+{% include 'council/components/smart_reader_modal.html' %}
+</body>
+</html>

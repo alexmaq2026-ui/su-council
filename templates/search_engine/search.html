@@ -1,0 +1,717 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .search-hero-unified {
+    background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 60%, var(--navy-light) 100%);
+    padding: 2.2rem 1.25rem 1.8rem;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Mode Switcher Pills */
+  .search-mode-tabs {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.45rem;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 0.35rem;
+    border-radius: 50px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    margin-bottom: 1.25rem;
+  }
+
+  .search-mode-pill {
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.8);
+    font-family: var(--font);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.42rem 1.1rem;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .search-mode-pill:hover {
+    color: var(--white);
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .search-mode-pill.active {
+    background: var(--gold);
+    color: var(--navy-dark);
+    font-weight: 800;
+    box-shadow: 0 2px 10px rgba(201, 168, 76, 0.35);
+  }
+
+  /* Fixed Input Bar Wrapper (wraps ONLY input + submit button) */
+  .search-bar-box {
+    position: relative;
+    max-width: 680px;
+    margin: 0 auto 1rem;
+  }
+
+  .search-bar-box input[type="text"] {
+    border-radius: 50px !important;
+    border: 2px solid rgba(255, 255, 255, 0.25) !important;
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: var(--white) !important;
+    padding: 0.85rem 1.5rem 0.85rem 7.5rem !important;
+    font-size: 1rem !important;
+    font-family: var(--font);
+    width: 100%;
+    min-height: 52px !important;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+  }
+
+  .search-bar-box input[type="text"]::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .search-bar-box input[type="text"]:focus {
+    border-color: var(--gold) !important;
+    background: rgba(255, 255, 255, 0.18) !important;
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(201, 168, 76, 0.22) !important;
+  }
+
+  .search-submit-btn {
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-radius: 50px !important;
+    background: linear-gradient(135deg, var(--gold), var(--gold-light));
+    color: var(--navy-dark);
+    border: none;
+    padding: 0.55rem 1.5rem;
+    font-weight: 800;
+    font-size: 0.92rem;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .search-submit-btn:hover {
+    filter: brightness(1.06);
+    box-shadow: 0 2px 10px rgba(201, 168, 76, 0.4);
+  }
+
+  /* Filter Strip inside Hero */
+  .search-filters-bar {
+    max-width: 960px;
+    margin: 0.75rem auto 0;
+    padding-top: 0.85rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.16);
+  }
+
+  .search-filters-bar .form-select {
+    background-color: rgba(10, 36, 68, 0.75) !important;
+    color: var(--white) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    border-radius: 8px !important;
+    font-size: 0.82rem !important;
+    padding: 0.35rem 2rem 0.35rem 0.75rem !important;
+    min-height: 34px !important;
+  }
+
+  .search-filters-bar .form-select:focus {
+    border-color: var(--gold) !important;
+    box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.25) !important;
+  }
+
+  .search-filters-bar .form-select option {
+    background-color: var(--navy-dark);
+    color: var(--white);
+  }
+
+  /* Result Card Enhancements */
+  .uc-search-card {
+    background: var(--white);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+    border-right: 4px solid var(--navy);
+    padding: 1.25rem;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .uc-search-card:hover {
+    box-shadow: var(--shadow-md);
+    border-right-color: var(--gold);
+  }
+
+  .uc-matched-table-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 0.75rem;
+  }
+
+  .uc-matched-table-header {
+    background: linear-gradient(135deg, #0f3460 0%, #1a4a80 100%);
+    color: #fff;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .uc-matched-table-header mark {
+    background: var(--gold);
+    color: var(--navy-dark);
+  }
+
+  .uc-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+    margin-bottom: 0;
+  }
+
+  .uc-mini-table th {
+    background: #eef2f6;
+    color: var(--navy);
+    font-weight: 700;
+    padding: 0.45rem 0.65rem;
+    border-bottom: 1px solid #cbd5e1;
+    white-space: nowrap;
+  }
+
+  .uc-mini-table td {
+    padding: 0.5rem 0.65rem;
+    border-bottom: 1px solid #e2e8f0;
+    color: var(--gray-800);
+    vertical-align: middle;
+  }
+
+  .uc-mini-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .uc-mini-table td.cell-matched {
+    background: #fefce8;
+    font-weight: 600;
+  }
+
+  .uc-decision-preview {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-right: 3px solid #16a34a;
+    border-radius: 8px;
+    padding: 0.65rem 0.9rem;
+    margin-top: 0.6rem;
+    font-size: 0.85rem;
+  }
+
+  mark {
+    background: #fef08a;
+    color: var(--navy-dark);
+    font-weight: 700;
+    border-radius: 3px;
+    padding: 0 3px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- ══════════════════════════════════════════════════════
+     UNIFIED SMART SEARCH HERO
+══════════════════════════════════════════════════════ -->
+<div class="search-hero-unified rounded-4 mb-4">
+  <div class="container py-1">
+    <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle bg-white bg-opacity-10 text-gold mb-2">
+      <i class="bi bi-search fs-3" id="hero-mode-icon"></i>
+    </div>
+    <h2 class="fw-bold text-white mb-1" id="hero-mode-title">
+      {% if mode == 'person' %}
+        البحث الذكي عن الأشخاص والمستفيدين
+      {% elif mode == 'decisions' %}
+        البحث في الموضوعات والقرارات الرسمية
+      {% elif mode == 'tables' %}
+        البحث في الجداول والكشوفات المرفقة
+      {% else %}
+        البحث الذكي الشامل في محاضر المجلس
+      {% endif %}
+    </h2>
+    <p class="text-white text-opacity-75 mb-3 small" id="hero-mode-subtitle">
+      {% if mode == 'person' %}
+        ابحث بالاسم (مع أو بدون لقب علمي، أو بالاسم الأول واللقب) لتحديد جميع الموضوعات والقرارات والجداول التي ورد فيها الشخص
+      {% elif mode == 'decisions' %}
+        ابحث في عناوين الموضوعات، الحيثيات، نصوص القرارات، وأرقام المذكرات والقرارات الموقّعة
+      {% elif mode == 'tables' %}
+        ابحث مباشرة داخل جداول التعيينات، التثبيت، التسويات، الترقيات، التعاقد، مكافآت Scopus، وكشوفات الطلاب والخريجين
+      {% else %}
+        محرك بحث موحّد يبحث بدقة في الموضوعات، القرارات، الأشخاص، الجداول الذكية، المذكرات، والمرفقات
+      {% endif %}
+    </p>
+
+    <form method="get" action="{% url 'search_engine:search' %}" id="unified-search-form">
+      <input type="hidden" name="mode" id="id_mode" value="{{ mode }}">
+
+      <!-- Mode Selector Pills -->
+      <div class="search-mode-tabs" role="tablist">
+        {% if can_general_search %}
+        <button type="button"
+                class="search-mode-pill {% if mode == 'all' %}active{% endif %}"
+                onclick="selectSearchMode('all')">
+          <i class="bi bi-grid-fill"></i>
+          <span>البحث الشامل (الكل)</span>
+        </button>
+        {% endif %}
+
+        {% if can_person_search %}
+        <button type="button"
+                class="search-mode-pill {% if mode == 'person' %}active{% endif %}"
+                onclick="selectSearchMode('person')">
+          <i class="bi bi-person-lines-fill"></i>
+          <span>الأشخاص والمستفيدون</span>
+        </button>
+        {% endif %}
+
+        {% if can_general_search %}
+        <button type="button"
+                class="search-mode-pill {% if mode == 'decisions' %}active{% endif %}"
+                onclick="selectSearchMode('decisions')">
+          <i class="bi bi-file-earmark-check-fill"></i>
+          <span>الموضوعات والقرارات</span>
+        </button>
+        <button type="button"
+                class="search-mode-pill {% if mode == 'tables' %}active{% endif %}"
+                onclick="selectSearchMode('tables')">
+          <i class="bi bi-table"></i>
+          <span>الجداول والكشوفات</span>
+        </button>
+        {% endif %}
+      </div>
+
+      <!-- Search Input Box (Strictly wraps only input + button) -->
+      <div class="search-bar-box">
+        <input
+          type="text"
+          name="q"
+          id="id_q"
+          value="{{ query }}"
+          placeholder="{% if mode == 'person' %}أدخل اسم الشخص (مثال: نبيلة الصرابي، د. لطيفة، إبراهيم المطاع، فائزة المسني...){% elif mode == 'decisions' %}ابحث في عناوين الموضوعات، نصوص القرارات، أو أرقام المذكرات...{% elif mode == 'tables' %}ابحث في بيانات الجداول (اسم، كلية، تخصص، درجة علمية...){% else %}ابحث عن موضوع، قرار، اسم شخص، كلية، أو بيان داخل الجداول...{% endif %}"
+          autofocus
+          autocomplete="off"
+        >
+        <button type="submit" class="search-submit-btn">
+          <i class="bi bi-search"></i>
+          <span>بحث</span>
+        </button>
+      </div>
+
+      <!-- Unified Filters Bar -->
+      <div class="search-filters-bar">
+        <div class="row g-2 justify-content-center align-items-center">
+          <!-- Scope -->
+          <div class="col-6 col-sm-auto">
+            <select name="scope" id="id_scope" class="form-select form-select-sm" onchange="toggleScopeFields()" title="نطاق البحث">
+              <option value="all" {% if scope == 'all' %}selected{% endif %}>جميع المحاضر والجلسات</option>
+              <option value="session" {% if scope == 'session' %}selected{% endif %}>جلسة محددة</option>
+              <option value="year" {% if scope == 'year' %}selected{% endif %}>سنة أكاديمية محددة</option>
+            </select>
+          </div>
+
+          <!-- Session Select -->
+          <div class="col-6 col-sm-auto" id="session-field" style="{% if scope != 'session' %}display:none;{% endif %}">
+            <select name="session_id" id="id_session_id" class="form-select form-select-sm" title="اختر الجلسة">
+              <option value="">-- اختر الجلسة --</option>
+              {% for s in all_sessions %}
+                <option value="{{ s.id }}" {% if session_id == s.id|stringformat:"s" %}selected{% endif %}>
+                  الجلسة رقم {{ s.session_number }} ({{ s.date }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Academic Year Select -->
+          <div class="col-6 col-sm-auto" id="year-field" style="{% if scope != 'year' %}display:none;{% endif %}">
+            <select name="year" id="id_year" class="form-select form-select-sm" title="اختر السنة الأكاديمية">
+              <option value="">-- اختر السنة الأكاديمية --</option>
+              {% for y in all_years %}
+                <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Category Select -->
+          <div class="col-6 col-sm-auto">
+            <select name="category" id="id_category" class="form-select form-select-sm" title="تصنيف الموضوع">
+              <option value="">كل التصنيفات</option>
+              {% for val, label in category_choices %}
+                <option value="{{ val }}" {% if category == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Topic Status Select -->
+          <div class="col-6 col-sm-auto">
+            <select name="topic_status" id="id_topic_status" class="form-select form-select-sm" title="حالة الموضوع">
+              <option value="">كل الحالات</option>
+              {% for val, label in status_choices %}
+                <option value="{{ val }}" {% if topic_status == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Vote Result Select -->
+          <div class="col-6 col-sm-auto">
+            <select name="vote_result" id="id_vote_result" class="form-select form-select-sm" title="نتيجة التصويت">
+              <option value="">كل التصويتات</option>
+              <option value="approve" {% if vote_result == 'approve' %}selected{% endif %}>موافق</option>
+              <option value="reject" {% if vote_result == 'reject' %}selected{% endif %}>مرفوض</option>
+              <option value="reserve" {% if vote_result == 'reserve' %}selected{% endif %}>متحفظ</option>
+            </select>
+          </div>
+
+          {% if searched %}
+          <div class="col-auto">
+            <a href="{% url 'search_engine:search' %}?mode={{ mode }}" class="btn btn-sm btn-outline-light">
+              مسح الفلاتر
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     SEARCH RESULTS SECTION
+══════════════════════════════════════════════════════ -->
+<div class="container-fluid px-0">
+  {% if searched %}
+    <!-- Summary Bar -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 bg-white p-3 rounded-3 border shadow-sm">
+      <div>
+        <h5 class="fw-bold mb-0 text-navy">
+          {% if query %}
+            نتائج البحث عن: <span class="text-gold">«{{ query }}»</span>
+          {% else %}
+            نتائج التصفية والاستعراض
+          {% endif %}
+        </h5>
+        <small class="text-muted">
+          {% if mode == 'person' %}
+            نطاق البحث: الأشخاص والمستفيدون في الموضوعات والقرارات والجداول
+          {% elif mode == 'decisions' %}
+            نطاق البحث: الموضوعات والقرارات الرسمية والمذكرات
+          {% elif mode == 'tables' %}
+            نطاق البحث: الجداول الذكية والكشوفات المرفقة
+          {% else %}
+            نطاق البحث: شامل (الموضوعات، القرارات، الأشخاص، الجداول، والمرفقات)
+          {% endif %}
+        </small>
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="badge bg-navy px-3 py-2 rounded-pill fs-6">
+          {{ total_count }} موضوع / قرار
+        </span>
+        {% if total_matched_table_rows > 0 %}
+        <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fs-6">
+          {{ total_matched_table_rows }} سجل مطابق في الجداول
+        </span>
+        {% endif %}
+        {% if total_decisions_matched > 0 %}
+        <span class="badge bg-success px-3 py-2 rounded-pill fs-6">
+          {{ total_decisions_matched }} قرار معتمد
+        </span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if results %}
+      <div class="d-flex flex-column gap-3" id="search-results">
+        {% for r in results %}
+          <div class="uc-search-card">
+            <!-- Header Metadata & Action -->
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom">
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="cat-badge cat-{{ r.topic.category }}">{{ r.category_display }}</span>
+                <a href="{% url 'council:session_detail' pk=r.session.pk %}" class="badge bg-light text-navy border text-decoration-none">
+                  الجلسة رقم {{ r.session.session_number }}
+                </a>
+                <span class="text-muted small">
+                  <i class="bi bi-calendar3 me-1"></i>{{ r.session.date }}
+                </span>
+                <span class="badge bg-{{ r.session.get_status_color }} bg-opacity-10 text-{{ r.session.get_status_color }} border border-{{ r.session.get_status_color }}">
+                  {{ r.session.get_status_display }}
+                </span>
+                {% if r.has_decision %}
+                  <span class="badge badge-approve">صادر به قرار</span>
+                {% endif %}
+                {% if r.matched_rows_count > 0 %}
+                  <span class="badge bg-warning bg-opacity-25 text-dark border border-warning">
+                    {{ r.matched_rows_count }} سجل بالجدول
+                  </span>
+                {% endif %}
+              </div>
+
+              <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'council:topic_detail' pk=r.topic.pk %}" class="btn btn-sm btn-navy">
+                  عرض الموضوع والقرار
+                </a>
+              </div>
+            </div>
+
+            <!-- Topic Title -->
+            <h5 class="fw-bold mb-2">
+              <a href="{% url 'council:topic_detail' pk=r.topic.pk %}" class="text-navy text-decoration-none">
+                <span class="text-gold small me-1">[{{ r.topic.ordinal_label }}]</span>
+                {{ r.title_highlighted|safe }}
+              </a>
+            </h5>
+
+            <!-- Match Locations Summary -->
+            {% if r.match_locations %}
+            <div class="mb-2 small text-muted">
+              <i class="bi bi-geo-alt-fill text-gold me-1"></i>
+              <strong>مواضع التطابق:</strong> {{ r.match_locations|join:" ، " }}
+            </div>
+            {% endif %}
+
+            <!-- Highlighted Text Field Excerpts (excluding table entries which render in full table format below) -->
+            {% if r.found_in %}
+              <div class="bg-light p-3 rounded-3 mt-2">
+                {% for ctx in r.found_in %}
+                  {% if ctx.field_label|slice:":5" != "جدول:" and ctx.field_label != "عنوان الجدول" %}
+                    <div class="mb-2 last-mb-0 small">
+                      <span class="badge bg-secondary me-1">{{ ctx.field_label }}</span>
+                      <span class="text-dark">{{ ctx.snippet|safe }}</span>
+                    </div>
+                  {% endif %}
+                {% endfor %}
+
+                {% if r.has_decision and 'نص القرار' not in r.match_locations %}
+                  <div class="uc-decision-preview">
+                    <span class="badge bg-success me-1">نص القرار الصادر</span>
+                    <span class="text-dark">{{ r.decision_highlighted|safe }}</span>
+                  </div>
+                {% endif %}
+              </div>
+            {% elif r.has_decision %}
+              <div class="uc-decision-preview">
+                <span class="badge bg-success me-1">نص القرار الصادر</span>
+                <span class="text-dark">{{ r.decision_highlighted|safe }}</span>
+              </div>
+            {% endif %}
+
+            <!-- Matched Smart Tables (Exact Rows & Columns) -->
+            {% if r.matched_tables %}
+              {% for mt in r.matched_tables %}
+                <div class="uc-matched-table-box">
+                  <div class="uc-matched-table-header">
+                    <span>
+                      <i class="bi bi-table text-gold me-1"></i>
+                      {{ mt.title_highlighted|safe }}
+                    </span>
+                    <span class="badge bg-light text-navy">
+                      {% if mt.matched_rows_count > 0 %}
+                        {{ mt.matched_rows_count }} سجل مطابق من أصل {{ mt.total_rows_count }}
+                      {% else %}
+                        إجمالي السجلات: {{ mt.total_rows_count }}
+                      {% endif %}
+                    </span>
+                  </div>
+
+                  {% if mt.matched_rows %}
+                  <div class="table-responsive">
+                    <table class="uc-mini-table">
+                      {% if mt.headers_highlighted %}
+                      <thead>
+                        <tr>
+                          {% for h in mt.headers_highlighted %}
+                            <th>{{ h|safe }}</th>
+                          {% endfor %}
+                        </tr>
+                      </thead>
+                      {% endif %}
+                      <tbody>
+                        {% for row in mt.matched_rows %}
+                          <tr>
+                            {% for cell in row.cells %}
+                              <td class="{% if cell.is_match %}cell-matched{% endif %}">
+                                {{ cell.value|safe }}
+                              </td>
+                            {% endfor %}
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            {% endif %}
+
+          </div>
+        {% endfor %}
+      </div>
+
+    {% else %}
+      <div class="empty-state p-5 bg-white rounded-4 border text-center shadow-sm">
+        <i class="bi bi-search display-3 text-muted mb-3"></i>
+        <h4 class="fw-bold text-navy">لم يتم العثور على أي نتائج مطابقة</h4>
+        <p class="text-muted mb-3">
+          لم يتم العثور على تطابق لعبارة البحث <strong>«{{ query }}»</strong> ضمن الفلاتر المحددة.
+        </p>
+        <div class="d-flex justify-content-center gap-2">
+          {% if mode != 'all' and can_general_search %}
+            <button type="button" class="btn btn-navy" onclick="selectSearchMode('all')">
+              التبديل إلى البحث الشامل في كل المحاضر
+            </button>
+          {% endif %}
+          <a href="{% url 'search_engine:search' %}" class="btn btn-outline-secondary">
+            إعادة ضبط البحث
+          </a>
+        </div>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <!-- Quick Discovery Cards (Initial State) -->
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="uc-card p-4 text-center h-100" style="cursor:pointer;" onclick="selectSearchMode('person')">
+          <div class="brand-icon mx-auto mb-3 bg-primary bg-opacity-10 text-primary">
+            <i class="bi bi-person-lines-fill"></i>
+          </div>
+          <h6 class="fw-bold text-navy">بحث شامل عن الأشخاص والمستفيدين</h6>
+          <p class="text-muted small mb-0">
+            تتبع أسماء أعضاء هيئة التدريس والطلاب واللجان في التعيينات، التثبيت، الترقيات، التعاقد، والدرجات العلمية.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="uc-card p-4 text-center h-100" style="cursor:pointer;" onclick="selectSearchMode('decisions')">
+          <div class="brand-icon mx-auto mb-3 bg-success bg-opacity-10 text-success">
+            <i class="bi bi-file-earmark-check"></i>
+          </div>
+          <h6 class="fw-bold text-navy">الموضوعات والقرارات والمذكرات</h6>
+          <p class="text-muted small mb-0">
+            البحث في نصوص القرارات المعتمدة، الحيثيات، الخطط الدراسية، وأرقام المذكرات والقرارات الإدارية.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="uc-card p-4 text-center h-100" style="cursor:pointer;" onclick="selectSearchMode('tables')">
+          <div class="brand-icon mx-auto mb-3 bg-warning bg-opacity-10 text-warning">
+            <i class="bi bi-table"></i>
+          </div>
+          <h6 class="fw-bold text-navy">الجداول الذكية والكشوفات</h6>
+          <p class="text-muted small mb-0">
+            استخراج السجلات والصفوف المطابقة مباشرة من جداول المكافآت، الخريجين، وتصحيح الشهادات والدرجات.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="uc-card p-4 text-center h-100" style="cursor:pointer;" onclick="selectSearchMode('all')">
+          <div class="brand-icon mx-auto mb-3 bg-info bg-opacity-10 text-info">
+            <i class="bi bi-magic"></i>
+          </div>
+          <h6 class="fw-bold text-navy">معالجة عربية ذكية وفورية</h6>
+          <p class="text-muted small mb-0">
+            يدعم البحث بالاسم الأول واللقب، ويتجاوز فروق الهمزات (أ/ا)، التاء المربوطة (ة/ه)، والألقاب العلمية (د. / أ.د.).
+          </p>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const MODE_META = {
+    all: {
+      title: 'البحث الذكي الشامل في محاضر المجلس',
+      subtitle: 'محرك بحث موحّد يبحث بدقة في الموضوعات، القرارات، الأشخاص، الجداول الذكية، المذكرات، والمرفقات',
+      placeholder: 'ابحث عن موضوع، قرار، اسم شخص، كلية، أو بيان داخل الجداول...',
+      icon: 'bi-search'
+    },
+    person: {
+      title: 'البحث الذكي عن الأشخاص والمستفيدين',
+      subtitle: 'ابحث بالاسم (مع أو بدون لقب علمي، أو بالاسم الأول واللقب) لتحديد جميع الموضوعات والقرارات والجداول التي ورد فيها الشخص',
+      placeholder: 'أدخل اسم الشخص (مثال: نبيلة الصرابي، د. لطيفة، إبراهيم المطاع، فائزة المسني...)',
+      icon: 'bi-person-lines-fill'
+    },
+    decisions: {
+      title: 'البحث في الموضوعات والقرارات الرسمية',
+      subtitle: 'ابحث في عناوين الموضوعات، الحيثيات، نصوص القرارات، وأرقام المذكرات والقرارات الموقّعة',
+      placeholder: 'ابحث في عناوين الموضوعات، نصوص القرارات، أو أرقام المذكرات...',
+      icon: 'bi-file-earmark-check-fill'
+    },
+    tables: {
+      title: 'البحث في الجداول والكشوفات المرفقة',
+      subtitle: 'ابحث مباشرة داخل جداول التعيينات، التثبيت، التسويات، الترقيات، التعاقد، مكافآت Scopus، وكشوفات الطلاب والخريجين',
+      placeholder: 'ابحث في بيانات الجداول (اسم، كلية، تخصص، درجة علمية...)',
+      icon: 'bi-table'
+    }
+  };
+
+  function selectSearchMode(mode) {
+    const modeInput = document.getElementById('id_mode');
+    const qInput = document.getElementById('id_q');
+    if (modeInput) modeInput.value = mode;
+
+    // Update active pill UI
+    document.querySelectorAll('.search-mode-pill').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    const clickedBtn = document.querySelector(`.search-mode-pill[onclick*="'${mode}'"]`);
+    if (clickedBtn) clickedBtn.classList.add('active');
+
+    // Update hero text & placeholder
+    const meta = MODE_META[mode] || MODE_META.all;
+    const titleEl = document.getElementById('hero-mode-title');
+    const subEl = document.getElementById('hero-mode-subtitle');
+    const iconEl = document.getElementById('hero-mode-icon');
+    if (titleEl) titleEl.textContent = meta.title;
+    if (subEl) subEl.textContent = meta.subtitle;
+    if (qInput) qInput.placeholder = meta.placeholder;
+    if (iconEl) iconEl.className = `bi ${meta.icon} fs-3`;
+
+    // If user already typed a query or is switching to tables browse, submit form automatically
+    if ((qInput && qInput.value.trim() !== '') || mode === 'tables') {
+      document.getElementById('unified-search-form').submit();
+    } else if (qInput) {
+      qInput.focus();
+    }
+  }
+
+  function toggleScopeFields() {
+    const scope = document.getElementById('id_scope').value;
+    const sessionField = document.getElementById('session-field');
+    const yearField = document.getElementById('year-field');
+    if (sessionField) sessionField.style.display = scope === 'session' ? '' : 'none';
+    if (yearField) yearField.style.display = scope === 'year' ? '' : 'none';
+  }
+
+  document.addEventListener('DOMContentLoaded', toggleScopeFields);
+</script>
+{% endblock %}

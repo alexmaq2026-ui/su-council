@@ -1,0 +1,439 @@
+{% extends 'base.html' %}
+
+{% block title %}استيراد مواضيع من ملف Word – الجلسة {{ session.session_number }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <h1 class="page-title">
+        <i class="bi bi-file-earmark-arrow-up"></i>استيراد مواضيع من ملف Word
+      </h1>
+      <div class="page-subtitle">الجلسة رقم {{ session.session_number }} ({{ session.date }})</div>
+    </div>
+    <div>
+      <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-arrow-right me-1"></i>العودة للجلسة
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+
+{% if step == 'preview' %}
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2: INTERACTIVE PREVIEW & SELECTIVE IMPORT SCREEN                    -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <div class="row justify-content-center">
+    <div class="col-12 col-xl-11">
+      
+      <!-- Top Overview Card -->
+      <div class="card shadow-sm border-0 mb-4 bg-white">
+        <div class="card-body p-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+              <div class="badge bg-navy px-3 py-2 fs-6 mb-2">
+                <i class="bi bi-file-earmark-word text-gold me-1"></i>ملف المحضر: {{ filename }}
+              </div>
+              <h4 class="fw-bold mb-1 text-navy">المعاينة الذكية والاختيار التفاعلي للمواضيع</h4>
+              <p class="text-muted small mb-0">
+                تم اكتشاف <strong class="text-primary">{{ total_topics }}</strong> موضوعاً بنجاح. يمكنك استيراد جميع المواضيع دفعة واحدة أو تحديد مواضيع بعينها لاستيرادها.
+              </p>
+            </div>
+            <div class="text-start">
+              <div class="p-3 bg-light rounded-3 border text-center">
+                <div class="small text-muted mb-1">المواضيع المحددة للاستيراد</div>
+                <div class="fs-4 fw-bold text-success">
+                  <span id="selected-counter">{{ total_topics }}</span> <span class="fs-6 text-muted">/ {{ total_topics }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          <!-- Category Filter Pills -->
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="d-flex flex-wrap gap-1 align-items-center" id="category-filter-bar">
+              <span class="small fw-bold text-muted me-2"><i class="bi bi-funnel me-1"></i>تصفية حسب المحور:</span>
+              <button type="button" class="btn btn-sm btn-navy active filter-pill" data-category="all">
+                الكل ({{ total_topics }})
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary filter-pill" data-category="general">
+                المواضيع العامة
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-info filter-pill" data-category="appointments">
+                التعيينات
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-primary filter-pill" data-category="academic">
+                الشؤون الأكاديمية
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-success filter-pill" data-category="postgrad">
+                الدراسات العليا
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-warning filter-pill" data-category="students">
+                شؤون الطلاب
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-dark filter-pill" data-category="centers">
+                شؤون المراكز
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-danger filter-pill" data-category="new_business">
+                ما استجد من أعمال
+              </button>
+            </div>
+
+            <!-- Master Selection Buttons -->
+            <div class="btn-group btn-group-sm">
+              <button type="button" class="btn btn-outline-primary" id="btn-select-all">
+                <i class="bi bi-check-all me-1"></i>تحديد الكل
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="btn-deselect-all">
+                <i class="bi bi-dash-square me-1"></i>إلغاء التحديد
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Main Import Form -->
+      <form method="post" id="import-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="confirm_import">
+
+        <!-- Optional: Replace Previous Topics Warning/Checkbox -->
+        {% if existing_topics_count > 0 %}
+        <div class="alert alert-warning border-warning d-flex align-items-center justify-content-between p-3 mb-4 shadow-sm">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle-fill fs-3 text-warning me-3"></i>
+            <div>
+              <strong class="d-block text-dark">تحذير: الجلسة تحتوي مسبقاً على {{ existing_topics_count }} موضوعاً!</strong>
+              <span class="small text-muted">يمكنك إحلال المواضيع الجديدة محل المواضيع السابقة (تنظيف وتصفير الجلسة) أو إضافتها إليها.</span>
+            </div>
+          </div>
+          <div class="form-check form-switch ps-0 pe-4">
+            <input class="form-check-input ms-2" type="checkbox" name="replace_existing" value="1" id="replace_existing" checked>
+            <label class="form-check-label fw-bold text-danger" for="replace_existing">
+              استبدال المواضيع السابقة بالكامل
+            </label>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Topics Table -->
+        <div class="card shadow-sm border-0 mb-4">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="topics-preview-table">
+              <thead class="table-light text-navy">
+                <tr>
+                  <th style="width: 50px;" class="text-center">
+                    <input type="checkbox" class="form-check-input" id="master-checkbox" checked title="تحديد/إلغاء تحديد الكل">
+                  </th>
+                  <th style="width: 70px;" class="text-center">#</th>
+                  <th style="width: 200px;">المحور / التصنيف</th>
+                  <th>عنوان الموضوع</th>
+                  <th style="width: 140px;" class="text-center">الحيثيات والقرار</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for t in topics %}
+                <tr class="topic-row" data-category="{{ t.category }}" id="row-{{ forloop.counter0 }}">
+                  <td class="text-center">
+                    <input type="checkbox" name="selected_topics" value="{{ forloop.counter0 }}" 
+                           class="form-check-input topic-checkbox" id="chk-{{ forloop.counter0 }}" checked>
+                  </td>
+                  <td class="text-center fw-bold text-muted">
+                    {{ t.order_number }}
+                  </td>
+                  <td>
+                    {% if t.category == 'general' %}
+                      <span class="badge bg-secondary px-2 py-1"><i class="bi bi-journal-text me-1"></i>المواضيع العامة</span>
+                    {% elif t.category == 'appointments' %}
+                      <span class="badge bg-info text-dark px-2 py-1"><i class="bi bi-person-badge me-1"></i>مواضيع التعيينات</span>
+                    {% elif t.category == 'academic' %}
+                      <span class="badge bg-primary px-2 py-1"><i class="bi bi-mortarboard me-1"></i>الشؤون الأكاديمية</span>
+                    {% elif t.category == 'postgrad' %}
+                      <span class="badge bg-success px-2 py-1"><i class="bi bi-award me-1"></i>الدراسات العليا</span>
+                    {% elif t.category == 'students' %}
+                      <span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-people me-1"></i>شؤون الطلاب</span>
+                    {% elif t.category == 'centers' %}
+                      <span class="badge bg-dark px-2 py-1"><i class="bi bi-building me-1"></i>شؤون المراكز</span>
+                    {% elif t.category == 'new_business' %}
+                      <span class="badge bg-danger px-2 py-1"><i class="bi bi-lightning-charge me-1"></i>ما استجد من أعمال</span>
+                    {% else %}
+                      <span class="badge bg-secondary px-2 py-1">{{ t.category_display }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <label for="chk-{{ forloop.counter0 }}" class="fw-bold text-dark mb-0 d-block" style="cursor: pointer;">
+                      {{ t.title }}
+                    </label>
+                  </td>
+                  <td class="text-center">
+                    {% if t.background or t.decision %}
+                    <button type="button" class="btn btn-outline-secondary btn-sm" 
+                            data-bs-toggle="collapse" data-bs-target="#details-{{ forloop.counter0 }}" 
+                            aria-expanded="false" title="معاينة النص">
+                      <i class="bi bi-eye me-1"></i>معاينة
+                    </button>
+                    {% else %}
+                    <span class="text-muted small">بدون تفاصيل</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% if t.background or t.decision %}
+                <tr class="collapse-row">
+                  <td colspan="5" class="p-0 border-0">
+                    <div class="collapse bg-light p-3 border-bottom" id="details-{{ forloop.counter0 }}">
+                      {% if t.background %}
+                      <div class="mb-2">
+                        <strong class="text-navy small d-block mb-1"><i class="bi bi-card-text me-1"></i>حيثيات وخلفية الموضوع:</strong>
+                        <p class="small text-muted mb-0" style="white-space: pre-line;">{{ t.background }}</p>
+                      </div>
+                      {% endif %}
+                      {% if t.decision %}
+                      <div class="mt-2 pt-2 border-top">
+                        <strong class="text-success small d-block mb-1"><i class="bi bi-check2-circle me-1"></i>القرار / التوصية:</strong>
+                        <p class="small text-dark fw-bold mb-0" style="white-space: pre-line;">{{ t.decision }}</p>
+                      </div>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Bottom Actions Bar (Sticky) -->
+        <div class="card shadow-sm border-0 bg-white p-3 mb-5">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <button type="submit" form="cancel-preview-form" class="btn btn-outline-danger">
+              <i class="bi bi-x-circle me-1"></i>إلغاء والعودة لرفع ملف آخر
+            </button>
+            <div class="d-flex align-items-center gap-2">
+              <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-secondary">
+                العودة للجلسة
+              </a>
+              <button type="submit" class="btn btn-gold btn-lg fw-bold px-4" id="submit-import-btn">
+                <i class="bi bi-cloud-arrow-down-fill me-1"></i>بدء استيراد المواضيع المحددة (<span id="btn-counter">{{ total_topics }}</span>)
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </form>
+
+      <!-- Separate Cancel Form -->
+      <form id="cancel-preview-form" method="post" class="d-none">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="cancel_preview">
+      </form>
+
+    </div>
+  </div>
+
+{% else %}
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1: FILE UPLOAD SCREEN                                              -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-7">
+      
+      <!-- Instructions Card -->
+      <div class="uc-card shadow-sm mb-4">
+        <div class="uc-card-header bg-navy text-white">
+          <h5 class="mb-0"><i class="bi bi-info-circle text-gold me-2"></i>إرشادات استيراد محضر الجلسة الذكي</h5>
+        </div>
+        <div class="uc-card-body p-4 bg-light">
+          <p class="small text-muted mb-3">يقوم النظام المحدث بتحليل ملف Word المرفوع واستخراج الموضوعات تلقائياً مع تمكينك من مراجعتها واختيار ما ترغب باستيراده:</p>
+          <ul class="small text-muted mb-0 ps-3">
+            <li class="mb-2"><strong>المعاينة التفاعلية:</strong> بعد رفع الملف ستظهر لك قائمة بكافة المواضيع المكتشفة لتختار منها (استيراد الكل أو مواضيع محددة).</li>
+            <li class="mb-2"><strong>المحاور السبعة:</strong> يتعرف النظام آلياً على قطاعات المجلس (المواضيع العامة، التعيينات، الشؤون الأكاديمية، الدراسات العليا، شؤون الطلاب، شؤون المراكز، ما استجد من أعمال).</li>
+            <li class="mb-2"><strong>حماية الجداول:</strong> الجداول وقوائم الطلاب والباحثين لا يتم تجزئتها وتظل ضمن حيثيات الموضوع التابعة له.</li>
+            <li><strong>الصيغة المقبولة:</strong> ملفات Word الرسمية بصيغة <code>.docx</code>.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Upload Form -->
+      <div class="uc-card shadow-sm">
+        <div class="uc-card-header">
+          <h5 class="mb-0"><i class="bi bi-cloud-arrow-up me-2"></i>رفع ملف Word للمعاينة والاستيراد</h5>
+        </div>
+        <div class="uc-card-body p-4">
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="upload_file">
+            
+            <div class="upload-zone mb-4 p-5 text-center border rounded-3 bg-light">
+              <i class="bi bi-file-earmark-word display-3 text-primary d-block mb-3"></i>
+              <h5 class="fw-bold mb-2">اسحب وأفلت ملف المحضر هنا، أو انقر للاختيار</h5>
+              <p class="text-muted small upload-label mb-3">يدعم ملفات Word (.docx)</p>
+              <input type="file" name="word_file" id="word_file" accept=".docx,.doc" class="d-none" required>
+              <button type="button" class="btn btn-navy" onclick="document.getElementById('word_file').click()">
+                <i class="bi bi-folder2-open me-1"></i>اختيار ملف المحضر من جهازك
+              </button>
+            </div>
+
+            {% if existing_topics_count > 0 %}
+            <div class="alert alert-info py-2 px-3 small mb-3">
+              <i class="bi bi-info-circle me-1"></i>تنبيه: الجلسة تحتوي حالياً على <strong>{{ existing_topics_count }}</strong> موضوعاً. ستتمكن في الخطوة التالية من اختيار استبدالها أو الإضافة إليها.
+            </div>
+            {% endif %}
+
+            <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+              <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-secondary">إلغاء</a>
+              <button type="submit" class="btn btn-gold px-4 fw-bold">
+                <i class="bi bi-cpu me-1"></i>رفع ومعاينة المواضيع
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+{% endif %}
+
+</div>
+
+{% block extra_js %}
+<script>
+// File name feedback on upload screen
+const fileInput = document.getElementById('word_file');
+if (fileInput) {
+  fileInput.addEventListener('change', function(e) {
+    if (e.target.files.length > 0) {
+      document.querySelector('.upload-label').textContent = 'الملف المحدد: ' + e.target.files[0].name;
+    }
+  });
+}
+
+// ── Interactive Preview JavaScript ──────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  const masterCheckbox = document.getElementById('master-checkbox');
+  const topicCheckboxes = document.querySelectorAll('.topic-checkbox');
+  const selectedCounter = document.getElementById('selected-counter');
+  const btnCounter = document.getElementById('btn-counter');
+  const submitBtn = document.getElementById('submit-import-btn');
+  const btnSelectAll = document.getElementById('btn-select-all');
+  const btnDeselectAll = document.getElementById('btn-deselect-all');
+  const filterPills = document.querySelectorAll('.filter-pill');
+  const rows = document.querySelectorAll('.topic-row');
+
+  function updateCounters() {
+    let checkedCount = 0;
+    topicCheckboxes.forEach(cb => {
+      if (cb.checked) checkedCount++;
+    });
+
+    if (selectedCounter) selectedCounter.textContent = checkedCount;
+    if (btnCounter) btnCounter.textContent = checkedCount;
+
+    if (submitBtn) {
+      if (checkedCount === 0) {
+        submitBtn.disabled = true;
+        submitBtn.classList.remove('btn-gold');
+        submitBtn.classList.add('btn-secondary');
+      } else {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('btn-secondary');
+        submitBtn.classList.add('btn-gold');
+      }
+    }
+
+    if (masterCheckbox) {
+      masterCheckbox.checked = (checkedCount === topicCheckboxes.length && topicCheckboxes.length > 0);
+      masterCheckbox.indeterminate = (checkedCount > 0 && checkedCount < topicCheckboxes.length);
+    }
+  }
+
+  // Checkbox changes
+  topicCheckboxes.forEach(cb => {
+    cb.addEventListener('change', updateCounters);
+  });
+
+  // Master checkbox
+  if (masterCheckbox) {
+    masterCheckbox.addEventListener('change', function() {
+      const isChecked = this.checked;
+      topicCheckboxes.forEach(cb => {
+        // Only toggle visible rows if filtered, or all if all visible
+        const row = cb.closest('.topic-row');
+        if (row && row.style.display !== 'none') {
+          cb.checked = isChecked;
+        }
+      });
+      updateCounters();
+    });
+  }
+
+  // Select All button
+  if (btnSelectAll) {
+    btnSelectAll.addEventListener('click', function() {
+      topicCheckboxes.forEach(cb => {
+        const row = cb.closest('.topic-row');
+        if (row && row.style.display !== 'none') {
+          cb.checked = true;
+        }
+      });
+      updateCounters();
+    });
+  }
+
+  // Deselect All button
+  if (btnDeselectAll) {
+    btnDeselectAll.addEventListener('click', function() {
+      topicCheckboxes.forEach(cb => {
+        const row = cb.closest('.topic-row');
+        if (row && row.style.display !== 'none') {
+          cb.checked = false;
+        }
+      });
+      updateCounters();
+    });
+  }
+
+  // Category Filter Pills
+  filterPills.forEach(pill => {
+    pill.addEventListener('click', function() {
+      filterPills.forEach(p => {
+        p.classList.remove('active', 'btn-navy');
+        if (!p.classList.contains('btn-outline-secondary') &&
+            !p.classList.contains('btn-outline-info') &&
+            !p.classList.contains('btn-outline-primary') &&
+            !p.classList.contains('btn-outline-success') &&
+            !p.classList.contains('btn-outline-warning') &&
+            !p.classList.contains('btn-outline-dark') &&
+            !p.classList.contains('btn-outline-danger')) {
+          p.classList.add('btn-outline-secondary');
+        }
+      });
+
+      this.classList.add('active', 'btn-navy');
+      this.classList.remove('btn-outline-secondary', 'btn-outline-info', 'btn-outline-primary', 'btn-outline-success', 'btn-outline-warning', 'btn-outline-dark', 'btn-outline-danger');
+
+      const targetCat = this.getAttribute('data-category');
+      rows.forEach(row => {
+        const rowCat = row.getAttribute('data-category');
+        if (targetCat === 'all' || rowCat === targetCat) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    });
+  });
+
+  // Initial calculation
+  updateCounters();
+});
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}إعدادات وسجل القراءة الذكية للمجلس{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-md-5">
+  <!-- Page Header -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
+    <div>
+      <h3 class="fw-bold text-dark mb-1">
+        إعدادات وسجل القراءة الذكية والصوت العصبي (المقترح م7)
+      </h3>
+      <p class="text-muted mb-0">
+        حوكمة محرك القراءة الصوتية الفصيحة، وضبط خيارات الصوت السحابي والمحلي، وسجل الاستماع.
+      </p>
+    </div>
+    <div class="d-flex gap-2 mt-3 mt-md-0">
+      <a href="{% url 'council:session_list' %}" class="btn btn-outline-secondary px-3">
+        العودة للجلسات
+      </a>
+      <a href="{% url 'council:notification_log' %}" class="btn btn-outline-primary px-3">
+        سجل التنبيهات
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Settings Form -->
+    <div class="col-lg-5">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-primary text-white py-3">
+          <h5 class="card-title mb-0 fw-bold">إعدادات المحرك الصوتي</h5>
+        </div>
+        <div class="card-body p-4">
+          <form method="post">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+              <label class="form-label fw-bold">نمط الصوت الافتراضي:</label>
+              <select name="voice_mode" class="form-select">
+                <option value="cloud_neural" {% if setting.voice_mode == 'cloud_neural' %}selected{% endif %}>
+                  صوت عصبي عربي سحابي (Azure Neural) - موصى به
+                </option>
+                <option value="browser_local" {% if setting.voice_mode == 'browser_local' %}selected{% endif %}>
+                  صوت المتصفح المحلي (Web Speech)
+                </option>
+              </select>
+              <div class="form-text">
+                الصوت العصبي السحابي يمنح نطقاً فصيحاً ومخارج حروف واضحة لمحاضر الجامعة، مع احتياطي محلي تلقائي.
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">الصوت العصبي المعتمد:</label>
+              <select name="neural_voice" class="form-select">
+                <option value="ar-SA-HamedNeural" {% if setting.neural_voice == 'ar-SA-HamedNeural' %}selected{% endif %}>
+                  حامد (ar-SA-HamedNeural) - صوت رجالي وقور وفصيح
+                </option>
+                <option value="ar-SA-ZariyahNeural" {% if setting.neural_voice == 'ar-SA-ZariyahNeural' %}selected{% endif %}>
+                  زارية (ar-SA-ZariyahNeural) - صوت نسائي رسمي هادئ
+                </option>
+                <option value="ar-YE-SalehNeural" {% if setting.neural_voice == 'ar-YE-SalehNeural' %}selected{% endif %}>
+                  صالح (ar-YE-SalehNeural) - صوت يمني رسمي
+                </option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">السرعة الافتراضية للقراءة:</label>
+              <select name="default_speed" class="form-select">
+                <option value="0.75" {% if setting.default_speed == 0.75 %}selected{% endif %}>0.75x (بطيء جداً)</option>
+                <option value="0.85" {% if setting.default_speed == 0.85 %}selected{% endif %}>0.85x (هادئ متأنٍ)</option>
+                <option value="1.0" {% if setting.default_speed == 1.0 %}selected{% endif %}>1.0x (السرعة الطبيعية)</option>
+                <option value="1.25" {% if setting.default_speed == 1.25 %}selected{% endif %}>1.25x (سريع معتدل)</option>
+                <option value="1.5" {% if setting.default_speed == 1.5 %}selected{% endif %}>1.5x (سريع للمراجعة)</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-bold">لون التمييز البصري للنص المقروء:</label>
+              <input type="text" name="highlight_color" class="form-control" value="{{ setting.highlight_color|default:'#FEF08A' }}">
+              <div class="form-text">رمز اللون الهيكسي المستخدم لتظليل الجملة النشطة (الافتراضي #FEF08A أصفر ذهبي).</div>
+            </div>
+
+            <div class="form-check form-switch mb-4">
+              <input class="form-check-input" type="checkbox" name="auto_scroll" id="autoScrollCheck" {% if setting.auto_scroll %}checked{% endif %}>
+              <label class="form-check-label fw-bold" for="autoScrollCheck">
+                تفعيل التمرير التلقائي الذكي لمتابعة النص المقروء
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-success fw-bold px-4 w-100 py-2">
+              حفظ وتطبيق الإعدادات
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Usage Logs Table -->
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0 fw-bold">سجل استخدام القراءة الذكية (آخر العمليات)</h5>
+          <span class="badge bg-light text-dark fw-bold">{{ recent_logs.count }} عملية مسجلة</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 text-center">
+              <thead class="table-light">
+                <tr>
+                  <th>المستخدم</th>
+                  <th>المحتوى المستمع إليه</th>
+                  <th>النمط والسرعة</th>
+                  <th>الفقرات</th>
+                  <th>الوقت والتاريخ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for log in recent_logs %}
+                <tr>
+                  <td class="fw-bold text-primary">{{ log.user.full_name|default:"عضو المجلس" }}</td>
+                  <td class="text-truncate text-start" style="max-width: 220px;" title="{{ log.target_title }}">
+                    {{ log.target_title }}
+                  </td>
+                  <td>
+                    {% if log.voice_mode == 'cloud_neural' %}
+                      <span class="badge bg-primary">عصبي سحابي</span>
+                    {% else %}
+                      <span class="badge bg-secondary">محلي</span>
+                    {% endif %}
+                    <span class="badge bg-light text-dark border">{{ log.speed }}x</span>
+                  </td>
+                  <td>{{ log.chunks_count }}</td>
+                  <td class="small text-muted">{{ log.created_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="5" class="py-4 text-muted">لم يتم تسجيل أي عمليات استماع بعد.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

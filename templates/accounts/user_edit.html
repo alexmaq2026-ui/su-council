@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+
+{% block title %}تعديل بيانات: {{ target_user.full_name }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header py-3">
+  <div class="page-header-inner">
+    <div>
+      <h1 class="page-title fs-5 mb-0">تعديل بيانات العضو وموقعه في المجلس</h1>
+      <div class="page-subtitle small">
+        {{ target_user.full_name }} — {{ target_user.get_effective_login_category_display }}
+      </div>
+    </div>
+    <div>
+      <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-light btn-sm">العودة للمستخدمين</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-10 col-lg-8">
+    <div class="uc-card shadow-sm">
+      <div class="uc-card-header py-2 px-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="mb-0 fw-bold">بيانات الحساب والموقع في بوابة الدخول</h6>
+        <span class="badge bg-light text-navy border">اسم المستخدم: {{ target_user.username }}</span>
+      </div>
+      <div class="uc-card-body p-3 p-md-4">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger mb-3 p-2 small">
+            {% for error in form.non_field_errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <!-- 1. الاسم الكامل -->
+          <div class="mb-3">
+            <label for="{{ form.full_name.id_for_label }}" class="form-label fw-semibold">
+              الاسم الكامل واللقب الأكاديمي <span class="text-danger">*</span>
+            </label>
+            {{ form.full_name }}
+            {% if form.full_name.errors %}
+              <div class="text-danger small mt-1">{{ form.full_name.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <!-- 2. تحديد الموقع والصفة والمقعد في بوابة الدخول -->
+          <div class="p-3 mb-3 rounded border" style="background-color: #f8fafc; border-color: #cbd5e1 !important;">
+            <div class="fw-bold text-navy mb-2" style="font-size: 0.92rem;">
+              الموقع في مجلس الجامعة ومقعد التمثيل في بوابة الدخول
+            </div>
+
+            <div class="row g-3">
+              <!-- Login Category -->
+              <div class="col-12 col-md-6">
+                <label for="id_login_category" class="form-label fw-semibold text-navy">
+                  الموقع في مجلس الجامعة وبوابة الدخول <span class="text-danger">*</span>
+                </label>
+                {{ form.login_category }}
+                {% if form.login_category.errors %}
+                  <div class="text-danger small mt-1">{{ form.login_category.errors.0 }}</div>
+                {% endif %}
+                <div class="form-text small">يحدد البوابة التي يظهر ضمنها العضو في شاشة تسجيل الدخول.</div>
+              </div>
+
+              <!-- Title -->
+              <div class="col-12 col-md-6">
+                <label for="id_title" class="form-label fw-semibold">
+                  اللقب الوظيفي / الصفة في المجلس
+                </label>
+                {{ form.title }}
+                {% if form.title.errors %}
+                  <div class="text-danger small mt-1">{{ form.title.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <!-- Official Title -->
+              <div class="col-12 col-md-6">
+                <label for="{{ form.official_title.id_for_label }}" class="form-label fw-semibold">
+                  الصفة الرسمية الكاملة بالمجلس (مع الكلية/الجهة)
+                </label>
+                {{ form.official_title }}
+                {% if form.official_title.errors %}
+                  <div class="text-danger small mt-1">{{ form.official_title.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <!-- Department -->
+              <div class="col-12 col-md-4">
+                <label for="{{ form.department.id_for_label }}" class="form-label fw-semibold">
+                  الجهة / الكلية / الإدارة
+                </label>
+                {{ form.department }}
+                {% if form.department.errors %}
+                  <div class="text-danger small mt-1">{{ form.department.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <!-- Order -->
+              <div class="col-12 col-md-2">
+                <label for="{{ form.order.id_for_label }}" class="form-label fw-semibold">
+                  الترتيب بالمجلس
+                </label>
+                {{ form.order }}
+                {% if form.order.errors %}
+                  <div class="text-danger small mt-1">{{ form.order.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <!-- Seat Assignment Mode -->
+              <div class="col-12">
+                <label for="id_seat_mode" class="form-label fw-semibold">
+                  ارتباط العضو بمقاعد المجلس وشاشة الدخول
+                </label>
+                {{ form.seat_mode }}
+                <div class="form-text small">
+                  عند تغيير الموقع أعلاه لعضو صاحب مقعد رسمي مستقل، ينتقل مقعده تلقائياً إلى البوابة الجديدة في شاشة الدخول.
+                </div>
+              </div>
+
+              <!-- Existing Seat Selection -->
+              <div class="col-12" id="existing-seat-container" style="display: none;">
+                <div class="row g-2 p-2 rounded border bg-white">
+                  <div class="col-12 col-md-7">
+                    <label for="id_existing_seat" class="form-label fw-semibold small mb-1">
+                      اختر مقعد الجهة / الكلية الموجود <span class="text-danger">*</span>
+                    </label>
+                    {{ form.existing_seat }}
+                    {% if form.existing_seat.errors %}
+                      <div class="text-danger small mt-1">{{ form.existing_seat.errors.0 }}</div>
+                    {% endif %}
+                  </div>
+                  <div class="col-12 col-md-5">
+                    <label for="id_seat_role" class="form-label fw-semibold small mb-1">
+                      صفة التمثيل في هذا المقعد
+                    </label>
+                    {{ form.seat_role }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. بيانات التواصل والإشراف -->
+          <div class="row g-3 mb-3">
+            <div class="col-12 col-md-4">
+              <label for="{{ form.phone.id_for_label }}" class="form-label fw-semibold">رقم الهاتف</label>
+              {{ form.phone }}
+            </div>
+            <div class="col-12 col-md-4">
+              <label for="{{ form.email.id_for_label }}" class="form-label fw-semibold">البريد الإلكتروني</label>
+              {{ form.email }}
+            </div>
+            <div class="col-12 col-md-4">
+              <label for="{{ form.manager.id_for_label }}" class="form-label fw-semibold">المسؤول المباشر</label>
+              {{ form.manager }}
+            </div>
+          </div>
+
+          <!-- 4. حالة الحساب -->
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              {{ form.is_active }}
+              <label class="form-check-label fw-semibold" for="{{ form.is_active.id_for_label }}">
+                الحساب نشط ومسموح له بالدخول
+              </label>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+            {% if target_user != user %}
+              {% if user.is_super or user.can_grant and target_user.manager == user %}
+                <a href="{% url 'accounts:user_delete' target_user.pk %}" class="btn btn-outline-danger btn-sm">
+                  حذف المستخدم
+                </a>
+              {% else %}
+                <div></div>
+              {% endif %}
+            {% else %}
+              <div></div>
+            {% endif %}
+            <div class="d-flex gap-2">
+              <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm">إلغاء</a>
+              <button type="submit" class="btn btn-navy btn-sm px-4">حفظ التعديلات</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  const categorySelect = document.getElementById('id_login_category');
+  const titleSelect = document.getElementById('id_title');
+  const seatModeSelect = document.getElementById('id_seat_mode');
+  const existingSeatBox = document.getElementById('existing-seat-container');
+
+  const titleToCategoryMap = {
+    'رئيس_الجامعة': 'presidency_office',
+    'مستشار': 'presidency_office',
+    'مساعد': 'presidency_office',
+    'نائب_رئيس': 'vice_presidents',
+    'عميد': 'deans',
+    'نائب_عميد': 'deans',
+    'امين_عام': 'secretariat_admin',
+    'امين_عام_مساعد': 'secretariat_admin',
+    'مدير_عام_المساعدة': 'secretariat_admin',
+    'موظف_المساعدة': 'secretariat_admin',
+    'ادارة_مساعدة': 'secretariat_admin',
+    'مدير_النظام': 'secretariat_admin',
+    'رئيس_نقابة': 'representatives',
+    'عضو_مجلس': 'representatives'
+  };
+
+  function syncSeatModeVisibility() {
+    if (!seatModeSelect || !existingSeatBox) return;
+    if (seatModeSelect.value === 'existing_seat') {
+      existingSeatBox.style.display = 'block';
+    } else {
+      existingSeatBox.style.display = 'none';
+    }
+  }
+
+  if (titleSelect && categorySelect) {
+    titleSelect.addEventListener('change', function() {
+      const val = titleSelect.value;
+      if (titleToCategoryMap[val]) {
+        categorySelect.value = titleToCategoryMap[val];
+      }
+    });
+  }
+
+  if (seatModeSelect) {
+    seatModeSelect.addEventListener('change', syncSeatModeVisibility);
+    syncSeatModeVisibility();
+  }
+})();
+</script>
+{% endblock %}

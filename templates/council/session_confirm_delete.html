@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}حذف الجلسة رقم {{ session.session_number }}{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <div>
+      <h1 class="page-title text-danger">
+        <i class="bi bi-calendar-x"></i>حذف الجلسة رقم {{ session.session_number }}
+      </h1>
+      <div class="page-subtitle">{{ session.title|default:"جلسة مجلس الجامعة" }} ({{ session.date }})</div>
+    </div>
+    <div>
+      <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-arrow-right me-1"></i>العودة للجلسة
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-6">
+    <div class="uc-card border-danger shadow-sm">
+      <div class="uc-card-header bg-danger text-white">
+        <h5><i class="bi bi-exclamation-triangle"></i>تأكيد حذف الجلسة</h5>
+      </div>
+      <div class="uc-card-body p-4 text-center">
+        <i class="bi bi-trash display-3 text-danger mb-3 d-block"></i>
+        <h4 class="fw-bold mb-2">هل أنت متأكد من حذف الجلسة رقم {{ session.session_number }}؟</h4>
+        <p class="text-danger mb-4">
+          <strong>تحذير:</strong> سيؤدي هذا الإجراء إلى حذف كافة الموضوعات والتسجيلات والمرفقات وسجلات التصويت والقرارات المرتبطة بهذه الجلسة نهائياً.
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          <div class="d-flex justify-content-center gap-3">
+            <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-secondary px-4">إلغاء</a>
+            <button type="submit" class="btn btn-danger px-4">
+              <i class="bi bi-trash me-1"></i>نعم، احذف الجلسة نهائياً
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
