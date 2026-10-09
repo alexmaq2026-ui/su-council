@@ -161,26 +161,28 @@
               </div>
 
               <!-- Quick stats -->
+              {% with st=s.get_stats %}
               <div class="row g-2 mb-3 text-center">
                 <div class="col-4">
                   <div class="p-2 bg-light rounded-3">
-                    <div class="fw-bold fs-5 text-navy">{{ s.topics.count }}</div>
+                    <div class="fw-bold fs-5 text-navy">{{ st.total }}</div>
                     <div class="small text-muted">موضوع</div>
                   </div>
                 </div>
                 <div class="col-4">
                   <div class="p-2 bg-light rounded-3">
-                    <div class="fw-bold fs-5 text-success">{{ s.get_stats.voted }}</div>
+                    <div class="fw-bold fs-5 text-success">{{ st.voted }}</div>
                     <div class="small text-muted">تم التصويت</div>
                   </div>
                 </div>
                 <div class="col-4">
                   <div class="p-2 bg-light rounded-3">
-                    <div class="fw-bold fs-5 text-warning">{{ s.get_stats.pending }}</div>
+                    <div class="fw-bold fs-5 text-warning">{{ st.pending }}</div>
                     <div class="small text-muted">في الانتظار</div>
                   </div>
                 </div>
               </div>
+              {% endwith %}
             </div>
 
             <!-- Footer actions -->

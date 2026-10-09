@@ -83,7 +83,7 @@ def session_list_view(request):
         messages.error(request, 'ليس لديك صلاحية لعرض الجلسات.')
         return redirect('/dashboard/')
 
-    qs = CouncilSession.objects.select_related('created_by').order_by('-date', '-session_number')
+    qs = CouncilSession.objects.select_related('created_by').prefetch_related('topics').order_by('-date', '-session_number')
     if not user_can_view_drafts(request.user):
         qs = qs.exclude(status='draft')
 
@@ -157,9 +157,9 @@ def session_detail_view(request, pk):
         return redirect('council:session_list')
 
     # Fetch all topics with related data in as few queries as possible
-    topics = (
+    topics = list(
         session.topics
-        .select_related('created_by')
+        .select_related('session', 'created_by', 'decision', 'signed_decision', 'display_state')
         .prefetch_related('attachments', 'recordings', 'votes', 'votes__member', 'tables')
         .order_by('category', 'sub_order', 'order_number')
     )
@@ -172,24 +172,30 @@ def session_detail_view(request, pk):
             if cat_topics:
                 topics_by_category[cat_label] = cat_topics
 
-    # Attendance list
-    attendances = (
+    # Attendance list (evaluate once in memory to avoid 6 separate SQL queries)
+    attendances = list(
         session.attendances
         .select_related('member', 'seat', 'proxy_user')
         .order_by('member__order', 'member__id')
     )
-    attendances_primary = attendances.filter(
-        Q(status='present_primary') | (Q(status='present') & Q(is_proxy=False))
-    )
-    attendances_deputy = attendances.filter(
-        Q(status='present_deputy') | Q(is_proxy=True)
-    )
-    attendances_excused = attendances.filter(status='excused')
-    attendances_unexcused = attendances.filter(status__in=['unexcused', 'absent'])
-    attendances_unrecorded = attendances.filter(status='unrecorded')
+    attendances_primary = [
+        a for a in attendances
+        if a.status == 'present_primary' or (a.status == 'present' and not a.is_proxy)
+    ]
+    attendances_deputy = [
+        a for a in attendances
+        if a.status == 'present_deputy' or a.is_proxy
+    ]
+    attendances_excused = [a for a in attendances if a.status == 'excused']
+    attendances_unexcused = [a for a in attendances if a.status in ('unexcused', 'absent')]
+    attendances_unrecorded = [a for a in attendances if a.status == 'unrecorded']
 
-    # Session stats
-    stats = session.get_stats()
+    # Session stats (computed in memory from already-fetched topics)
+    stats = {
+        'total': len(topics),
+        'voted': sum(1 for t in topics if t.status == 'voted'),
+        'pending': sum(1 for t in topics if t.status == 'pending'),
+    }
 
     editable = not session.is_frozen()
     next_stage = session.get_next_stage()

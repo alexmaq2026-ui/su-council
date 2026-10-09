@@ -133,11 +133,11 @@ class CouncilSession(models.Model):
 
     def get_stats(self):
         """Return quick stats for dashboard."""
-        topics = self.topics.all()
+        topics = list(self.topics.all())
         return {
-            'total': topics.count(),
-            'voted': topics.filter(status='voted').count(),
-            'pending': topics.filter(status='pending').count(),
+            'total': len(topics),
+            'voted': sum(1 for t in topics if t.status == 'voted'),
+            'pending': sum(1 for t in topics if t.status == 'pending'),
         }
 
     def get_next_stage(self):
@@ -756,25 +756,33 @@ class Topic(models.Model):
         return self.get_status_display()
 
     def get_vote_summary(self):
-        """Return vote counts for this topic."""
-        votes = self.votes.all()
+        """Return vote counts for this topic (uses prefetched votes when available)."""
+        votes = list(self.votes.all())
         return {
-            'total':   votes.count(),
-            'approve': votes.filter(choice='approve').count(),
-            'reject':  votes.filter(choice='reject').count(),
-            'reserve': votes.filter(choice='reserve').count(),
+            'total':   len(votes),
+            'approve': sum(1 for v in votes if v.choice == 'approve'),
+            'reject':  sum(1 for v in votes if v.choice == 'reject'),
+            'reserve': sum(1 for v in votes if v.choice == 'reserve'),
         }
 
     def has_decision(self):
-        return hasattr(self, 'decision') and self.decision is not None
+        try:
+            return self.decision is not None
+        except Exception:
+            return False
 
     def user_voted(self, user):
         """Check if a user already voted on this topic."""
-        return self.votes.filter(member=user).exists()
+        uid = getattr(user, 'pk', user)
+        return any(v.member_id == uid for v in self.votes.all())
 
     def get_user_vote(self, user):
-        """Get the user's vote object or None."""
-        return self.votes.filter(member=user).first()
+        """Get the user's vote object or None (uses prefetched votes when available)."""
+        uid = getattr(user, 'pk', user)
+        for v in self.votes.all():
+            if v.member_id == uid:
+                return v
+        return None
 
     def get_display_state(self):
         """Get or create TopicDisplayState for this topic."""

@@ -40,11 +40,12 @@ def topic_detail_view(request, pk):
 
     topic = get_object_or_404(
         Topic.objects
-        .select_related('session', 'created_by')
+        .select_related('session', 'created_by', 'decision', 'signed_decision', 'display_state')
         .prefetch_related(
             'attachments', 'attachments__uploaded_by',
             'recordings', 'recordings__recorded_by',
             'votes', 'votes__member',
+            'tables', 'target_seats',
         ),
         pk=pk
     )

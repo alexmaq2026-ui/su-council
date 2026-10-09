@@ -83,8 +83,9 @@ DATABASES = {
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=0)
+    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=60)
     DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
+    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 AUTH_USER_MODEL = 'accounts.User'
@@ -113,6 +114,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 if not DEBUG:
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
     WHITENOISE_MANIFEST_STRICT = False
+    WHITENOISE_USE_FINDERS = True
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -133,4 +135,4 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800   # 50 MB
 
 # ── Session ───────────────────────────────────────────────────────────────────
 SESSION_COOKIE_AGE = 86400 * 7  # 7 days
-SESSION_SAVE_EVERY_REQUEST = True
+SESSION_SAVE_EVERY_REQUEST = False

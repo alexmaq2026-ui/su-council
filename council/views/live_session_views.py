@@ -61,10 +61,7 @@ def session_live_view(request, session_pk):
         messages.error(request, 'ليس لديك صلاحية لدخول شاشة الانعقاد الحي.')
         return redirect('/dashboard/')
 
-    session = get_object_or_404(
-        CouncilSession.objects.prefetch_related('topics__display_state', 'topics__tables', 'topics__votes'),
-        pk=session_pk
-    )
+    session = get_object_or_404(CouncilSession, pk=session_pk)
 
     if not session.can_be_seen_by(user):
         messages.error(request, 'لا يمكنك استعراض هذه الجلسة.')
@@ -72,14 +69,26 @@ def session_live_view(request, session_pk):
 
     is_controller = user_can_control_live(user)
 
-    # Ensure all topics have a TopicDisplayState
-    raw_topics = list(session.topics.select_related('display_state', 'decision').order_by('sub_order', 'order_number', 'id'))
+    # Fetch topics once with all related objects prefetched
+    raw_topics = list(
+        session.topics
+        .select_related('session', 'display_state', 'decision')
+        .prefetch_related('tables', 'votes', 'votes__member', 'recordings', 'attachments')
+        .order_by('sub_order', 'order_number', 'id')
+    )
+    created_any_state = False
     for t in raw_topics:
         if not hasattr(t, 'display_state') or t.display_state is None:
             TopicDisplayState.objects.get_or_create(topic=t)
+            created_any_state = True
 
-    # Refresh topics and sort in official TOPIC_CATEGORIES order
-    raw_topics = list(session.topics.select_related('display_state', 'decision').order_by('sub_order', 'order_number', 'id'))
+    if created_any_state:
+        raw_topics = list(
+            session.topics
+            .select_related('session', 'display_state', 'decision')
+            .prefetch_related('tables', 'votes', 'votes__member', 'recordings', 'attachments')
+            .order_by('sub_order', 'order_number', 'id')
+        )
     cat_order_map = {cat_key: idx for idx, (cat_key, _) in enumerate(TOPIC_CATEGORIES)}
     topics = sorted(raw_topics, key=lambda t: (cat_order_map.get(t.category, 99), t.sub_order, t.order_number, t.id))
 
@@ -254,27 +263,34 @@ def session_analytics_view(request, session_pk):
         messages.error(request, 'ليس لديك صلاحية لعرض لوحة إحصائيات وتحليلات الجلسة.')
         return redirect('/dashboard/')
 
-    session = get_object_or_404(
-        CouncilSession.objects.prefetch_related('topics__display_state', 'topics__votes', 'speak_requests'),
-        pk=session_pk
-    )
+    session = get_object_or_404(CouncilSession, pk=session_pk)
     if not session.can_be_seen_by(request.user):
         messages.error(request, 'لا يمكن عرض إحصائيات هذه الجلسة.')
         return redirect('/dashboard/')
 
-    topics = session.topics.select_related('display_state').all()
-    total_topics = topics.count()
-    voted_topics = topics.filter(status='voted').count()
-    total_votes = Vote.objects.filter(topic__session=session).count()
+    topics = list(
+        session.topics
+        .select_related('session', 'display_state', 'decision')
+        .prefetch_related('votes')
+        .all()
+    )
+    total_topics = len(topics)
+    voted_topics = sum(1 for t in topics if t.status == 'voted')
+    total_votes = sum(len(t.votes.all()) for t in topics)
 
     # Speaking statistics
-    speak_requests = SpeakRequest.objects.filter(session=session)
-    total_speakers_count = speak_requests.filter(status='completed').values('member').distinct().count()
-    total_speeches = speak_requests.filter(status='completed').count()
+    completed_speeches = list(
+        SpeakRequest.objects
+        .filter(session=session, status='completed')
+        .select_related('member', 'seat')
+    )
+    total_speakers_count = len({sr.member_id for sr in completed_speeches})
+    total_speeches = len(completed_speeches)
 
     total_speaking_seconds = 0
     speaker_stats = {}
-    for sr in speak_requests.filter(status='completed').select_related('member', 'seat'):
+    speeches_by_topic = {}
+    for sr in completed_speeches:
         dur = sr.get_duration_seconds()
         total_speaking_seconds += dur
         m_name = sr.member.full_name
@@ -283,6 +299,8 @@ def session_analytics_view(request, session_pk):
             speaker_stats[m_name] = {'count': 0, 'duration': 0, 'seat': s_name, 'member': sr.member}
         speaker_stats[m_name]['count'] += 1
         speaker_stats[m_name]['duration'] += dur
+        if sr.topic_id:
+            speeches_by_topic[sr.topic_id] = speeches_by_topic.get(sr.topic_id, 0) + 1
 
     speaker_ranking = sorted(speaker_stats.values(), key=lambda x: x['duration'], reverse=True)
 
@@ -298,7 +316,7 @@ def session_analytics_view(request, session_pk):
     for t in topics:
         state = getattr(t, 'display_state', None)
         v_summary = t.get_vote_summary()
-        t_speeches = speak_requests.filter(topic=t, status='completed').count()
+        t_speeches = speeches_by_topic.get(t.pk, 0)
         topic_analytics.append({
             'topic': t,
             'state': state,

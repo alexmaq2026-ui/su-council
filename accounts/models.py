@@ -221,7 +221,15 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Return the user's Permission object (created with zero permissions if absent)."""
         if not self.pk:
             return None
+        if hasattr(self, '_cached_council_perm') and self._cached_council_perm is not None:
+            return self._cached_council_perm
+        if hasattr(self, '_state') and 'council_permission' in self._state.fields_cache:
+            perm = self._state.fields_cache['council_permission']
+            if perm is not None:
+                self._cached_council_perm = perm
+                return perm
         perm, _ = CouncilPermission.objects.get_or_create(user=self)
+        self._cached_council_perm = perm
         return perm
 
     # ── Permission Check Delegation ──────────────────────────────────────────
@@ -545,6 +553,13 @@ class CouncilPermission(models.Model):
 
     def __str__(self):
         return f'صلاحيات {self.user.full_name}'
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if hasattr(self, '_state') and 'user' in self._state.fields_cache:
+            u = self._state.fields_cache['user']
+            if u is not None:
+                u._cached_council_perm = self
 
     def count_granted(self):
         """Return total number of granted permissions (out of 57)."""

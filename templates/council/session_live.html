@@ -322,7 +322,7 @@
                       {% if t.recordings.all and user.can_listen_audio %}
                       <div class="p-2 mb-3 bg-white rounded border">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                          <span class="small fw-bold text-navy"><i class="bi bi-mic-fill text-danger me-1"></i>تسجيلات نقاش الموضوع ({{ t.recordings.count }}):</span>
+                          <span class="small fw-bold text-navy"><i class="bi bi-mic-fill text-danger me-1"></i>تسجيلات نقاش الموضوع ({{ t.recordings.all|length }}):</span>
                           {% if user.can_view_topics %}
                             <a href="{% url 'council:topic_detail' t.pk %}" target="_blank" class="small text-decoration-none">إدارة التسجيلات ←</a>
                           {% endif %}

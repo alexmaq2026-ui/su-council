@@ -250,7 +250,7 @@
       <div class="stat-icon bg-primary bg-opacity-10 text-primary">
         <i class="bi bi-journal-text"></i>
       </div>
-      <div class="stat-value">{{ session.topics.count }}</div>
+      <div class="stat-value">{{ stats.total }}</div>
       <div class="stat-label">إجمالي الموضوعات</div>
     </div>
   </div>
@@ -277,7 +277,7 @@
       <div class="stat-icon bg-info bg-opacity-10 text-info">
         <i class="bi bi-people"></i>
       </div>
-      <div class="stat-value">{{ attendances.count }}</div>
+      <div class="stat-value">{{ attendances|length }}</div>
       <div class="stat-label">أعضاء المجلس المسجلين</div>
     </div>
   </div>
@@ -342,8 +342,8 @@
                     {% if t.memo_number %}
                       <span class="badge bg-light text-dark border">مذكرة {{ t.memo_number }}</span>
                     {% endif %}
-                    {% if t.tables.count %}
-                      <span class="badge border" style="background-color: #fef3c7; color: #92400e;">{{ t.tables.count }} جدول</span>
+                    {% if t.tables.all %}
+                      <span class="badge border" style="background-color: #fef3c7; color: #92400e;">{{ t.tables.all|length }} جدول</span>
                     {% endif %}
                     {% if t.has_decision %}
                       <span class="badge bg-success bg-opacity-10 text-success border border-success">
@@ -352,11 +352,11 @@
                     {% endif %}
                   </div>
                   <div class="d-flex align-items-center gap-2">
-                    {% if t.recordings.count %}
+                    {% if t.recordings.all %}
                       <span class="text-danger small" title="يوجد تسجيل صوتي"><i class="bi bi-mic-fill"></i></span>
                     {% endif %}
-                    {% if t.attachments.count %}
-                      <span class="text-primary small" title="توجد مرفقات"><i class="bi bi-paperclip"></i> {{ t.attachments.count }}</span>
+                    {% if t.attachments.all %}
+                      <span class="text-primary small" title="توجد مرفقات"><i class="bi bi-paperclip"></i> {{ t.attachments.all|length }}</span>
                     {% endif %}
                     {% if user_can_use_smart_reader %}
                       <button type="button" class="btn btn-sm btn-outline-warning text-dark fw-bold" onclick="openSmartReader({topicId: {{ t.pk }}})" title="استماع بالقراءة الذكية">
@@ -388,7 +388,7 @@
                 <!-- Topic Audio Recordings -->
                 {% if t.recordings.all and user.can_listen_audio %}
                   <div class="p-2 mb-2 bg-light rounded border d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <span class="small fw-bold text-navy"><i class="bi bi-mic-fill text-danger me-1"></i>تسجيلات نقاش الموضوع ({{ t.recordings.count }}):</span>
+                    <span class="small fw-bold text-navy"><i class="bi bi-mic-fill text-danger me-1"></i>تسجيلات نقاش الموضوع ({{ t.recordings.all|length }}):</span>
                     <div class="d-flex flex-wrap align-items-center gap-2">
                       {% for rec in t.recordings.all %}
                         <div class="d-flex align-items-center gap-1 bg-white px-2 py-1 rounded border">
@@ -486,7 +486,7 @@
     {% if user_can_view_attendance %}
     <div class="uc-card shadow-sm mb-4">
       <div class="uc-card-header d-flex justify-content-between align-items-center">
-        <h6>سجل الحضور والغياب ({{ attendances.count }})</h6>
+        <h6>سجل الحضور والغياب ({{ attendances|length }})</h6>
         {% if user_can_manage_attendance %}
           <a href="{% url 'council:session_attendance' pk=session.pk %}" class="btn btn-sm btn-outline-light py-0 px-2" style="font-size: 0.75rem;">
             إدارة
@@ -497,12 +497,12 @@
         {% if attendances %}
           <!-- Status Counters Bar -->
           <div class="p-2 px-3 bg-light border-bottom d-flex flex-wrap gap-2 justify-content-between align-items-center small">
-            <span class="badge bg-success" title="حاضر أصيل">🟢 أصيل: {{ attendances_primary.count }}</span>
-            <span class="badge bg-warning text-dark" title="حاضر إنابة">🟠 إنابة: {{ attendances_deputy.count }}</span>
-            <span class="badge bg-warning text-dark border" title="غياب بعذر">🟡 بعذر: {{ attendances_excused.count }}</span>
-            <span class="badge bg-danger" title="غياب بغير عذر">🔴 غائب: {{ attendances_unexcused.count }}</span>
-            {% if attendances_unrecorded.count %}
-              <span class="badge bg-secondary" title="لم يرصد">⚪ لم يرصد: {{ attendances_unrecorded.count }}</span>
+            <span class="badge bg-success" title="حاضر أصيل">🟢 أصيل: {{ attendances_primary|length }}</span>
+            <span class="badge bg-warning text-dark" title="حاضر إنابة">🟠 إنابة: {{ attendances_deputy|length }}</span>
+            <span class="badge bg-warning text-dark border" title="غياب بعذر">🟡 بعذر: {{ attendances_excused|length }}</span>
+            <span class="badge bg-danger" title="غياب بغير عذر">🔴 غائب: {{ attendances_unexcused|length }}</span>
+            {% if attendances_unrecorded %}
+              <span class="badge bg-secondary" title="لم يرصد">⚪ لم يرصد: {{ attendances_unrecorded|length }}</span>
             {% endif %}
           </div>
 
