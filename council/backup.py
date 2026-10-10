@@ -49,7 +49,7 @@ def create_backup(user=None, reason='يدوي'):
             from django.core.management import call_command
             out = backup_dir / f'db_backup_{ts}.json'
             with open(out, 'w', encoding='utf-8') as f:
-                call_command('dumpdata', 'accounts', 'council', indent=2, stdout=f)
+                call_command('dumpdata', 'accounts', 'council', stdout=f)
             size = out.stat().st_size
         BackupLog.objects.create(
             backup_path=str(out), size_bytes=size,

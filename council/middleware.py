@@ -97,13 +97,16 @@ class SessionLifecycleGuardMiddleware:
         if SessionLifecycleGuardMiddleware._last_backup_day == today:
             return
         SessionLifecycleGuardMiddleware._last_backup_day = today
-        try:
-            from council.models import BackupLog
-            from council.backup import create_backup
-            if not BackupLog.objects.filter(created_at__date=today, success=True).exists():
-                create_backup(reason='نسخ تلقائي يومي')
-        except Exception:
-            pass
+        import threading
+        def _bg_backup():
+            try:
+                from council.models import BackupLog
+                from council.backup import create_backup
+                if not BackupLog.objects.filter(created_at__date=today, success=True).exists():
+                    create_backup(reason='نسخ تلقائي يومي')
+            except Exception:
+                pass
+        threading.Thread(target=_bg_backup, daemon=True).start()
 
     # ── lifecycle guard ───────────────────────────────────────────────────
     def _guard(self, request):
