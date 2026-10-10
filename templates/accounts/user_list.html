@@ -358,13 +358,13 @@
                    class="btn-action-edit"
                    title="تعديل بيانات المستخدم">تعديل</a>
                 {% endif %}
-                {% if user.is_super or user.can_manage_users or user.can_grant_permissions and u.manager == user %}
+                {% if user.is_super or user.can_reset_user_password %}
                 <a href="{% url 'accounts:user_reset_password' u.pk %}"
                    class="btn-action-pwd"
                    title="إعادة تعيين كلمة المرور">كلمة المرور</a>
                 {% endif %}
                 {% if u != user %}
-                  {% if user.is_super or user.can_manage_users or user.can_grant_permissions and u.manager == user %}
+                  {% if user.is_super or user.can_delete_user %}
                   <button type="button"
                           class="btn-action-delete"
                           title="حذف أو تعطيل المستخدم"

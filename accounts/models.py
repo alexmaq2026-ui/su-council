@@ -345,6 +345,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def can_manage_users(self):        return self._has_perm('can_manage_users')
     @property
+    def can_delete_user(self):         return self._has_perm('can_delete_user')
+    @property
+    def can_reset_user_password(self): return self._has_perm('can_reset_user_password')
+    @property
     def can_import_members(self):      return self._has_perm('can_import_members')
     @property
     def can_manage_delegates(self):    return self._has_perm('can_manage_delegates')
@@ -440,7 +444,8 @@ class CouncilPermission(models.Model):
         'can_upload_signed_decision', 'can_send_decisions',
         'can_view_correspondence', 'can_view_dispatch_log',
         # 8. Users & Delegation
-        'can_manage_users', 'can_import_members', 'can_grant_permissions',
+        'can_manage_users', 'can_delete_user', 'can_reset_user_password',
+        'can_import_members', 'can_grant_permissions',
         'can_manage_delegates', 'can_change_password',
         # 9. Lifecycle & Live Session
         'can_advance_session_stage', 'can_reopen_frozen_session', 'can_approve_new_session',
@@ -508,11 +513,13 @@ class CouncilPermission(models.Model):
     can_view_dispatch_log       = models.BooleanField('عرض ومتابعة سجل إرسال واستلام القرارات', default=False)
 
     # 8. Users, Delegation & Account Operations
-    can_manage_users        = models.BooleanField('إضافة وتعديل بيانات المستخدمين', default=False)
-    can_import_members      = models.BooleanField('استيراد أعضاء المجلس (Excel/Word)', default=False)
-    can_grant_permissions   = models.BooleanField('تخويل وإدارة صلاحيات المستخدمين', default=False)
-    can_manage_delegates    = models.BooleanField('إدارة الممثلين والتفويض بالإنابة', default=False)
-    can_change_password     = models.BooleanField('تغيير كلمة المرور الخاصة بالحساب', default=False)
+    can_manage_users          = models.BooleanField('إضافة وتعديل بيانات المستخدمين', default=False)
+    can_delete_user           = models.BooleanField('حذف وتعطيل حسابات المستخدمين', default=False)
+    can_reset_user_password   = models.BooleanField('إعادة تعيين كلمات المرور للمستخدمين', default=False)
+    can_import_members        = models.BooleanField('استيراد أعضاء المجلس (Excel/Word)', default=False)
+    can_grant_permissions     = models.BooleanField('تخويل وإدارة صلاحيات المستخدمين', default=False)
+    can_manage_delegates      = models.BooleanField('إدارة الممثلين والتفويض بالإنابة', default=False)
+    can_change_password       = models.BooleanField('تغيير كلمة المرور الخاصة بالحساب', default=False)
 
     # 9. Session Lifecycle & Live Session Management
     can_advance_session_stage = models.BooleanField('نقل الجلسة بين المراحل الخمس', default=False)

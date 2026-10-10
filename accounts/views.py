@@ -701,11 +701,9 @@ def user_delete_view(request, pk):
     target_user = get_object_or_404(User, pk=pk)
 
     # Authority check
-    can_manage = current_user.is_super or (
-        (current_user.can_manage_users or current_user.can_grant) and (target_user.manager == current_user or current_user.can_manage_users)
-    )
-    if not can_manage:
-        messages.error(request, 'ليس لديك صلاحية لحذف هذا المستخدم.')
+    can_delete = current_user.is_super or current_user.can_delete_user
+    if not can_delete:
+        messages.error(request, 'ليس لديك صلاحية لحذف أو تعطيل المستخدمين.')
         return redirect('accounts:user_list')
 
     if target_user == current_user:
@@ -814,7 +812,7 @@ def user_reset_password_view(request, pk):
     Accessible by Super Admin or users with can_manage_users / can_grant permission.
     """
     current_user = request.user
-    if not (current_user.is_super or current_user.can_manage_users or current_user.can_grant):
+    if not (current_user.is_super or current_user.can_reset_user_password):
         messages.error(request, 'ليس لديك صلاحية لإعادة تعيين كلمة المرور للمستخدمين.')
         return redirect('/dashboard/')
 
@@ -824,12 +822,6 @@ def user_reset_password_view(request, pk):
     if target_user.is_super and not current_user.is_super:
         messages.error(request, 'لا يمكن تغيير كلمة مرور المسؤول الأعلى.')
         return redirect('accounts:user_list')
-
-    # Authority check for department managers
-    if not current_user.is_super and not current_user.can_manage_users:
-        if target_user.manager != current_user:
-            messages.error(request, 'يمكنك فقط إعادة تعيين كلمات المرور للموظفين التابعين لك.')
-            return redirect('accounts:user_list')
 
     form = AdminResetPasswordForm(target_user=target_user, data=request.POST or None)
     if request.method == 'POST' and form.is_valid():

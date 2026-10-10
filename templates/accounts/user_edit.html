@@ -175,13 +175,13 @@
           <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
             <div class="d-flex gap-2">
               {% if target_user != user %}
-                {% if user.is_super or user.can_grant and target_user.manager == user %}
+                {% if user.is_super or user.can_delete_user %}
                   <a href="{% url 'accounts:user_delete' target_user.pk %}" class="btn btn-outline-danger btn-sm">
                     حذف المستخدم
                   </a>
                 {% endif %}
               {% endif %}
-              {% if user.is_super or user.can_manage_users or user.can_grant and target_user.manager == user %}
+              {% if user.is_super or user.can_reset_user_password %}
                 <a href="{% url 'accounts:user_reset_password' target_user.pk %}" class="btn btn-outline-warning btn-sm">
                   <i class="bi bi-key-fill me-1"></i> إعادة تعيين كلمة المرور
                 </a>

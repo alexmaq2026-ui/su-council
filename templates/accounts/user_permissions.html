@@ -207,6 +207,8 @@ document.addEventListener('DOMContentLoaded', () => {
     {% if permission_obj.can_view_correspondence %}'can_view_correspondence',{% endif %}
     {% if permission_obj.can_view_dispatch_log %}'can_view_dispatch_log',{% endif %}
     {% if permission_obj.can_manage_users %}'can_manage_users',{% endif %}
+    {% if permission_obj.can_delete_user %}'can_delete_user',{% endif %}
+    {% if permission_obj.can_reset_user_password %}'can_reset_user_password',{% endif %}
     {% if permission_obj.can_import_members %}'can_import_members',{% endif %}
     {% if permission_obj.can_grant_permissions %}'can_grant_permissions',{% endif %}
     {% if permission_obj.can_manage_delegates %}'can_manage_delegates',{% endif %}
