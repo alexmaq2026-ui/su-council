@@ -25,6 +25,7 @@ backups/
 *.pdf
 *.docx
 ملاجظة*.txt
+بيانات_النشر*.txt
 file
 
 # Environment

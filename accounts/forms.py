@@ -635,6 +635,20 @@ class ChangePasswordForm(forms.Form):
 
     def __init__(self, user, *args, **kwargs):
         self.user = user
+        # Backward/template compatibility: alias fields if present in POST data
+        data = kwargs.get('data')
+        if data is not None:
+            if hasattr(data, 'copy'):
+                data = data.copy()
+            else:
+                data = dict(data)
+            if 'old_password' in data and not data.get('current_password'):
+                data['current_password'] = data['old_password']
+            if 'new_password' in data and not data.get('new_password1'):
+                data['new_password1'] = data['new_password']
+            if 'confirm_password' in data and not data.get('new_password2'):
+                data['new_password2'] = data['confirm_password']
+            kwargs['data'] = data
         super().__init__(*args, **kwargs)
 
     def clean_current_password(self):
@@ -655,5 +669,59 @@ class ChangePasswordForm(forms.Form):
 
     def save(self):
         self.user.set_password(self.cleaned_data['new_password1'])
-        self.user.save()
+        if self.user.pk:
+            self.user.save(update_fields=['password'])
+        else:
+            self.user.save()
         return self.user
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. Admin Reset User Password Form
+# ─────────────────────────────────────────────────────────────────────────────
+class AdminResetPasswordForm(forms.Form):
+    new_password = forms.CharField(
+        label='كلمة المرور الجديدة',
+        initial='123456',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'أدخل كلمة المرور الجديدة',
+            'autocomplete': 'new-password'
+        }, render_value=True),
+        help_text='الافتراضية: 123456 (يمكنك تعيين أي كلمة مرور جديدة).'
+    )
+    confirm_password = forms.CharField(
+        label='تأكيد كلمة المرور',
+        initial='123456',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'أعد كتابة كلمة المرور للتأكيد',
+            'autocomplete': 'new-password'
+        }, render_value=True),
+    )
+
+    def __init__(self, target_user=None, *args, **kwargs):
+        if target_user is None:
+            target_user = kwargs.pop('user', None) or kwargs.pop('target_user', None)
+        self.target_user = target_user
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned = super().clean()
+        p1 = cleaned.get('new_password')
+        p2 = cleaned.get('confirm_password')
+        if p1 and p2:
+            if p1 != p2:
+                self.add_error('confirm_password', 'كلمتا المرور غير متطابقتين.')
+            if len(p1) < 6:
+                self.add_error('new_password', 'يجب ألا تقل كلمة المرور عن 6 أحرف.')
+        return cleaned
+
+    def save(self):
+        new_pwd = self.cleaned_data['new_password']
+        self.target_user.set_password(new_pwd)
+        if self.target_user.pk:
+            self.target_user.save(update_fields=['password'])
+        else:
+            self.target_user.save()
+        return self.target_user

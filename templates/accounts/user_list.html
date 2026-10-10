@@ -45,6 +45,26 @@
   border-color: #94a3b8 !important;
 }
 
+.btn-action-pwd {
+  color: #b45309 !important;
+  background-color: #ffffff !important;
+  border: 1px solid #fde047 !important;
+  padding: 0.2rem 0.55rem !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+  line-height: 1.3 !important;
+}
+.btn-action-pwd:hover {
+  background-color: #fef08a !important;
+  color: #713f12 !important;
+  border-color: #eab308 !important;
+}
+
 .btn-action-delete {
   color: #dc2626 !important;
   background-color: #ffffff !important;
@@ -337,6 +357,11 @@
                 <a href="{% url 'accounts:user_edit' u.pk %}"
                    class="btn-action-edit"
                    title="تعديل بيانات المستخدم">تعديل</a>
+                {% endif %}
+                {% if user.is_super or user.can_manage_users or user.can_grant_permissions and u.manager == user %}
+                <a href="{% url 'accounts:user_reset_password' u.pk %}"
+                   class="btn-action-pwd"
+                   title="إعادة تعيين كلمة المرور">كلمة المرور</a>
                 {% endif %}
                 {% if u != user %}
                   {% if user.is_super or user.can_manage_users or user.can_grant_permissions and u.manager == user %}

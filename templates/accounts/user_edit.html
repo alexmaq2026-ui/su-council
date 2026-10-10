@@ -173,17 +173,20 @@
           </div>
 
           <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
-            {% if target_user != user %}
-              {% if user.is_super or user.can_grant and target_user.manager == user %}
-                <a href="{% url 'accounts:user_delete' target_user.pk %}" class="btn btn-outline-danger btn-sm">
-                  حذف المستخدم
-                </a>
-              {% else %}
-                <div></div>
+            <div class="d-flex gap-2">
+              {% if target_user != user %}
+                {% if user.is_super or user.can_grant and target_user.manager == user %}
+                  <a href="{% url 'accounts:user_delete' target_user.pk %}" class="btn btn-outline-danger btn-sm">
+                    حذف المستخدم
+                  </a>
+                {% endif %}
               {% endif %}
-            {% else %}
-              <div></div>
-            {% endif %}
+              {% if user.is_super or user.can_manage_users or user.can_grant and target_user.manager == user %}
+                <a href="{% url 'accounts:user_reset_password' target_user.pk %}" class="btn btn-outline-warning btn-sm">
+                  <i class="bi bi-key-fill me-1"></i> إعادة تعيين كلمة المرور
+                </a>
+              {% endif %}
+            </div>
             <div class="d-flex gap-2">
               <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm">إلغاء</a>
               <button type="submit" class="btn btn-navy btn-sm px-4">حفظ التعديلات</button>

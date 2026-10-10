@@ -30,6 +30,8 @@ urlpatterns = [
     path('users/<int:pk>/delete/',      views.user_delete_view,                name='user-delete'),
     path('users/<int:pk>/activate/',    views.user_activate_view,              name='user_activate'),
     path('users/<int:pk>/activate/',    views.user_activate_view,              name='user-activate'),
+    path('users/<int:pk>/reset-password/', views.user_reset_password_view,     name='user_reset_password'),
+    path('users/<int:pk>/reset-password/', views.user_reset_password_view,     name='user-reset-password'),
 
     # ── Seat Deputies Management ──────────────────────────────────────────────
     path('seats/deputies/', views.seat_deputies_view, name='seat_deputies'),

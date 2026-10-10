@@ -15,6 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .forms import (
+    AdminResetPasswordForm,
     ChangePasswordForm,
     LoginForm,
     PermissionForm,
@@ -804,6 +805,54 @@ def change_password_view(request):
         'form': form,
     }
     return render(request, 'accounts/change_password.html', context)
+
+
+@login_required_custom
+def user_reset_password_view(request, pk):
+    """
+    Allow administrator or manager to reset a user's password if forgotten.
+    Accessible by Super Admin or users with can_manage_users / can_grant permission.
+    """
+    current_user = request.user
+    if not (current_user.is_super or current_user.can_manage_users or current_user.can_grant):
+        messages.error(request, 'ليس لديك صلاحية لإعادة تعيين كلمة المرور للمستخدمين.')
+        return redirect('/dashboard/')
+
+    target_user = get_object_or_404(User, pk=pk)
+
+    # Do not allow non-superusers to reset superuser's password
+    if target_user.is_super and not current_user.is_super:
+        messages.error(request, 'لا يمكن تغيير كلمة مرور المسؤول الأعلى.')
+        return redirect('accounts:user_list')
+
+    # Authority check for department managers
+    if not current_user.is_super and not current_user.can_manage_users:
+        if target_user.manager != current_user:
+            messages.error(request, 'يمكنك فقط إعادة تعيين كلمات المرور للموظفين التابعين لك.')
+            return redirect('accounts:user_list')
+
+    form = AdminResetPasswordForm(target_user=target_user, data=request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        log_action(
+            current_user, 'update', obj=target_user, request=request,
+            notes=f'إعادة تعيين كلمة مرور المستخدم ({target_user.full_name})'
+        )
+        messages.success(
+            request,
+            f'تم إعادة تعيين كلمة المرور بنجاح للمستخدم «{target_user.full_name}».'
+        )
+        next_url = request.GET.get('next')
+        if next_url and next_url.startswith('/'):
+            return redirect(next_url)
+        return redirect('accounts:user_list')
+
+    context = {
+        'title': f'إعادة تعيين كلمة المرور: {target_user.full_name}',
+        'target_user': target_user,
+        'form': form,
+    }
+    return render(request, 'accounts/user_reset_password.html', context)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
