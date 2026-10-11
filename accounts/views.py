@@ -11,6 +11,7 @@ import functools
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.db.models import Count, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -691,6 +692,100 @@ def user_permissions_view(request, pk):
 
 
 @login_required_custom
+def grant_voting_member_permissions_view(request, pk):
+    """
+    Directly grant the 11 Core Voting Member Permissions to a single user in one click.
+    Accessible by Super Admin or users with can_grant_permissions.
+    """
+    current_user = request.user
+    if not (current_user.is_super or current_user.can_grant_permissions):
+        messages.error(request, 'ليس لديك صلاحية لتخويل أو منح الصلاحيات.')
+        return redirect('accounts:user_list')
+
+    target_user = get_object_or_404(User, pk=pk)
+    if target_user.is_super:
+        messages.warning(request, 'لا يمكن تعديل صلاحيات مدير النظام الأعلى، فهو يمتلك كامل الصلاحيات تلقائياً.')
+        return redirect('accounts:user_list')
+
+    perm, _ = CouncilPermission.objects.get_or_create(user=target_user)
+    perm.apply_voting_member_core_permissions(
+        granted_by_user=current_user,
+        notes='منح الصلاحيات الأساسية للأعضاء من لهم حق التصويت (11 صلاحية معتمدة)'
+    )
+
+    log_action(
+        current_user, 'permission', obj=perm, request=request,
+        notes=f'منح الصلاحيات الأساسية للأعضاء من لهم حق التصويت لـ {target_user.full_name} (11 صلاحية)'
+    )
+    messages.success(
+        request,
+        f'تم بنجاح منح «الصلاحيات الأساسية للأعضاء من لهم حق التصويت» (11 صلاحية) للعضو «{target_user.full_name}» بنقرة واحدة.'
+    )
+
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url:
+        return redirect(next_url)
+    return redirect('accounts:user_list')
+
+
+@login_required_custom
+def grant_voting_member_permissions_bulk_view(request):
+    """
+    Bulk grant the 11 Core Voting Member Permissions to multiple selected users or all deans.
+    Accessible by Super Admin or users with can_grant_permissions.
+    """
+    current_user = request.user
+    if not (current_user.is_super or current_user.can_grant_permissions):
+        messages.error(request, 'ليس لديك صلاحية لتخويل أو منح الصلاحيات.')
+        return redirect('accounts:user_list')
+
+    if request.method == 'POST':
+        target_group = request.POST.get('target_group', '').strip()
+        selected_ids = request.POST.getlist('user_ids')
+
+        targets_qs = User.objects.none()
+        group_label = ''
+
+        if target_group == 'all_deans':
+            targets_qs = User.objects.filter(is_active=True, is_super=False).filter(
+                Q(title='عميد') | Q(login_category='deans')
+            )
+            group_label = 'كافة عمداء الكليات'
+        elif target_group == 'all_voting_members':
+            targets_qs = User.objects.filter(is_active=True, is_super=False).filter(
+                Q(title__in=['عميد', 'نائب_رئيس', 'عضو_مجلس', 'رئيس_نقابة']) |
+                Q(login_category__in=['deans', 'vice_presidents', 'representatives'])
+            )
+            group_label = 'كافة أعضاء المجلس المصوتين'
+        elif selected_ids:
+            targets_qs = User.objects.filter(id__in=selected_ids, is_active=True, is_super=False)
+            group_label = f'{targets_qs.count()} عضواً تم تحديدهم'
+
+        count = 0
+        for target_user in targets_qs:
+            perm, _ = CouncilPermission.objects.get_or_create(user=target_user)
+            perm.apply_voting_member_core_permissions(
+                granted_by_user=current_user,
+                notes=f'منح جماعي للصلاحيات الأساسية للأعضاء المصوتين ({group_label})'
+            )
+            count += 1
+
+        if count > 0:
+            log_action(
+                current_user, 'permission', request=request,
+                notes=f'منح جماعي للصلاحيات الأساسية للأعضاء من لهم حق التصويت لـ {count} عضواً ({group_label})'
+            )
+            messages.success(
+                request,
+                f'تم بنجاح منح «الصلاحيات الأساسية للأعضاء من لهم حق التصويت» لـ ({count}) عضواً ضمن [{group_label}] دفعة واحدة.'
+            )
+        else:
+            messages.warning(request, 'لم يتم تحديد أي أعضاء مؤهلين لتطبيق الصلاحيات.')
+
+    return redirect('accounts:user_list')
+
+
+@login_required_custom
 def user_delete_view(request, pk):
     """
     Delete or deactivate a user account.
@@ -942,3 +1037,118 @@ def seat_deputies_view(request):
         'title': f'إدارة الممثلين بالإنابة – {seat.name}',
     }
     return render(request, 'accounts/seat_deputies.html', context)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# م6 – الروابط الشخصية المباشرة عند الطلب (On-Demand Personal Direct Gate)
+# ═════════════════════════════════════════════════════════════════════════════
+
+@login_required_custom
+def generate_user_token_view(request, pk):
+    """
+    Generate or regenerate on-demand a personal access link for a user.
+    Accessible by Super Admin or users with can_manage_users.
+    Invalidates the previous link immediately upon regeneration.
+    """
+    if not (request.user.is_super or getattr(request.user, 'can_manage_users', False) or getattr(request.user, 'can_grant', False)):
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.GET.get('format') == 'json':
+            return JsonResponse({'success': False, 'status': 'error', 'error': 'غير مصرح لك بهذا الإجراء.', 'message': 'غير مصرح لك بهذا الإجراء.'}, status=403)
+        messages.error(request, 'ليس لديك صلاحية لتوليد روابط الدخول.')
+        return redirect('accounts:user_list')
+
+    target_user = get_object_or_404(User, pk=pk)
+    token = target_user.generate_access_token()
+    full_url = target_user.get_direct_login_url(request)
+
+    log_action(request.user, 'update', obj=target_user, request=request,
+               notes=f'توليد رابط دخول شخصي للمستخدم: {target_user.full_name}')
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.GET.get('format') == 'json' or request.method == 'POST':
+        return JsonResponse({
+            'success': True,
+            'status': 'ok',
+            'user_id': target_user.id,
+            'full_name': target_user.full_name,
+            'token': token,
+            'url': full_url,
+            'direct_url': full_url,
+            'created_at': target_user.token_created_at.strftime('%Y-%m-%d %H:%M') if target_user.token_created_at else '',
+            'message': f'تم توليد الرابط الشخصي للمستخدم «{target_user.full_name}» بنجاح.'
+        })
+
+    messages.success(request, f'تم توليد الرابط الشخصي للمستخدم «{target_user.full_name}» بنجاح.')
+    return redirect(request.META.get('HTTP_REFERER', 'accounts:user_list'))
+
+
+def direct_gate_login_view(request, token):
+    """
+    Personalized direct entry portal for a specific council member/representative.
+    Token is generated on-demand by the Admin.
+    Resolves member identity without public roster enumeration.
+    Prompts for member's final password, verifies, and logs in.
+    Optimized for personal smartphones and desktop PCs.
+    """
+    if request.user.is_authenticated:
+        return redirect('/dashboard/')
+
+    target_user = User.objects.filter(access_token=token, is_active=True).first()
+    if not target_user:
+        return render(request, 'accounts/gate_invalid.html', {
+            'title': 'رابط الدخول غير صالح أو تم تجديده – مجلس الجامعة',
+        }, status=404)
+
+    from council.models import EntitySeat
+    seat = EntitySeat.objects.filter(
+        Q(primary_rep=target_user) | Q(deputy_rep_1=target_user) | Q(deputy_rep_2=target_user),
+        is_active=True
+    ).first()
+
+    role_label = 'الممثل الرسمي'
+    if seat:
+        if target_user == seat.primary_rep:
+            role_label = 'الممثل الأصيل'
+        elif target_user == seat.deputy_rep_1:
+            role_label = 'الممثل بالإنابة (النائب الأول)'
+        elif target_user == seat.deputy_rep_2:
+            role_label = 'الممثل بالإنابة (النائب الثاني)'
+    elif target_user.is_super:
+        role_label = 'إدارة النظام الأعلى'
+    elif target_user.department:
+        role_label = target_user.department
+
+    seat_display_name = seat.name if seat else (target_user.department or target_user.official_title or target_user.get_title_display())
+    error_message = None
+
+    if request.method == 'POST':
+        password = request.POST.get('password', '').strip()
+        if not password:
+            error_message = 'يرجى إدخال كلمة المرور المعتمدة للمتابعة.'
+        elif not target_user.check_password(password):
+            error_message = 'كلمة المرور غير صحيحة، يرجى إعادة المحاولة.'
+        else:
+            user = target_user
+            user.last_login_ip = _get_client_ip(request)
+            user.save(update_fields=['last_login_ip'])
+            login(request, user)
+            log_action(user, 'login', request=request,
+                       notes=f'دخول مباشر عبر الرابط الشخصي المعتمد: {user.full_name}')
+
+            _handle_auto_attendance_and_receipts(user, seat, request)
+
+            messages.success(request, f'أهلاً بك {user.full_name} في نظام مجلس الجامعة.')
+            next_url = request.GET.get('next', '/dashboard/')
+            if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+                return redirect(next_url)
+            return redirect('/dashboard/')
+
+    context = {
+        'target_user': target_user,
+        'seat': seat,
+        'seat_display_name': seat_display_name,
+        'role_label': role_label,
+        'token': token,
+        'error_message': error_message,
+        'title': f'بوابة الدخول الرسمية – {target_user.full_name}',
+    }
+    return render(request, 'accounts/gate_login.html', context)
+

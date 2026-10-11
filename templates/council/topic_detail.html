@@ -35,6 +35,11 @@
           🎙️ استماع بالقراءة الذكية للموضوع
         </button>
       {% endif %}
+      {% if is_controller and session.status == 'active' %}
+        <button type="button" class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="launchTopicFromDetail({{ topic.pk }}, '{% url 'council:session_live' session_pk=session.pk %}')">
+          <i class="bi bi-broadcast-pin me-1"></i> طرح للجلسة الحية والتصويت ←
+        </button>
+      {% endif %}
       {% if user.can_view_sessions %}
         <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-light btn-sm">
           <i class="bi bi-arrow-right me-1"></i>جدول الأعمال
@@ -414,6 +419,13 @@
           <i class="bi bi-clock-history fs-5 text-warning"></i>
           <span class="small"><strong>باب التصويت مغلق حالياً لهذا الموضوع.</strong> يتم فتح وإغلاق التصويت بإشارة وتوجيه من رئيس المجلس في الجلسة الحية.</span>
         </div>
+        {% if is_controller and topic.session.status == 'active' %}
+          <div class="mb-3">
+            <button type="button" class="btn btn-danger btn-sm fw-bold w-100 shadow-sm py-2" onclick="launchTopicFromDetail({{ topic.pk }}, '{% url 'council:session_live' session_pk=topic.session.pk %}')">
+              <i class="bi bi-broadcast-pin me-1"></i> طرح هذا الموضوع الآن للجلسة الحية والتصويت ←
+            </button>
+          </div>
+        {% endif %}
       {% endif %}
 
       <!-- Live Vote Statistics -->
@@ -681,6 +693,37 @@
         }
       })
       .catch(err => alert('تعذر الاتصال بالخادم.'));
+    }
+
+    function launchTopicFromDetail(topicId, liveUrl) {
+      const btn = window.event ? window.event.currentTarget : null;
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جارٍ الطرح والانتقال...';
+      }
+      fetch('/api/topics/' + topicId + '/control/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ action: 'show' })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          window.location.href = liveUrl + '#topic-row-' + topicId;
+        } else {
+          alert(data.error || 'تعذر طرح الموضوع للجلسة الحية.');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-broadcast-pin me-1"></i> طرح للجلسة الحية والتصويت ←';
+          }
+        }
+      })
+      .catch(err => {
+        window.location.href = liveUrl + '#topic-row-' + topicId;
+      });
     }
     </script>
   </div>

@@ -276,157 +276,155 @@
       color: #0F172A;
     }
 
-    /* ── 5 Main Institutional Gateway Tabs (No 'فئة' Word Anywhere) ── */
+    /* ── Exclusive Institutional Accordion Gateways (Folding / Collapsing) ── */
     .gateways-section-label {
-      font-size: 0.92rem;
-      font-weight: 800;
-      color: #475569;
-      margin-bottom: 0.65rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .categories-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 0.7rem;
-      margin-bottom: 1.4rem;
-    }
-
-    @media (max-width: 1050px) {
-      .categories-grid {
-        grid-template-columns: repeat(3, 1fr);
-      }
-    }
-
-    @media (max-width: 680px) {
-      .categories-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .category-card-btn {
-      background: #F8FAFC;
-      border: 2px solid #DCE4EE;
-      border-top: 4px solid #CBD5E1;
-      border-radius: 14px;
-      padding: 0.9rem 0.95rem;
-      text-align: right;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      width: 100%;
-    }
-
-    .category-card-btn:hover {
-      border-color: var(--primary-navy);
-      border-top-color: var(--gold-bright);
-      background: #ffffff;
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(19, 41, 75, 0.1);
-    }
-
-    .category-card-btn.active {
-      background: linear-gradient(145deg, var(--primary-navy) 0%, var(--navy-dark) 100%);
-      border-color: var(--primary-navy);
-      border-top: 4px solid var(--gold-bright);
-      color: #ffffff;
-      box-shadow: 0 12px 26px rgba(19, 41, 75, 0.25);
-    }
-
-    .category-card-title {
       font-size: 0.95rem;
       font-weight: 800;
-      color: var(--primary-navy);
-      line-height: 1.42;
-      margin-bottom: 0.35rem;
-    }
-
-    .category-card-btn.active .category-card-title {
-      color: #ffffff;
-    }
-
-    .category-card-sub {
-      font-size: 0.75rem;
-      color: #64748B;
-      line-height: 1.38;
-      font-weight: 500;
-      margin-bottom: 0.65rem;
-    }
-
-    .category-card-btn.active .category-card-sub {
-      color: rgba(255, 255, 255, 0.8);
-    }
-
-    .category-card-footer {
+      color: #334155;
+      margin-bottom: 0.85rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      width: 100%;
-      padding-top: 0.45rem;
-      border-top: 1px solid rgba(148, 163, 184, 0.22);
     }
 
-    .category-status-word {
-      font-size: 0.74rem;
-      font-weight: 800;
-      color: var(--primary-navy);
+    .accordion-portals {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      margin-bottom: 1.5rem;
     }
 
-    .category-card-btn.active .category-status-word {
-      color: var(--gold-light);
+    .gateway-panel {
+      background: #ffffff;
+      border: 2px solid #DCE4EE;
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.22s ease;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
     }
 
-    .category-count-pill {
-      font-size: 0.73rem;
-      font-weight: 800;
-      padding: 0.1rem 0.5rem;
-      border-radius: 6px;
-      background: #E2E8F0;
-      color: #1E293B;
+    .gateway-panel.active {
+      border-color: var(--primary-navy);
+      box-shadow: 0 10px 28px rgba(19, 41, 75, 0.12);
     }
 
-    .category-card-btn.active .category-count-pill {
-      background: var(--gold);
-      color: #ffffff;
-    }
-
-    /* ── Active Portal Stage Container ── */
-    .portal-stage-box {
-      background: var(--surface-bg);
-      border: 1.5px solid #DCE4EE;
-      border-radius: 18px;
-      padding: 1.25rem;
-    }
-
-    .active-category-header {
+    .gateway-header {
+      padding: 1.05rem 1.35rem;
+      background: #F8FAFC;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-      padding-bottom: 0.75rem;
-      border-bottom: 2px solid #E2E8F0;
+      gap: 0.85rem;
+      transition: all 0.18s ease;
+      border-right: 6px solid #CBD5E1;
+      user-select: none;
     }
 
-    .active-category-name {
+    .gateway-panel.active .gateway-header {
+      background: linear-gradient(90deg, #13294B 0%, #1E3A68 100%);
+      color: #ffffff;
+      border-right-color: var(--gold-bright);
+    }
+
+    .gateway-header:hover {
+      background: #F1F5F9;
+    }
+
+    .gateway-panel.active .gateway-header:hover {
+      background: linear-gradient(90deg, #0E203B 0%, #162E54 100%);
+    }
+
+    .gateway-title-side {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .gateway-state-indicator {
+      font-size: 0.76rem;
+      font-weight: 800;
+      padding: 0.22rem 0.65rem;
+      border-radius: 6px;
+      background: #E2E8F0;
+      color: #334155;
+      white-space: nowrap;
+    }
+
+    .gateway-panel.active .gateway-state-indicator {
+      background: var(--gold-bright);
+      color: var(--navy-dark);
+    }
+
+    .gateway-title {
       font-size: 1.08rem;
-      font-weight: 900;
+      font-weight: 800;
       color: var(--primary-navy);
+      line-height: 1.35;
+      margin-bottom: 0.12rem;
     }
 
-    .active-category-hint {
+    .gateway-panel.active .gateway-title {
+      color: #ffffff;
+    }
+
+    .gateway-subtitle {
       font-size: 0.82rem;
-      font-weight: 700;
-      color: #475569;
-      background: #ffffff;
-      border: 1px solid #CBD5E1;
-      padding: 0.25rem 0.8rem;
+      color: #64748B;
+      font-weight: 500;
+    }
+
+    .gateway-panel.active .gateway-subtitle {
+      color: rgba(255, 255, 255, 0.82);
+    }
+
+    .gateway-action-side {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+
+    .gateway-count-pill {
+      font-size: 0.78rem;
+      font-weight: 800;
+      padding: 0.22rem 0.7rem;
       border-radius: 8px;
+      background: #E2E8F0;
+      color: #1E293B;
+      border: 1px solid #CBD5E1;
+    }
+
+    .gateway-panel.active .gateway-count-pill {
+      background: rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .gateway-action-button {
+      font-size: 0.82rem;
+      font-weight: 800;
+      padding: 0.38rem 1.05rem;
+      border-radius: 8px;
+      background: var(--primary-navy);
+      color: #ffffff;
+      border: 1px solid transparent;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+    }
+
+    .gateway-panel.active .gateway-action-button {
+      background: var(--gold-bright);
+      color: var(--navy-dark);
+    }
+
+    .gateway-body {
+      padding: 1.25rem;
+      background: var(--surface-bg);
+      border-top: 2px solid var(--gold-bright);
     }
 
     /* ── Interactive Login Action Tiles (Look & Feel like Login Buttons, NOT Data Cards) ── */
@@ -724,11 +722,8 @@
           <p class="portal-main-subtitle">مرحباً بأعضاء مجلس الجامعة والقيادات الأكاديمية والإدارية</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
-          <button type="button" class="btn-header-action" id="btnShowAllCategories" onclick="selectCategory('all')">
-            عرض جميع أعضاء المجلس ({{ total_cards_count }})
-          </button>
           <button type="button" class="btn-header-action" onclick="openManualLoginModal()">
-            الدخول المباشر باسم المستخدم
+            الدخول المباشر باسم المستخدم وكلمة المرور
           </button>
         </div>
       </div>
@@ -739,14 +734,14 @@
           <span class="portal-search-tag">وصول سريع</span>
           <input type="text"
                  id="seatSearchInput"
-                 placeholder="ابحث باسمك أو باسم الكلية أو المنصب للدخول الفوري..."
+                 placeholder="ابحث باسم كليتك أو جهتك للدخول المباشر..."
                  autocomplete="off">
           <button type="button" class="btn-clear-search" id="btnClearSearch" onclick="clearSearchInput()">
             مسح
           </button>
         </div>
         <div class="small fw-bold" style="color: var(--gold-light);">
-          اختر البوابة أدناه ثم اضغط على اسمك لإدخال كلمة المرور
+          اضغط على بوابتك الأكاديمية أدناه لفتحها (تنطوي باقي البوابات تلقائياً)
         </div>
       </div>
     </div>
@@ -755,17 +750,17 @@
     <div class="guided-steps-bar">
       <div class="guided-step-item">
         <span class="guided-step-num">الخطوة الأولى</span>
-        <span>اختر موقعك القيادي أو كليتك</span>
+        <span>اختر بوابتك في مجلس الجامعة لفتحها</span>
       </div>
       <span class="guided-step-divider">ـــ</span>
       <div class="guided-step-item">
         <span class="guided-step-num">الخطوة الثانية</span>
-        <span>اضغط على زر الدخول أمام اسمك</span>
+        <span>اضغط على زر «دخول الحساب» أمام كليتك أو مقعدك</span>
       </div>
       <span class="guided-step-divider">ـــ</span>
       <div class="guided-step-item">
         <span class="guided-step-num">الخطوة الثالثة</span>
-        <span>أدخل كلمة المرور الشخصية</span>
+        <span>أدخل كلمة المرور الشخصية المعتمدة</span>
       </div>
     </div>
 
@@ -801,115 +796,129 @@
         </div>
       </div>
 
-      <!-- 5 Institutional Portals (Zero 'فئة' wording) -->
+      <!-- Institutional Accordion Portals (Full folding & Privacy Shielded) -->
       <div class="gateways-section-label">
-        <span>اختر البوابة الخاصة بموقعك في مجلس الجامعة:</span>
+        <span>بوابات مجلس الجامعة الرسمية — اضغط على بوابتك لفتحها (تنطوي باقي البوابات تلقائياً):</span>
       </div>
 
-      <div class="categories-grid" id="categoriesGrid">
+      <div class="accordion-portals" id="accordionPortals">
         {% for cat in categories_meta %}
-          <button type="button"
-                  class="category-card-btn {% if forloop.first %}active{% endif %}"
-                  id="cat-btn-{{ cat.key }}"
-                  data-cat-key="{{ cat.key }}"
-                  data-cat-title="{{ cat.title }}"
-                  onclick="selectCategory('{{ cat.key }}')">
-            <div>
-              <div class="category-card-title">{{ cat.title }}</div>
-              <div class="category-card-sub">{{ cat.subtitle }}</div>
+          <div class="gateway-panel" id="gateway-panel-{{ cat.key }}" data-cat-key="{{ cat.key }}">
+
+            <!-- Header Strip (Click to toggle) -->
+            <div class="gateway-header" onclick="toggleGateway('{{ cat.key }}')">
+              <div class="gateway-title-side">
+                <span class="gateway-state-indicator" id="indicator-{{ cat.key }}">[ مغلقة ]</span>
+                <div>
+                  <div class="gateway-title">{{ cat.title }}</div>
+                  <div class="gateway-subtitle">{{ cat.subtitle }}</div>
+                </div>
+              </div>
+              <div class="gateway-action-side">
+                <span class="gateway-count-pill">{{ cat.count }} {{ cat.unit }}</span>
+                <span class="gateway-action-button" id="btn-label-{{ cat.key }}">فتح البوابة</span>
+              </div>
             </div>
-            <div class="category-card-footer">
-              <span class="category-status-word">فتح البوابة</span>
-              <span class="category-count-pill">{{ cat.count }} {{ cat.unit }}</span>
+
+            <!-- Foldable Body (Only opens when active, folds all others) -->
+            <div class="gateway-body" id="gateway-body-{{ cat.key }}" style="display: none;">
+              <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                <div class="small fw-bold text-navy" style="color: var(--primary-navy);">
+                  المقاعد والجهات المعتمدة في {{ cat.title }} — اضغط على «دخول الحساب»:
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-3 fw-bold" onclick="toggleGateway('{{ cat.key }}')">
+                  طي هذه البوابة
+                </button>
+              </div>
+
+              <div class="seats-grid">
+                <!-- 1. Official Seats belonging to this gateway -->
+                {% for seat in seats %}
+                  {% if seat.category_key == cat.key %}
+                    <div class="seat-card {% if seat.seat_type == 'presidency' %}seat-card-presidency{% endif %}"
+                         role="button"
+                         tabindex="0"
+                         data-card-kind="seat"
+                         data-seat-id="{{ seat.id }}"
+                         data-category="{{ seat.category_key }}"
+                         data-search-text="{{ seat.name }} {{ seat.primary_rep.full_name|default:'' }} {{ seat.primary_rep.official_title|default:'' }} {{ seat.deputy_rep_1.full_name|default:'' }} {{ seat.deputy_rep_2.full_name|default:'' }}"
+                         onclick="openSeatModal({{ seat.id }})"
+                         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSeatModal({{ seat.id }});}">
+                      <div class="tile-identity-side">
+                        <div class="member-initials-badge">{{ seat.primary_initials }}</div>
+                        <div class="tile-text-stack">
+                          <div class="seat-entity-title">{{ seat.name }}</div>
+                          <div class="member-name-text">
+                            {% if seat.category_key == 'deans' %}
+                              المقعد الرسمي – عمادة الكلية
+                            {% elif seat.category_key == 'vice_presidents' %}
+                              المقعد الرسمي – نيابة رئاسة الجامعة
+                            {% elif seat.category_key == 'presidency_office' %}
+                              المكتب والقيادة الأكاديمية العليا
+                            {% elif seat.category_key == 'representatives' %}
+                              المقعد الرسمي – ممثل النقابة وأعضاء التدريس
+                            {% else %}
+                              المقعد المعتمد بمجلس الجامعة
+                            {% endif %}
+                          </div>
+                          {% if seat.deputy_rep_1 or seat.deputy_rep_2 %}
+                            <span class="deputies-pill-inline">متاح الدخول للأصيل أو بالإنابة</span>
+                          {% endif %}
+                        </div>
+                      </div>
+
+                      <div class="tile-action-side">
+                        <div class="card-enter-bar">دخول الحساب</div>
+                      </div>
+                    </div>
+                  {% endif %}
+                {% endfor %}
+
+                <!-- 2. Standalone Users belonging to this gateway -->
+                {% for u in standalone_users %}
+                  {% if u.category_key == cat.key %}
+                    <div class="seat-card"
+                         role="button"
+                         tabindex="0"
+                         data-card-kind="staff"
+                         data-staff-id="{{ u.id }}"
+                         data-category="{{ u.category_key }}"
+                         data-search-text="{{ u.official_title|default:'' }} {{ u.full_name }} {{ u.department|default:'' }} {{ u.get_title_display }} {{ u.username }}"
+                         onclick="openStaffModal({{ u.id }})"
+                         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openStaffModal({{ u.id }});}">
+                      <div class="tile-identity-side">
+                        <div class="member-initials-badge">{{ u.initials }}</div>
+                        <div class="tile-text-stack">
+                          <div class="seat-entity-title">{{ u.official_title|default:u.get_title_display }}</div>
+                          <div class="member-name-text">{{ u.role_badge_label }}</div>
+                        </div>
+                      </div>
+
+                      <div class="tile-action-side">
+                        <div class="card-enter-bar">دخول الحساب</div>
+                      </div>
+                    </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+
             </div>
-          </button>
+
+          </div>
         {% endfor %}
       </div>
 
-      <!-- Interactive Login Stage -->
-      <div class="portal-stage-box">
-        <div class="active-category-header">
-          <div class="active-category-name" id="activeCategoryTitle">
-            مكتب رئيس الجامعة والمستشارون والمساعدون
-          </div>
-          <div class="active-category-hint" id="activeCategoryCountBadge">
-            اضغط على اسمك أو جهتك لتسجيل الدخول
-          </div>
+      <!-- Empty Search State -->
+      <div id="emptySearchState" class="text-center py-5 d-none">
+        <div class="fw-bold text-navy fs-5 mb-2" style="color: var(--primary-navy);">
+          لا توجد جهة أو كلية تطابق عبارة البحث
         </div>
-
-        <div class="seats-grid" id="seatsContainer">
-          <!-- 1. Official Council Member Login Buttons -->
-          {% for seat in seats %}
-            <div class="seat-card {% if seat.seat_type == 'presidency' %}seat-card-presidency{% endif %}"
-                 role="button"
-                 tabindex="0"
-                 data-card-kind="seat"
-                 data-seat-id="{{ seat.id }}"
-                 data-category="{{ seat.category_key }}"
-                 data-search-text="{{ seat.name }} {{ seat.primary_rep.full_name|default:'' }} {{ seat.primary_rep.official_title|default:'' }} {{ seat.deputy_rep_1.full_name|default:'' }} {{ seat.deputy_rep_2.full_name|default:'' }}"
-                 onclick="openSeatModal({{ seat.id }})"
-                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSeatModal({{ seat.id }});}">
-              <div class="tile-identity-side">
-                <div class="member-initials-badge">{{ seat.primary_initials }}</div>
-                <div class="tile-text-stack">
-                  <div class="seat-entity-title">{{ seat.name }}</div>
-                  <div class="member-name-text">
-                    {% if seat.primary_rep %}
-                      {{ seat.primary_rep.full_name }}
-                    {% else %}
-                      <span class="text-muted">لم يُحدد ممثل أول</span>
-                    {% endif %}
-                  </div>
-                  {% if seat.deputy_rep_1 or seat.deputy_rep_2 %}
-                    <span class="deputies-pill-inline">متاح الدخول للأصيل أو بالإنابة</span>
-                  {% endif %}
-                </div>
-              </div>
-
-              <div class="tile-action-side">
-                <div class="card-enter-bar">دخول الحساب</div>
-              </div>
-            </div>
-          {% endfor %}
-
-          <!-- 2. Standalone Secretariat & System Administration Login Buttons -->
-          {% for u in standalone_users %}
-            <div class="seat-card"
-                 role="button"
-                 tabindex="0"
-                 data-card-kind="staff"
-                 data-staff-id="{{ u.id }}"
-                 data-category="{{ u.category_key }}"
-                 data-search-text="{{ u.full_name }} {{ u.official_title|default:'' }} {{ u.department|default:'' }} {{ u.get_title_display }} {{ u.username }}"
-                 onclick="openStaffModal({{ u.id }})"
-                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openStaffModal({{ u.id }});}">
-              <div class="tile-identity-side">
-                <div class="member-initials-badge">{{ u.initials }}</div>
-                <div class="tile-text-stack">
-                  <div class="seat-entity-title">{{ u.official_title|default:u.get_title_display }}</div>
-                  <div class="member-name-text">{{ u.full_name }}</div>
-                </div>
-              </div>
-
-              <div class="tile-action-side">
-                <div class="card-enter-bar">دخول الحساب</div>
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-
-        <!-- Empty Search State -->
-        <div id="emptySearchState" class="text-center py-5 d-none">
-          <div class="fw-bold text-navy fs-5 mb-2" style="color: var(--primary-navy);">
-            لا يوجد اسم أو جهة تطابق عبارة البحث
-          </div>
-          <p class="text-muted small mb-3">
-            جرب كتابة الاسم الأول فقط أو اسم الكلية، أو اضغط على زر عرض جميع أعضاء المجلس.
-          </p>
-          <button type="button" class="btn-action-primary btn-sm" onclick="clearSearchInput()">
-            إعادة عرض القائمة
-          </button>
-        </div>
+        <p class="text-muted small mb-3">
+          تأكد من كتابة اسم الكلية أو المنصب بشكل صحيح، أو اضغط على مسح البحث.
+        </p>
+        <button type="button" class="btn-action-primary btn-sm" onclick="clearSearchInput()">
+          إعادة تعيين البحث
+        </button>
       </div>
 
     </div>
@@ -1094,7 +1103,7 @@
     'all':               'جميع أعضاء وجهات مجلس الجامعة'
   };
 
-  let currentCategory = 'presidency_office';
+  let activeGatewayKey = null;
 
   const seatModalEl = document.getElementById('seatLoginModal');
   const seatModal = new bootstrap.Modal(seatModalEl);
@@ -1102,90 +1111,150 @@
   const manualModalEl = document.getElementById('manualLoginModal');
   const manualModal = new bootstrap.Modal(manualModalEl);
 
-  const allCards = document.querySelectorAll('#seatsContainer .seat-card');
   const searchInput = document.getElementById('seatSearchInput');
   const btnClearSearch = document.getElementById('btnClearSearch');
   const emptySearchState = document.getElementById('emptySearchState');
 
-  // ── 1. Gateway Filtering & Instant Search ───────────────────────────────────
-  function selectCategory(catKey, skipSave) {
-    currentCategory = catKey;
-    if (!skipSave && catKey !== 'all') {
-      try { localStorage.setItem('ucms_last_category', catKey); } catch (e) {}
-    }
+  // ── 1. Exclusive Accordion Gateways Toggle (Folding / Collapsing) ───────────
+  function toggleGateway(catKey) {
+    const isCurrentlyOpen = (activeGatewayKey === catKey);
 
+    // If search was active, clear it first
     if (searchInput.value.trim() !== '') {
       searchInput.value = '';
       btnClearSearch.style.display = 'none';
+      document.querySelectorAll('.seat-card').forEach(c => c.style.display = 'flex');
+      emptySearchState.classList.add('d-none');
     }
 
-    document.querySelectorAll('.category-card-btn').forEach(btn => {
-      const statusWord = btn.querySelector('.category-status-word');
-      if (btn.getAttribute('data-cat-key') === catKey) {
-        btn.classList.add('active');
-        if (statusWord) statusWord.textContent = 'البوابة المختارة';
-      } else {
-        btn.classList.remove('active');
-        if (statusWord) statusWord.textContent = 'فتح البوابة';
-      }
+    // Fold and collapse ALL gateways
+    document.querySelectorAll('.gateway-panel').forEach(p => {
+      const k = p.getAttribute('data-cat-key');
+      p.classList.remove('active');
+      const b = document.getElementById(`gateway-body-${k}`);
+      if (b) b.style.display = 'none';
+      const ind = document.getElementById(`indicator-${k}`);
+      if (ind) ind.textContent = '[ مغلقة ]';
+      const btn = document.getElementById(`btn-label-${k}`);
+      if (btn) btn.textContent = 'فتح البوابة';
     });
 
-    const showAllBtn = document.getElementById('btnShowAllCategories');
-    if (catKey === 'all') {
-      showAllBtn.classList.add('active');
-    } else {
-      showAllBtn.classList.remove('active');
+    // If it was already open, user clicked to fold it
+    if (isCurrentlyOpen) {
+      activeGatewayKey = null;
+      try { localStorage.removeItem('ucms_active_gateway'); } catch (e) {}
+      return;
     }
 
-    applyFilter();
+    // Open the selected gateway exclusively
+    const targetPanel = document.getElementById(`gateway-panel-${catKey}`);
+    const targetBody = document.getElementById(`gateway-body-${catKey}`);
+    const targetInd = document.getElementById(`indicator-${catKey}`);
+    const targetBtn = document.getElementById(`btn-label-${catKey}`);
+
+    if (targetPanel && targetBody) {
+      targetPanel.classList.add('active');
+      targetBody.style.display = 'block';
+      if (targetInd) targetInd.textContent = '[ البوابة المفتوحة حالياً ]';
+      if (targetBtn) targetBtn.textContent = 'طي البوابة';
+      activeGatewayKey = catKey;
+      try { localStorage.setItem('ucms_active_gateway', catKey); } catch (e) {}
+      targetPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }
 
-  function applyFilter() {
-    const query = searchInput.value.trim().toLowerCase();
-    let visibleCount = 0;
+  // ── 2. Instant Search across Gateways ────────────────────────────────────────
+  searchInput.addEventListener('input', function() {
+    const query = this.value.trim().toLowerCase();
+    btnClearSearch.style.display = query ? 'inline-block' : 'none';
 
-    allCards.forEach(card => {
-      const cardCat = card.getAttribute('data-category');
-      const searchText = (card.getAttribute('data-search-text') || '').toLowerCase();
+    if (!query) {
+      // Restore all cards display
+      document.querySelectorAll('.seat-card').forEach(c => c.style.display = 'flex');
+      emptySearchState.classList.add('d-none');
+      if (activeGatewayKey) {
+        document.querySelectorAll('.gateway-panel').forEach(p => {
+          const k = p.getAttribute('data-cat-key');
+          const b = document.getElementById(`gateway-body-${k}`);
+          const ind = document.getElementById(`indicator-${k}`);
+          const btn = document.getElementById(`btn-label-${k}`);
+          if (k === activeGatewayKey) {
+            p.classList.add('active');
+            if (b) b.style.display = 'block';
+            if (ind) ind.textContent = '[ البوابة المفتوحة حالياً ]';
+            if (btn) btn.textContent = 'طي البوابة';
+          } else {
+            p.classList.remove('active');
+            if (b) b.style.display = 'none';
+            if (ind) ind.textContent = '[ مغلقة ]';
+            if (btn) btn.textContent = 'فتح البوابة';
+          }
+        });
+      }
+      return;
+    }
 
-      const matchesCat = query ? true : (currentCategory === 'all' || cardCat === currentCategory);
-      const matchesQuery = !query || searchText.includes(query);
+    let totalMatches = 0;
 
-      if (matchesCat && matchesQuery) {
-        card.style.display = 'flex';
-        visibleCount++;
+    document.querySelectorAll('.gateway-panel').forEach(panel => {
+      const catKey = panel.getAttribute('data-cat-key');
+      const body = document.getElementById(`gateway-body-${catKey}`);
+      const ind = document.getElementById(`indicator-${catKey}`);
+      const btn = document.getElementById(`btn-label-${catKey}`);
+      const cards = panel.querySelectorAll('.seat-card');
+      let catMatches = 0;
+
+      cards.forEach(card => {
+        const searchText = (card.getAttribute('data-search-text') || '').toLowerCase();
+        if (searchText.includes(query)) {
+          card.style.display = 'flex';
+          catMatches++;
+          totalMatches++;
+        } else {
+          card.style.display = 'none';
+        }
+      });
+
+      if (catMatches > 0) {
+        panel.classList.add('active');
+        if (body) body.style.display = 'block';
+        if (ind) ind.textContent = `[ ${catMatches} مطابقة ]`;
+        if (btn) btn.textContent = 'طي النتائج';
       } else {
-        card.style.display = 'none';
+        panel.classList.remove('active');
+        if (body) body.style.display = 'none';
+        if (ind) ind.textContent = '[ مغلقة ]';
+        if (btn) btn.textContent = 'فتح البوابة';
       }
     });
 
-    const titleEl = document.getElementById('activeCategoryTitle');
-    const countEl = document.getElementById('activeCategoryCountBadge');
-
-    if (query) {
-      titleEl.textContent = `نتائج البحث في بوابة مجلس الجامعة عن: "${searchInput.value.trim()}"`;
-      countEl.textContent = `${visibleCount} نتيجة مطابقة — اضغط للدخول`;
-    } else {
-      titleEl.textContent = CATEGORY_TITLES[currentCategory] || '';
-      countEl.textContent = `اضغط على اسمك أو جهتك لتسجيل الدخول (${visibleCount})`;
-    }
-
-    if (visibleCount === 0) {
+    if (totalMatches === 0) {
       emptySearchState.classList.remove('d-none');
     } else {
       emptySearchState.classList.add('d-none');
     }
-  }
-
-  searchInput.addEventListener('input', function() {
-    btnClearSearch.style.display = this.value.trim() ? 'inline-block' : 'none';
-    applyFilter();
   });
 
   function clearSearchInput() {
     searchInput.value = '';
     btnClearSearch.style.display = 'none';
-    applyFilter();
+    document.querySelectorAll('.seat-card').forEach(c => c.style.display = 'flex');
+    emptySearchState.classList.add('d-none');
+    if (activeGatewayKey) {
+      const b = document.getElementById(`gateway-body-${activeGatewayKey}`);
+      if (b) b.style.display = 'block';
+    } else {
+      document.querySelectorAll('.gateway-panel').forEach(p => {
+        const k = p.getAttribute('data-cat-key');
+        p.classList.remove('active');
+        const b = document.getElementById(`gateway-body-${k}`);
+        if (b) b.style.display = 'none';
+        const ind = document.getElementById(`indicator-${k}`);
+        if (ind) ind.textContent = '[ مغلقة ]';
+        const btn = document.getElementById(`btn-label-${k}`);
+        if (btn) btn.textContent = 'فتح البوابة';
+      });
+    }
     searchInput.focus();
   }
 
@@ -1434,35 +1503,33 @@
   }
 
   document.addEventListener('DOMContentLoaded', function() {
-    let initialCat = 'presidency_office';
-    try {
-      const savedCat = localStorage.getItem('ucms_last_category');
-      if (savedCat && CATEGORY_TITLES[savedCat]) {
-        initialCat = savedCat;
-      }
-    } catch (e) {}
-
     renderRememberedBanner();
 
     if (FAILED_STATE && FAILED_STATE.mode) {
       if (FAILED_STATE.mode === 'entity' && FAILED_STATE.seat_id && seatsMap[FAILED_STATE.seat_id]) {
         const s = seatsMap[FAILED_STATE.seat_id];
-        selectCategory(s.category_key, true);
+        toggleGateway(s.category_key);
         openSeatModal(s.id, FAILED_STATE.user_id, FAILED_STATE.error);
         return;
       } else if (FAILED_STATE.mode === 'staff' && FAILED_STATE.staff_user_id && staffMap[FAILED_STATE.staff_user_id]) {
         const u = staffMap[FAILED_STATE.staff_user_id];
-        selectCategory(u.category_key, true);
+        toggleGateway(u.category_key);
         openStaffModal(u.id, FAILED_STATE.error);
         return;
       } else if (FAILED_STATE.mode === 'direct_manual') {
-        selectCategory(initialCat, true);
         openManualLoginModal(FAILED_STATE.error);
         return;
       }
     }
 
-    selectCategory(initialCat, true);
+    // Zero-Exposure on Initial Load: All gateways start folded by default.
+    // If a remembered gateway exists in localStorage, open it for convenience:
+    try {
+      const savedCat = localStorage.getItem('ucms_active_gateway');
+      if (savedCat && CATEGORY_TITLES[savedCat]) {
+        toggleGateway(savedCat);
+      }
+    } catch (e) {}
   });
 </script>
 </body>

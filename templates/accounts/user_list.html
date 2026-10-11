@@ -191,6 +191,23 @@
   color: #64748b !important;
   border: 1px dashed #cbd5e1 !important;
 }
+
+.btn-action-token {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  border: 1px solid #a7f3d0 !important;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.btn-action-token:hover {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+}
 </style>
 {% endblock %}
 
@@ -203,6 +220,11 @@
         <small class="text-muted">{{ users|length }} مستخدم مسجّل</small>
       </div>
       <div class="d-flex flex-wrap gap-2">
+        {% if user.is_super or user.can_grant_permissions %}
+        <button type="button" class="btn btn-sm btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#bulkGrantVotingModal" style="border-color: #0f3460; color: #0f3460;">
+          <i class="bi bi-star-fill text-warning me-1"></i>منح صلاحيات التصويت دفعة واحدة
+        </button>
+        {% endif %}
         {% if user.is_super or user.can_import_members or user.can_manage_users or user.can_grant %}
         <a href="{% url 'accounts:member_import' %}" class="btn btn-gold btn-sm">استيراد أعضاء</a>
         {% endif %}
@@ -315,9 +337,13 @@
             <td>
               <div class="d-flex flex-wrap gap-1 align-items-center">
                 {% if u.is_super %}
-                  <span class="badge perm-badge perm-super" title="مدير النظام الأعلى (58 / 58)">مدير النظام الأعلى (58/58)</span>
+                  <span class="badge perm-badge perm-super" title="مدير النظام الأعلى (60 / 60)">مدير النظام الأعلى</span>
+                {% elif u.is_voting_member_core %}
+                  <span class="badge" style="background-color: #0f3460; color: #ffffff; font-size: 0.78rem; font-weight: 600;" title="الصلاحيات الأساسية للأعضاء من لهم حق التصويت (11 / 60)">
+                    <i class="bi bi-star-fill text-warning me-1"></i>مصوّت أساسي (11)
+                  </span>
                 {% elif u.has_any_permission %}
-                  <span class="badge perm-badge perm-export" title="إجمالي الصلاحيات الممنوحة">{{ u.granted_permissions_count }} / 58 صلاحية</span>
+                  <span class="badge perm-badge perm-export" title="إجمالي الصلاحيات الممنوحة">{{ u.granted_permissions_count }} صلاحية</span>
                   {% if u.can_vote %}
                     <span class="badge perm-badge perm-vote" title="حق التصويت في المجلس">تصويت</span>
                   {% endif %}
@@ -331,7 +357,7 @@
                     <span class="badge perm-badge perm-grant" title="تخويل وإدارة الصلاحيات">تخويل</span>
                   {% endif %}
                 {% else %}
-                  <span class="badge perm-badge perm-none" title="لا توجد صلاحيات ممنوحة (0 / 58)">لا صلاحيات (0/58)</span>
+                  <span class="badge perm-badge perm-none" title="لا توجد صلاحيات ممنوحة (0)">لا صلاحيات</span>
                 {% endif %}
               </div>
             </td>
@@ -352,6 +378,13 @@
                 <a href="{% url 'accounts:user_permissions' u.pk %}"
                    class="btn-action-perm"
                    title="تحديد وإدارة الصلاحيات">الصلاحيات</a>
+                  {% if not u.is_super and not u.is_voting_member_core %}
+                  <a href="{% url 'accounts:grant_voting_permissions' u.pk %}"
+                     class="btn-action-perm"
+                     style="background-color: #e0e7ff !important; color: #3730a3 !important; border-color: #c7d2fe !important;"
+                     onclick="return confirm('هل تريد منح «الصلاحيات الأساسية للأعضاء من لهم حق التصويت» (11 صلاحية) لـ {{ u.full_name }} بنقرة واحدة؟');"
+                     title="منح الصلاحيات الأساسية للمصوتين (11) فوراً">+ منح التصويت</a>
+                  {% endif %}
                 {% endif %}
                 {% if user.is_super or user.can_manage_users or user.can_grant_permissions %}
                 <a href="{% url 'accounts:user_edit' u.pk %}"
@@ -362,6 +395,15 @@
                 <a href="{% url 'accounts:user_reset_password' u.pk %}"
                    class="btn-action-pwd"
                    title="إعادة تعيين كلمة المرور">كلمة المرور</a>
+                {% endif %}
+                {% if user.is_super or user.can_manage_users %}
+                <button type="button"
+                        class="btn-action-token"
+                        id="btn-token-{{ u.pk }}"
+                        title="توليد أو إدارة رابط الدخول المباشر الشخصي"
+                        onclick="openTokenModal('{{ u.pk }}', '{{ u.full_name|escapejs }}', '{% if u.access_token %}{{ u.get_direct_login_url }}{% endif %}')">
+                  {% if u.access_token %}الرابط المباشر{% else %}توليد رابط{% endif %}
+                </button>
                 {% endif %}
                 {% if u != user %}
                   {% if user.is_super or user.can_delete_user %}
@@ -417,6 +459,96 @@
           <button type="submit" name="action_type" value="deactivate" class="btn btn-warning btn-sm">تعطيل مؤقت</button>
           <button type="submit" name="action_type" value="permanent_delete" class="btn btn-danger btn-sm">حذف نهائي</button>
         </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Bulk Grant Voting Member Permissions Modal ── -->
+<div class="modal fade" id="bulkGrantVotingModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content uc-modal shadow-sm">
+      <form method="post" action="{% url 'accounts:grant_voting_permissions_bulk' %}">
+        {% csrf_token %}
+        <div class="modal-header border-0 pb-0">
+          <h6 class="modal-title fw-bold text-navy">
+            منح الصلاحيات الأساسية للأعضاء من لهم حق التصويت دفعة واحدة
+          </h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-3">
+          <div class="alert alert-info py-2 px-3 small mb-3">
+            <strong>الحزمة القياسية (11 صلاحية معتمدة):</strong><br>
+            عرض الجلسات، عرض الموضوعات، معاينة المرفقات، ممارسة حق التصويت، مراسلات الكلية، إدارة الممثلين والتفويض، تغيير كلمة المرور، دخول الجلسة الحية، طلب الكلمة، طلب الخروج، والتنبيهات.
+          </div>
+          <label class="form-label fw-semibold small">اختر المجموعة المستهدفة للمنح الجماعي:</label>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="target_group" id="target_deans" value="all_deans" checked>
+            <label class="form-check-label fw-medium" for="target_deans">
+              كافة عمداء الكليات (المقيدين كعمداء في النظام)
+            </label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="target_group" id="target_all_voters" value="all_voting_members">
+            <label class="form-check-label fw-medium" for="target_all_voters">
+              كافة أعضاء المجلس المصوتين (عمداء + نواب رئيس + ممثلو النقابة)
+            </label>
+          </div>
+          <p class="text-muted small mt-3 mb-0">
+            سيتم استثناء حسابات مديري النظام الأعلى تلقائياً وتطبيق القالب على جميع الأعضاء المحددين بضغطة زر واحدة.
+          </p>
+        </div>
+        <div class="modal-footer border-0 pt-0 d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+          <button type="submit" class="btn btn-primary btn-sm fw-bold px-3" style="background-color: #0f3460; border-color: #0f3460;">
+            تطبيق ومنح دفعة واحدة
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Direct Personal Access Link Modal (Strictly Text-Only) ── -->
+<div class="modal fade" id="tokenManageModal" tabindex="-1" aria-labelledby="tokenManageModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content uc-modal shadow-sm">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title fw-bold text-navy" id="tokenManageModalLabel">رابط الدخول المباشر الشخصي</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <div class="modal-body py-3">
+        {% csrf_token %}
+        <p class="mb-2">المستخدم: <strong id="token-user-name" class="text-navy"></strong></p>
+        <p class="text-muted small mb-3">
+          هذا الرابط مخصص للأجهزة الشخصية (الهاتف أو الحاسوب)، ينقل العضو مباشرة إلى بوابة الدخول الخاصة به دون الحاجة للمرور بقائمة الأسماء العامة، ويطلب كلمة المرور الخاصة به للتحقق والتأكيد.
+        </p>
+
+        <!-- Active section -->
+        <div id="token-active-section" class="d-none">
+          <label class="form-label fw-bold small text-navy">الرابط المباشر الفعّال حالياً:</label>
+          <div class="input-group mb-2">
+            <input type="text" id="token-url-input" class="form-control form-control-sm text-start" dir="ltr" readonly>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-copy-token" onclick="copyTokenUrl()">نسخ الرابط</button>
+          </div>
+          <div id="copy-feedback" class="text-success small fw-bold mb-3 d-none">تم نسخ الرابط بنجاح إلى الحافظة.</div>
+          <div class="alert alert-warning py-2 px-3 small mb-0">
+            تنبيه: يمكنك إعادة توليد الرابط في أي وقت، وسيؤدي ذلك فوراً إلى إبطال وصلاحية أي رابط سابق تم إرساله للعضو.
+          </div>
+        </div>
+
+        <!-- Empty section -->
+        <div id="token-empty-section" class="d-none">
+          <div class="alert alert-info py-2 px-3 small mb-0">
+            لم يتم توليد رابط دخول مباشر لهذا العضو حتى الآن. يمكنك النقر أدناه لتوليد الرابط فوراً.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0 d-flex justify-content-between">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">إغلاق</button>
+        <button type="button" class="btn btn-primary btn-sm fw-bold px-3" id="btn-generate-token" style="background-color: #0f3460; border-color: #0f3460;" onclick="doGenerateToken()">
+          توليد الرابط الآن
+        </button>
       </div>
     </div>
   </div>
@@ -479,6 +611,114 @@ function confirmDelete(url, userName) {
     const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
     modal.show();
   }
+}
+
+// ── Direct Personal Access Link Logic ──
+let currentTokenUserId = null;
+let currentTokenUrl = null;
+
+function openTokenModal(userId, userName, directUrl) {
+  currentTokenUserId = userId;
+  currentTokenUrl = directUrl || '';
+  document.getElementById('token-user-name').textContent = userName;
+  const activeSec = document.getElementById('token-active-section');
+  const emptySec  = document.getElementById('token-empty-section');
+  const copyFeedback = document.getElementById('copy-feedback');
+  const genBtn = document.getElementById('btn-generate-token');
+  if (copyFeedback) copyFeedback.classList.add('d-none');
+
+  if (currentTokenUrl) {
+    document.getElementById('token-url-input').value = currentTokenUrl;
+    activeSec.classList.remove('d-none');
+    emptySec.classList.add('d-none');
+    genBtn.textContent = 'إعادة توليد رابط جديد (إبطال القديم)';
+  } else {
+    document.getElementById('token-url-input').value = '';
+    activeSec.classList.add('d-none');
+    emptySec.classList.remove('d-none');
+    genBtn.textContent = 'توليد الرابط الآن';
+  }
+
+  const modal = new bootstrap.Modal(document.getElementById('tokenManageModal'));
+  modal.show();
+}
+
+function copyTokenUrl() {
+  const input = document.getElementById('token-url-input');
+  if (!input || !input.value) return;
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    const feedback = document.getElementById('copy-feedback');
+    if (feedback) {
+      feedback.textContent = 'تم نسخ الرابط بنجاح إلى الحافظة.';
+      feedback.classList.remove('d-none');
+      setTimeout(() => feedback.classList.add('d-none'), 3000);
+    }
+  }).catch(() => {
+    document.execCommand('copy');
+    const feedback = document.getElementById('copy-feedback');
+    if (feedback) {
+      feedback.textContent = 'تم نسخ الرابط بنجاح إلى الحافظة.';
+      feedback.classList.remove('d-none');
+      setTimeout(() => feedback.classList.add('d-none'), 3000);
+    }
+  });
+}
+
+function doGenerateToken() {
+  if (!currentTokenUserId) return;
+  const genBtn = document.getElementById('btn-generate-token');
+  const originalText = genBtn.textContent;
+  genBtn.disabled = true;
+  genBtn.textContent = 'جاري التوليد...';
+
+  const postUrl = `/users/${currentTokenUserId}/generate-token/`;
+  const csrfToken = document.querySelector('#tokenManageModal [name=csrfmiddlewaretoken]') 
+                    ? document.querySelector('#tokenManageModal [name=csrfmiddlewaretoken]').value 
+                    : (document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '');
+
+  fetch(postUrl, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken,
+      'X-Requested-With': 'XMLHttpRequest',
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    genBtn.disabled = false;
+    if (data.status === 'ok') {
+      currentTokenUrl = data.direct_url;
+      document.getElementById('token-url-input').value = data.direct_url;
+      document.getElementById('token-active-section').classList.remove('d-none');
+      document.getElementById('token-empty-section').classList.add('d-none');
+      genBtn.textContent = 'إعادة توليد رابط جديد (إبطال القديم)';
+      
+      const rowBtn = document.getElementById(`btn-token-${currentTokenUserId}`);
+      if (rowBtn) {
+        rowBtn.textContent = 'الرابط المباشر';
+        const uName = document.getElementById('token-user-name').textContent;
+        rowBtn.onclick = function() {
+          openTokenModal(currentTokenUserId, uName, data.direct_url);
+        };
+      }
+      
+      const feedback = document.getElementById('copy-feedback');
+      if (feedback) {
+        feedback.textContent = 'تم توليد الرابط بنجاح! يمكنك الآن نسخه ومشاركته مع العضو.';
+        feedback.classList.remove('d-none');
+      }
+    } else {
+      alert(data.message || 'حدث خطأ أثناء توليد الرابط.');
+      genBtn.textContent = originalText;
+    }
+  })
+  .catch(err => {
+    genBtn.disabled = false;
+    genBtn.textContent = originalText;
+    alert('تعذر الاتصال بالخادم لتوليد الرابط.');
+  });
 }
 </script>
 {% endblock %}

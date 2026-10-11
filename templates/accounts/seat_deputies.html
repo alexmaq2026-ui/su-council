@@ -50,7 +50,16 @@
           {% if seat.primary_rep %}
             <h5 class="fw-bold text-navy mb-1" style="color: #1B365D;">{{ seat.primary_rep.full_name }}</h5>
             <div class="text-muted small mb-2">{{ seat.primary_rep.official_title|default:seat.primary_rep.get_title_display }}</div>
-            <div class="small text-secondary">اسم المستخدم: <code>{{ seat.primary_rep.username }}</code></div>
+            <div class="small text-secondary mb-3">اسم المستخدم: <code>{{ seat.primary_rep.username }}</code></div>
+            {% if user.is_super or user.can_manage_users %}
+            <div class="pt-2 border-top">
+              <button type="button" class="btn btn-sm btn-outline-primary fw-bold"
+                      id="btn-token-{{ seat.primary_rep.pk }}"
+                      onclick="openTokenModal('{{ seat.primary_rep.pk }}', '{{ seat.primary_rep.full_name|escapejs }}', '{% if seat.primary_rep.access_token %}{{ seat.primary_rep.get_direct_login_url }}{% endif %}')">
+                {% if seat.primary_rep.access_token %}الرابط المباشر الشخصي للأصيل{% else %}توليد رابط مباشر للأصيل{% endif %}
+              </button>
+            </div>
+            {% endif %}
           {% else %}
             <div class="alert alert-warning mb-0 small">لم يُعين ممثل أول لهذا المقعد.</div>
           {% endif %}
@@ -78,7 +87,16 @@
             {% if seat.deputy_rep_1 %}
               <div class="fw-bold text-dark">{{ seat.deputy_rep_1.full_name }}</div>
               <div class="small text-muted">{{ seat.deputy_rep_1.official_title|default:seat.deputy_rep_1.get_title_display }}</div>
-              <div class="small text-muted">اسم المستخدم: <code>{{ seat.deputy_rep_1.username }}</code></div>
+              <div class="small text-muted mb-2">اسم المستخدم: <code>{{ seat.deputy_rep_1.username }}</code></div>
+              {% if user.is_super or user.can_manage_users %}
+              <div class="pt-2 border-top">
+                <button type="button" class="btn btn-sm btn-outline-primary fw-bold"
+                        id="btn-token-{{ seat.deputy_rep_1.pk }}"
+                        onclick="openTokenModal('{{ seat.deputy_rep_1.pk }}', '{{ seat.deputy_rep_1.full_name|escapejs }}', '{% if seat.deputy_rep_1.access_token %}{{ seat.deputy_rep_1.get_direct_login_url }}{% endif %}')">
+                  {% if seat.deputy_rep_1.access_token %}الرابط المباشر الشخصي للنائب 1{% else %}توليد رابط مباشر للنائب 1{% endif %}
+                </button>
+              </div>
+              {% endif %}
             {% else %}
               <div class="small text-muted">لا يوجد ممثل بالإنابة مسجل في هذه الخانة.</div>
             {% endif %}
@@ -97,7 +115,16 @@
             {% if seat.deputy_rep_2 %}
               <div class="fw-bold text-dark">{{ seat.deputy_rep_2.full_name }}</div>
               <div class="small text-muted">{{ seat.deputy_rep_2.official_title|default:seat.deputy_rep_2.get_title_display }}</div>
-              <div class="small text-muted">اسم المستخدم: <code>{{ seat.deputy_rep_2.username }}</code></div>
+              <div class="small text-muted mb-2">اسم المستخدم: <code>{{ seat.deputy_rep_2.username }}</code></div>
+              {% if user.is_super or user.can_manage_users %}
+              <div class="pt-2 border-top">
+                <button type="button" class="btn btn-sm btn-outline-primary fw-bold"
+                        id="btn-token-{{ seat.deputy_rep_2.pk }}"
+                        onclick="openTokenModal('{{ seat.deputy_rep_2.pk }}', '{{ seat.deputy_rep_2.full_name|escapejs }}', '{% if seat.deputy_rep_2.access_token %}{{ seat.deputy_rep_2.get_direct_login_url }}{% endif %}')">
+                  {% if seat.deputy_rep_2.access_token %}الرابط المباشر الشخصي للنائب 2{% else %}توليد رابط مباشر للنائب 2{% endif %}
+                </button>
+              </div>
+              {% endif %}
             {% else %}
               <div class="small text-muted">لا يوجد ممثل بالإنابة مسجل في هذه الخانة.</div>
             {% endif %}
@@ -211,4 +238,162 @@
   </div>
 
 </div>
+</div>
+
+<!-- ── Direct Personal Access Link Modal (Strictly Text-Only) ── -->
+<div class="modal fade" id="tokenManageModal" tabindex="-1" aria-labelledby="tokenManageModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-sm rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title fw-bold text-navy" id="tokenManageModalLabel">رابط الدخول المباشر الشخصي</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <div class="modal-body py-3">
+        {% csrf_token %}
+        <p class="mb-2">المستخدم: <strong id="token-user-name" class="text-navy"></strong></p>
+        <p class="text-muted small mb-3">
+          هذا الرابط مخصص للأجهزة الشخصية (الهاتف أو الحاسوب)، ينقل العضو مباشرة إلى بوابة الدخول الخاصة به دون الحاجة للمرور بقائمة الأسماء العامة، ويطلب كلمة المرور الخاصة به للتحقق والتأكيد.
+        </p>
+
+        <!-- Active section -->
+        <div id="token-active-section" class="d-none">
+          <label class="form-label fw-bold small text-navy">الرابط المباشر الفعّال حالياً:</label>
+          <div class="input-group mb-2">
+            <input type="text" id="token-url-input" class="form-control form-control-sm text-start" dir="ltr" readonly>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-copy-token" onclick="copyTokenUrl()">نسخ الرابط</button>
+          </div>
+          <div id="copy-feedback" class="text-success small fw-bold mb-3 d-none">تم نسخ الرابط بنجاح إلى الحافظة.</div>
+          <div class="alert alert-warning py-2 px-3 small mb-0">
+            تنبيه: يمكنك إعادة توليد الرابط في أي وقت، وسيؤدي ذلك فوراً إلى إبطال وصلاحية أي رابط سابق تم إرساله للعضو.
+          </div>
+        </div>
+
+        <!-- Empty section -->
+        <div id="token-empty-section" class="d-none">
+          <div class="alert alert-info py-2 px-3 small mb-0">
+            لم يتم توليد رابط دخول مباشر لهذا العضو حتى الآن. يمكنك النقر أدناه لتوليد الرابط فوراً.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0 d-flex justify-content-between">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">إغلاق</button>
+        <button type="button" class="btn btn-primary btn-sm fw-bold px-3" id="btn-generate-token" style="background-color: #1B365D; border-color: #1B365D;" onclick="doGenerateToken()">
+          توليد الرابط الآن
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentTokenUserId = null;
+let currentTokenUrl = null;
+
+function openTokenModal(userId, userName, directUrl) {
+  currentTokenUserId = userId;
+  currentTokenUrl = directUrl || '';
+  document.getElementById('token-user-name').textContent = userName;
+  const activeSec = document.getElementById('token-active-section');
+  const emptySec  = document.getElementById('token-empty-section');
+  const copyFeedback = document.getElementById('copy-feedback');
+  const genBtn = document.getElementById('btn-generate-token');
+  if (copyFeedback) copyFeedback.classList.add('d-none');
+
+  if (currentTokenUrl) {
+    document.getElementById('token-url-input').value = currentTokenUrl;
+    activeSec.classList.remove('d-none');
+    emptySec.classList.add('d-none');
+    genBtn.textContent = 'إعادة توليد رابط جديد (إبطال القديم)';
+  } else {
+    document.getElementById('token-url-input').value = '';
+    activeSec.classList.add('d-none');
+    emptySec.classList.remove('d-none');
+    genBtn.textContent = 'توليد الرابط الآن';
+  }
+
+  const modal = new bootstrap.Modal(document.getElementById('tokenManageModal'));
+  modal.show();
+}
+
+function copyTokenUrl() {
+  const input = document.getElementById('token-url-input');
+  if (!input || !input.value) return;
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    const feedback = document.getElementById('copy-feedback');
+    if (feedback) {
+      feedback.textContent = 'تم نسخ الرابط بنجاح إلى الحافظة.';
+      feedback.classList.remove('d-none');
+      setTimeout(() => feedback.classList.add('d-none'), 3000);
+    }
+  }).catch(() => {
+    document.execCommand('copy');
+    const feedback = document.getElementById('copy-feedback');
+    if (feedback) {
+      feedback.textContent = 'تم نسخ الرابط بنجاح إلى الحافظة.';
+      feedback.classList.remove('d-none');
+      setTimeout(() => feedback.classList.add('d-none'), 3000);
+    }
+  });
+}
+
+function doGenerateToken() {
+  if (!currentTokenUserId) return;
+  const genBtn = document.getElementById('btn-generate-token');
+  const originalText = genBtn.textContent;
+  genBtn.disabled = true;
+  genBtn.textContent = 'جاري التوليد...';
+
+  const postUrl = `/users/${currentTokenUserId}/generate-token/`;
+  const csrfToken = document.querySelector('#tokenManageModal [name=csrfmiddlewaretoken]') 
+                    ? document.querySelector('#tokenManageModal [name=csrfmiddlewaretoken]').value 
+                    : (document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '');
+
+  fetch(postUrl, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken,
+      'X-Requested-With': 'XMLHttpRequest',
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(res => res.json())
+  .then(data => {
+    genBtn.disabled = false;
+    if (data.status === 'ok') {
+      currentTokenUrl = data.direct_url;
+      document.getElementById('token-url-input').value = data.direct_url;
+      document.getElementById('token-active-section').classList.remove('d-none');
+      document.getElementById('token-empty-section').classList.add('d-none');
+      genBtn.textContent = 'إعادة توليد رابط جديد (إبطال القديم)';
+      
+      const cardBtn = document.getElementById(`btn-token-${currentTokenUserId}`);
+      if (cardBtn) {
+        cardBtn.textContent = 'الرابط المباشر الشخصي';
+        const uName = document.getElementById('token-user-name').textContent;
+        cardBtn.onclick = function() {
+          openTokenModal(currentTokenUserId, uName, data.direct_url);
+        };
+      }
+      
+      const feedback = document.getElementById('copy-feedback');
+      if (feedback) {
+        feedback.textContent = 'تم توليد الرابط بنجاح! يمكنك الآن نسخه ومشاركته.';
+        feedback.classList.remove('d-none');
+      }
+    } else {
+      alert(data.message || 'حدث خطأ أثناء توليد الرابط.');
+      genBtn.textContent = originalText;
+    }
+  })
+  .catch(err => {
+    genBtn.disabled = false;
+    genBtn.textContent = originalText;
+    alert('تعذر الاتصال بالخادم لتوليد الرابط.');
+  });
+}
+</script>
 {% endblock %}

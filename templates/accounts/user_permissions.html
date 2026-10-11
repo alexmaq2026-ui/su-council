@@ -83,6 +83,12 @@
         <div>
           <div class="small fw-bold text-navy mb-2">تطبيق قالب دور قياسي سريع (اختياري):</div>
           <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-primary fw-bold preset-btn shadow-sm" data-preset="voting_member" style="background-color: #0f3460; border-color: #0f3460;">
+              <i class="bi bi-star-fill text-warning me-1"></i>الصلاحيات الأساسية للأعضاء من لهم حق التصويت (11)
+            </button>
+            <a href="{% url 'accounts:grant_voting_permissions' target_user.pk %}" class="btn btn-sm btn-outline-success fw-bold" onclick="return confirm('هل تريد منح «الصلاحيات الأساسية للأعضاء من لهم حق التصويت» وحفظها فوراً لـ {{ target_user.full_name }}؟');" title="تطبيق الـ 11 صلاحية وحفظها مباشرة بنقرة واحدة">
+              <i class="bi bi-lightning-charge-fill me-1"></i>منح وحفظ فوري
+            </a>
             <button type="button" class="btn btn-sm btn-outline-secondary preset-btn" data-preset="council_member">عضو مجلس (عرض + تصويت + مداخلات)</button>
             <button type="button" class="btn btn-sm btn-outline-secondary preset-btn" data-preset="secretary">الأمين العام / المقرر</button>
             <button type="button" class="btn btn-sm btn-outline-secondary preset-btn" data-preset="director">مدير الإدارة المساعدة</button>
@@ -314,6 +320,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Presets Mapping
   const presets = {
+    voting_member: [
+      'can_view_sessions', 'can_view_topics', 'can_view_attachments',
+      'can_vote', 'can_view_correspondence', 'can_manage_delegates',
+      'can_change_password', 'can_view_live_session', 'can_request_speak',
+      'can_request_exit_permit', 'can_view_notifications'
+    ],
     council_member: [
       'can_view_sessions', 'can_view_topics', 'can_view_attendance',
       'can_view_attachments', 'can_listen_audio', 'can_view_live_session',

@@ -228,6 +228,7 @@ def session_detail_view(request, pk):
         'user_can_export_minutes':    (user.is_super or user.can_export_minutes),
         'user_can_verify_integrity':  (user.is_super or user.can_verify_integrity),
         'user_can_view_live':         (user.is_super or user.can_view_live_session or user.can_start_session_live),
+        'is_controller':              (user.is_super or user.can_start_session_live),
         'user_can_view_projector':    (user.is_super or user.can_view_projector),
         'user_can_view_analytics':    (user.is_super or user.can_view_analytics),
         'user_can_use_smart_reader':  (user.is_super or user.can_use_smart_reader),

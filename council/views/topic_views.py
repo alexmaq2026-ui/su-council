@@ -92,6 +92,7 @@ def topic_detail_view(request, pk):
         'user_can_delete_decision':    (user.is_super or user.can_delete_decision) and editable,
         'user_can_upload_signed':      (user.is_super or user.can_upload_signed_decision or user.can_send_decisions),
         'user_can_send_decisions':     (user.is_super or user.can_send_decisions),
+        'is_controller':              (user.is_super or user.can_start_session_live),
         'user_can_use_smart_reader':   (user.is_super or user.can_use_smart_reader),
         'status_choices':  TOPIC_STATUS,
     }

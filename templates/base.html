@@ -19,6 +19,33 @@
 </head>
 <body>
 
+{% if global_live_session and not is_on_live_page %}
+<!-- 🔴 GLOBAL LIVE SESSION PERSISTENT BANNER ── يضمن عدم ضياع الجلسة الحية عند تصفح أي شاشة -->
+<div id="global-live-session-banner" class="global-live-banner py-2 px-3 text-white shadow d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: linear-gradient(90deg, #881337 0%, #b91c1c 40%, #991b1b 100%); border-bottom: 2px solid #facc15; z-index: 1060; position: sticky; top: 0;">
+  <div class="d-flex align-items-center gap-2 flex-grow-1 overflow-hidden">
+    <span class="badge bg-warning text-dark fw-bold px-2 py-1 flex-shrink-0 animate-pulse" style="font-size: 0.8rem;">
+      <i class="bi bi-broadcast me-1 text-danger"></i>انعقاد حي جاري الآن
+    </span>
+    <div class="text-truncate">
+      <strong class="text-white">الجلسة رقم {{ global_live_session.session_number }}</strong>
+      {% if global_active_topic %}
+        <span class="text-white-50 mx-1">|</span>
+        <span class="text-white small">الموضوع المعروض حالياً: <strong class="text-warning">{{ global_active_topic.ordinal_label }}: {{ global_active_topic.title }}</strong></span>
+      {% else %}
+        <span class="text-white-50 mx-1">|</span>
+        <span class="text-white-50 small">قاعة المجلس منعقدة برئاسة المجلس</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="d-flex align-items-center gap-2 flex-shrink-0">
+    <a href="{{ global_live_url }}{% if global_active_topic %}?topic={{ global_active_topic.pk }}#topic-row-{{ global_active_topic.pk }}{% endif %}" class="btn btn-warning btn-sm fw-bold px-3 py-1 shadow text-dark d-inline-flex align-items-center gap-1" style="background-color: #facc15; border-color: #eab308;">
+      <i class="bi bi-arrow-return-right"></i>
+      <span>العودة الفورية لقاعة الجلسة الحية</span>
+    </a>
+  </div>
+</div>
+{% endif %}
+
 <!-- ══════════════════════════════════════════════════════
      TOP NAVBAR
 ══════════════════════════════════════════════════════ -->
@@ -45,9 +72,27 @@
     <!-- Desktop Nav Links -->
     <div class="collapse navbar-collapse">
       <ul class="navbar-nav me-auto gap-1">
+        {% if is_member_live_lockdown %}
+        <li class="nav-item">
+          <span class="nav-link text-warning fw-bold d-inline-flex align-items-center gap-2 px-3 py-1 rounded bg-dark bg-opacity-75 border border-warning border-opacity-50 shadow-sm" style="font-size: 0.85rem; cursor: default;" title="قاعة الجلسة الحية مغلقة أثناء المداولات">
+            <i class="bi bi-shield-lock-fill text-gold"></i>
+            <span>قاعة الانعقاد الحي (الأزرار الخارجية مقفلة أثناء المداولات)</span>
+          </span>
+        </li>
+        {% else %}
+        {% if global_live_session %}
+        <li class="nav-item">
+          <a class="nav-link text-warning fw-bold d-flex align-items-center gap-1 px-2 rounded bg-danger bg-opacity-25 border border-danger border-opacity-50"
+             href="{{ global_live_url }}{% if global_active_topic %}?topic={{ global_active_topic.pk }}#topic-row-{{ global_active_topic.pk }}{% endif %}"
+             title="انتقال فوري لقاعة الانعقاد الحي">
+            <span class="spinner-grow spinner-grow-sm text-danger" role="status" style="width: 0.65rem; height: 0.65rem;"></span>
+            <span>القاعة الحية ({{ global_live_session.session_number }})</span>
+          </a>
+        </li>
+        {% endif %}
         {% if user.is_super or user.can_view_sessions %}
         <li class="nav-item">
-          <a class="nav-link {% if '/sessions' in request.path %}active{% endif %}"
+          <a class="nav-link {% if '/sessions' in request.path and not is_on_live_page %}active{% endif %}"
              href="/sessions/">
             <i class="bi bi-calendar3 me-1"></i>الجلسات
           </a>
@@ -100,6 +145,7 @@
             <i class="bi bi-shield-check me-1"></i>سجل الرقابة
           </a>
         </li>
+        {% endif %}
         {% endif %}
       </ul>
 
@@ -235,6 +281,20 @@
       </div>
     </div>
     <nav class="sidebar-nav">
+      {% if is_member_live_lockdown %}
+      <div class="p-3 text-center">
+        <div class="p-3 rounded-3 bg-dark text-warning border border-warning border-opacity-50 shadow-sm">
+          <i class="bi bi-shield-lock-fill fs-2 text-gold d-block mb-2"></i>
+          <h6 class="fw-bold mb-1">قاعة الجلسة الحية</h6>
+          <p class="small text-white-50 mb-0">تم تجميد روابط وقوائم التنقل الخارجي لضمان تركيز وانضباط المداولات أثناء انعقاد الجلسة.</p>
+        </div>
+      </div>
+      {% else %}
+      {% if global_live_session %}
+      <a href="{{ global_live_url }}{% if global_active_topic %}?topic={{ global_active_topic.pk }}#topic-row-{{ global_active_topic.pk }}{% endif %}" class="sidebar-link text-warning fw-bold bg-danger bg-opacity-25 border border-danger border-opacity-50 my-1">
+        <i class="bi bi-broadcast text-danger animate-pulse"></i><span>القاعة الحية (الجلسة {{ global_live_session.session_number }}) 🔴</span>
+      </a>
+      {% endif %}
       {% if user.has_any_permission %}
       <a href="/dashboard/" class="sidebar-link {% if request.path == '/dashboard/' %}active{% endif %}">
         <i class="bi bi-speedometer2"></i><span>لوحة التحكم</span>
@@ -294,6 +354,7 @@
       <a href="/change-password/" class="sidebar-link">
         <i class="bi bi-shield-lock"></i><span>تغيير كلمة المرور</span>
       </a>
+      {% endif %}
       {% endif %}
       <form method="post" action="/logout/" class="p-3 mt-2">
         {% csrf_token %}

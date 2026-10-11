@@ -98,25 +98,37 @@ def session_live_view(request, session_pk):
         t.has_decision_flag = t.has_decision()
         t.decision_text_val = t.decision.decision_text if t.has_decision_flag else ''
 
-    # If session is active and NO topic is shown or voting, show the first topic
+    # ── Intelligent Active Topic Resolution (Preserves President's exact position) ──
+    topics_map = {t.pk: t for t in topics}
     active_topic = None
-    for t in topics:
-        if t.display_state.display_status in ('shown', 'voting'):
-            active_topic = t
-            break
 
-    if not active_topic and topics and session.status in ('active', 'publishing', 'partial_close'):
-        # Check if first topic is hidden, show it
-        first_t = topics[0]
-        if first_t.display_state.display_status == 'shown':
-            active_topic = first_t
-        elif is_controller and first_t.display_state.display_status == 'hidden':
-            first_t.display_state.display_status = 'shown'
-            first_t.display_state.save()
-            active_topic = first_t
-        else:
-            active_topic = first_t
-    elif not active_topic and topics:
+    # 1. URL parameter override (e.g. returning directly from global banner: ?topic=123)
+    req_topic_id = request.GET.get('topic')
+    if req_topic_id and req_topic_id.isdigit():
+        req_id = int(req_topic_id)
+        if req_id in topics_map:
+            active_topic = topics_map[req_id]
+
+    # 2. Check if any topic is actively in 'shown' or 'voting' state on the floor
+    if not active_topic:
+        for t in topics:
+            if t.display_state.display_status in ('shown', 'voting'):
+                active_topic = t
+                break
+
+    # 3. Check session's remembered last_active_topic
+    if not active_topic and session.last_active_topic_id and session.last_active_topic_id in topics_map:
+        active_topic = topics_map[session.last_active_topic_id]
+
+    # 4. If none, find the first upcoming topic that is not closed/voted yet
+    if not active_topic and topics:
+        for t in topics:
+            if t.status not in ('voted', 'closed') and t.display_state.display_status != 'closed' and not t.has_decision_flag:
+                active_topic = t
+                break
+
+    # 5. Fallback to first topic if all else fails
+    if not active_topic and topics:
         active_topic = topics[0]
 
     completed_topics_count = sum(
@@ -173,11 +185,30 @@ def session_live_view(request, session_pk):
         session=session, status='pending'
     ).select_related('member', 'seat')
 
-    # Recording
-    recording, _ = SessionRecording.objects.get_or_create(session=session)
+    # Real-time attendance list for in-cockpit attendance modal
+    existing_att = {
+        a.member_id: a
+        for a in session.attendances.select_related('member', 'seat', 'proxy_user').all()
+    }
+    from accounts.models import User as CouncilUserModel
+    all_council_members = CouncilUserModel.objects.filter(is_active=True).exclude(title='مدير_النظام').order_by('order', 'id')
+    attendance_list = []
+    for m in all_council_members:
+        att = existing_att.get(m.pk)
+        attendance_list.append({
+            'member': m,
+            'seat': att.seat if att else None,
+            'status': att.status if att else 'unrecorded',
+            'status_display': att.get_status_display() if att else 'لم يُرصد',
+            'is_proxy': att.is_proxy if att else False,
+            'proxy_name': att.proxy_name if att else '',
+        })
+
+    recording = SessionRecording.objects.filter(session=session).first()
 
     context = {
         'session': session,
+        'attendance_list': attendance_list,
         'topics': topics,
         'topics_by_category': topics_by_category,
         'active_topic': active_topic,
@@ -466,6 +497,12 @@ def api_topic_control(request, topic_pk):
         else:
             return JsonResponse({'ok': False, 'error': 'إجراء غير معروف.'}, status=400)
 
+        # Update last_active_topic on session to persist active position
+        if action in ('show', 'open_voting', 'close_voting', 'set_timer', 'save_decision'):
+            if topic.session.last_active_topic_id != topic.pk:
+                topic.session.last_active_topic = topic
+                topic.session.save(update_fields=['last_active_topic'])
+
     summary = topic.get_vote_summary()
     percentages = state.get_vote_percentages()
     has_dec = topic.has_decision()
@@ -726,7 +763,8 @@ def api_speak_queue(request, session_pk):
         if st.display_status in ('voting', 'shown') and active_topic_id is None:
             active_topic_id = t.pk
 
-        rem_secs = st.get_remaining_seconds()
+        u_vote = t.get_user_vote(request.user)
+        rem_secs = st.get_remaining_seconds() if st else 0
         topics_state[str(t.pk)] = {
             'id': t.pk,
             'category': t.category,
@@ -749,6 +787,9 @@ def api_speak_queue(request, session_pk):
             'percentages': st.get_vote_percentages(),
             'has_decision': has_dec,
             'decision_text': dec_text,
+            'has_user_voted': u_vote is not None,
+            'user_choice': u_vote.choice if u_vote else None,
+            'user_choice_label': u_vote.get_choice_display() if u_vote else None,
         }
 
     total_topics_count = len(topics)
@@ -1031,3 +1072,106 @@ def api_session_quorum(request, session_pk):
     session = get_object_or_404(CouncilSession, pk=session_pk)
     info = session.get_quorum_info()
     return JsonResponse({'ok': True, 'quorum': info})
+
+
+@login_required(login_url='/login/')
+@require_GET
+def api_session_active_topic(request, session_pk):
+    """
+    Lightweight polling endpoint to detect if a topic is actively being presented
+    or voted on in this live session, enabling auto-redirection of members.
+    """
+    user = request.user
+    if not (user.is_super or user.can_view_live_session or user.can_start_session_live or user.can_view_topics):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح.'}, status=403)
+
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+    active_state = TopicDisplayState.objects.filter(
+        topic__session_id=session.pk,
+        display_status__in=['shown', 'voting']
+    ).select_related('topic').first()
+
+    if active_state:
+        return JsonResponse({
+            'ok': True,
+            'has_active': True,
+            'topic_id': active_state.topic.pk,
+            'topic_title': active_state.topic.title,
+            'display_status': active_state.display_status,
+            'live_url': f'/sessions/{session.pk}/live/'
+        })
+    return JsonResponse({'ok': True, 'has_active': False})
+
+
+@login_required(login_url='/login/')
+@require_GET
+def api_topic_quick_view(request, topic_pk):
+    """
+    Returns full details of any topic including description, proposals,
+    dynamic tables, and attachments for quick side-drawer inspection
+    inside the live session cockpit without leaving the session.
+    """
+    user = request.user
+    topic = get_object_or_404(Topic, pk=topic_pk)
+    if not topic.session.can_be_seen_by(user):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح.'}, status=403)
+
+    tables_data = []
+    for tbl in topic.tables.all():
+        tables_data.append({
+            'id': tbl.id,
+            'title': tbl.title or tbl.get_table_type_display(),
+            'headers': tbl.headers or [],
+            'rows': tbl.rows_data or [],
+            'total_row': tbl.get_formatted_total_row() or [],
+        })
+
+    attachments_data = []
+    for att in topic.attachments.all():
+        attachments_data.append({
+            'id': att.id,
+            'name': att.file_name or (att.file.name.split('/')[-1] if att.file else 'مرفق'),
+            'url': att.file.url if att.file else '#',
+            'type': att.file_type or '',
+        })
+
+    recordings_data = []
+    for rec in topic.recordings.all():
+        recordings_data.append({
+            'id': rec.id,
+            'label': rec.label or 'تسجيل نقاش الموضوع',
+            'url': rec.audio_file.url if rec.audio_file else '',
+            'duration': rec.get_duration_display(),
+            'recorded_at': rec.recorded_at.strftime('%Y-%m-%d %H:%M') if rec.recorded_at else '',
+        })
+
+    has_dec = topic.has_decision()
+    dec_text = topic.decision.decision_text if has_dec else ''
+
+    display_status = 'hidden'
+    if hasattr(topic, 'display_state'):
+        display_status = topic.display_state.display_status
+    else:
+        st = TopicDisplayState.objects.filter(topic=topic).first()
+        if st:
+            display_status = st.display_status
+
+    return JsonResponse({
+        'ok': True,
+        'id': topic.pk,
+        'title': topic.title,
+        'ordinal_label': topic.ordinal_label,
+        'category': topic.category,
+        'category_label': topic.get_category_display(),
+        'presenting_entity': topic.presenting_entity or '',
+        'legal_basis': topic.background or '',
+        'description': '',
+        'priorities': topic.priorities or '',
+        'decision_text': dec_text,
+        'tables': tables_data,
+        'attachments': attachments_data,
+        'recordings': recordings_data,
+        'display_status': display_status,
+        'status': topic.status,
+        'status_display': topic.get_clear_status_display(),
+    })

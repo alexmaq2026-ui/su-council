@@ -26,14 +26,9 @@
     </div>
     
     <div class="d-flex flex-wrap gap-2 align-items-center">
-      {% if user_can_view_live %}
-        <a href="{% url 'council:session_live' session_pk=session.pk %}" class="btn btn-danger btn-sm fw-bold">
-          غرفة إدارة الجلسة الحية (Live)
-        </a>
-      {% endif %}
-      {% if user_can_view_projector %}
-        <a href="{% url 'council:session_projector' session_pk=session.pk %}" target="_blank" class="btn btn-outline-light btn-sm fw-bold">
-          شاشة العرض (Projector)
+      {% if session.status == 'active' %}
+        <a href="{% url 'council:session_live' session_pk=session.pk %}" class="btn btn-danger btn-sm fw-bold px-3 py-1 shadow-sm border border-warning animate-pulse" style="background-color: #dc2626;">
+          <i class="bi bi-broadcast me-1"></i>العودة الفورية للقاعة الحية 🔴
         </a>
       {% endif %}
       {% if user_can_view_analytics %}
@@ -108,9 +103,6 @@
         </div>
         <div class="d-flex align-items-center gap-2">
           <span class="badge bg-danger fs-6 px-3 py-2">{{ q.quorum_percentage }}%</span>
-          {% if user_can_view_live %}
-            <a href="{% url 'council:session_live' session.pk %}" class="btn btn-danger btn-sm fw-bold">دخول غرفة الجلسة الحية ←</a>
-          {% endif %}
         </div>
       </div>
     {% endif %}
@@ -367,6 +359,11 @@
                       <a href="{% url 'council:topic_detail' pk=t.pk %}" class="btn btn-sm btn-outline-navy">
                         عرض الموضوع
                       </a>
+                    {% endif %}
+                    {% if is_controller and session.status == 'active' %}
+                      <button type="button" class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="launchTopicToLive({{ t.pk }}, '{% url 'council:session_live' session_pk=session.pk %}')" title="طرح هذا الموضوع فوراً للمداولة والتصويت في الجلسة الحية">
+                        <i class="bi bi-broadcast-pin me-1"></i> طرح للنقاش الحي والتصويت
+                      </button>
                     {% endif %}
                   </div>
                 </div>
@@ -787,6 +784,71 @@ function verifySessionIntegrity(sessionPk) {
     `;
   });
 }
+
+function launchTopicToLive(topicId, liveUrl) {
+  const btn = window.event ? window.event.currentTarget : null;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جارٍ الطرح والانتقال...';
+  }
+  fetch(`/api/topics/${topicId}/control/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({ action: 'show' })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      window.location.href = `${liveUrl}#topic-row-${topicId}`;
+    } else {
+      alert(data.error || 'تعذر طرح الموضوع للجلسة الحية.');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-broadcast-pin me-1"></i> طرح للنقاش الحي والتصويت';
+      }
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    window.location.href = `${liveUrl}#topic-row-${topicId}`;
+  });
+}
+
+{% if not is_controller and user_can_vote and not user_can_add_topic and not user_can_edit_topic and session.status == 'active' %}
+// Auto-Redirect Listener for voting council members only (administrative staff are exempt to manage topics/attachments)
+(function() {
+  let isRedirecting = false;
+  function checkActiveTopicForMember() {
+    if (isRedirecting) return;
+    fetch("{% url 'council:api_session_active_topic' session_pk=session.pk %}")
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok && data.has_active && !isRedirecting) {
+          isRedirecting = true;
+          const banner = document.createElement('div');
+          banner.className = 'position-fixed bottom-0 start-50 translate-middle-x mb-4 p-3 bg-dark text-white rounded-3 shadow-lg border border-warning d-flex align-items-center gap-3';
+          banner.style.zIndex = '99999';
+          banner.innerHTML = `
+            <div class="spinner-grow text-warning flex-shrink-0" role="status"></div>
+            <div>
+              <strong class="d-block text-warning fs-6">بدأ رئيس المجلس مناقشة موضوع الآن!</strong>
+              <small class="text-light">${data.topic_title} — جارٍ تحويلك تلقائياً إلى الغرفة الحية...</small>
+            </div>
+          `;
+          document.body.appendChild(banner);
+          setTimeout(() => {
+            window.location.href = data.live_url || "{% url 'council:session_live' session_pk=session.pk %}";
+          }, 1200);
+        }
+      })
+      .catch(err => console.debug('Sync check err:', err));
+  }
+  setInterval(checkActiveTopicForMember, 2500);
+})();
+{% endif %}
 </script>
 
 {% endblock %}

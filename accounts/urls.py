@@ -26,6 +26,10 @@ urlpatterns = [
     path('users/<int:pk>/edit/',        views.user_edit_view,                  name='user-edit'),
     path('users/<int:pk>/permissions/', views.user_permissions_view,           name='user_permissions'),
     path('users/<int:pk>/permissions/', views.user_permissions_view,           name='user-permissions'),
+    path('users/<int:pk>/grant-voting-permissions/', views.grant_voting_member_permissions_view, name='grant_voting_permissions'),
+    path('users/<int:pk>/grant-voting-permissions/', views.grant_voting_member_permissions_view, name='grant-voting-permissions'),
+    path('users/grant-voting-permissions-bulk/', views.grant_voting_member_permissions_bulk_view, name='grant_voting_permissions_bulk'),
+    path('users/grant-voting-permissions-bulk/', views.grant_voting_member_permissions_bulk_view, name='grant-voting-permissions-bulk'),
     path('users/<int:pk>/delete/',      views.user_delete_view,                name='user_delete'),
     path('users/<int:pk>/delete/',      views.user_delete_view,                name='user-delete'),
     path('users/<int:pk>/activate/',    views.user_activate_view,              name='user_activate'),
@@ -36,6 +40,11 @@ urlpatterns = [
     # ── Seat Deputies Management ──────────────────────────────────────────────
     path('seats/deputies/', views.seat_deputies_view, name='seat_deputies'),
     path('seats/deputies/', views.seat_deputies_view, name='seat-deputies'),
+
+    # ── Personal Direct Gate & Token Authentication ───────────────────────────
+    path('gate/<str:token>/', views.direct_gate_login_view, name='direct_gate_login'),
+    path('users/<int:pk>/generate-token/', views.generate_user_token_view, name='generate_user_token'),
+    path('users/<int:pk>/generate-token/', views.generate_user_token_view, name='generate-user-token'),
 
     # ── Personal Profile ──────────────────────────────────────────────────────
     path('profile/',         views.profile_view,         name='profile'),

@@ -97,7 +97,9 @@ urlpatterns = [
     # APIs for Live Session & Topic State Control
     path('api/topics/<int:topic_pk>/control/', live_session_views.api_topic_control, name='api_topic_control'),
     path('api/topics/<int:topic_pk>/state/', live_session_views.api_topic_state, name='api_topic_state'),
+    path('api/topics/<int:topic_pk>/quick-view/', live_session_views.api_topic_quick_view, name='api_topic_quick_view'),
     path('api/sessions/<int:session_pk>/quorum/', live_session_views.api_session_quorum, name='api_session_quorum'),
+    path('api/sessions/<int:session_pk>/active-topic/', live_session_views.api_session_active_topic, name='api_session_active_topic'),
 
     # APIs for Speech Queue (SpeakRequest)
     path('api/sessions/<int:session_pk>/speak/toggle/', live_session_views.api_speak_request_toggle, name='api_speak_request_toggle'),

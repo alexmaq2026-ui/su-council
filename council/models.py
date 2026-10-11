@@ -109,6 +109,10 @@ class CouncilSession(models.Model):
         related_name='stage_changed_sessions', verbose_name='غيّر المرحلة'
     )
     reopen_reason             = models.TextField('سبب إعادة الفتح', blank=True)
+    last_active_topic         = models.ForeignKey(
+        'Topic', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='+', verbose_name='آخر موضوع نشط في الجلسة'
+    )
 
     created_by                = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,

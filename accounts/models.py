@@ -106,6 +106,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_login_ip  = models.GenericIPAddressField('آخر IP', null=True, blank=True)
     avatar_initials = models.CharField('الحروف الأولى', max_length=3, blank=True)
 
+    # On-Demand Personal Direct Link Token
+    access_token     = models.CharField('رمز الدخول الشخصي المباشر', max_length=64, blank=True, null=True, unique=True)
+    token_created_at = models.DateTimeField('تاريخ توليد رمز الدخول', null=True, blank=True)
+
     manager = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='subordinates', verbose_name='المسؤول المباشر'
@@ -216,6 +220,30 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.is_staff = True
             self.is_superuser = True
         super().save(*args, **kwargs)
+
+    def generate_access_token(self):
+        """Generate or regenerate on-demand a cryptographically secure random token for direct entry."""
+        import secrets
+        self.access_token = secrets.token_urlsafe(24)
+        self.token_created_at = timezone.now()
+        self.save(update_fields=['access_token', 'token_created_at'])
+        return self.access_token
+
+    def revoke_access_token(self):
+        """Revoke the direct entry token."""
+        self.access_token = None
+        self.token_created_at = None
+        self.save(update_fields=['access_token', 'token_created_at'])
+
+    def get_direct_login_url(self, request=None):
+        """Return the absolute or relative direct entry URL for this user."""
+        if not self.access_token:
+            return ''
+        from django.urls import reverse
+        rel_path = reverse('accounts:direct_gate_login', kwargs={'token': self.access_token})
+        if request:
+            return request.build_absolute_uri(rel_path)
+        return rel_path
 
     def get_permission(self):
         """Return the user's Permission object (created with zero permissions if absent)."""
@@ -415,6 +443,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         perm = self.get_permission()
         return perm.count_granted() if perm else 0
 
+    @property
+    def is_voting_member_core(self):
+        if self.is_super:
+            return False
+        perm = self.get_permission()
+        return perm.is_voting_member_core() if perm else False
+
 
 class CouncilPermission(models.Model):
     """
@@ -458,6 +493,21 @@ class CouncilPermission(models.Model):
         'can_view_notifications', 'can_view_notification_log',
         'can_manage_sms_template', 'can_use_smart_reader',
         'can_manage_smart_reader', 'can_view_audit_log',
+    ]
+
+    # 🌟 الصلاحيات الأساسية للأعضاء من لهم حق التصويت (11 صلاحية قياسية معتمدة)
+    VOTING_MEMBER_CORE_PERMISSIONS = [
+        'can_view_sessions',        # عرض شاشة قائمة الجلسات وتفاصيل الجلسة
+        'can_view_topics',          # عرض تفاصيل الموضوعات والحيثيات والقرارات
+        'can_view_attachments',     # معاينة وتحميل أوليات ومرفقات الموضوع
+        'can_vote',                 # ممارسة حق التصويت (موافق/مرفوض/متحفظ)
+        'can_view_correspondence',  # عرض شاشة مراسلات الكلية وتحميل القرارات الواردة
+        'can_manage_delegates',     # إدارة الممثلين والتفويض بالإنابة
+        'can_change_password',      # تغيير كلمة المرور الخاصة بالحساب
+        'can_view_live_session',    # دخول غرفة الجلسة الحية (Live)
+        'can_request_speak',        # طلب المداخلة في الجلسة
+        'can_request_exit_permit',  # طلب الإذن بالخروج النهائي من الجلسة
+        'can_view_notifications',   # عرض جرس ومركز التنبيهات والإشعارات
     ]
 
     user = models.OneToOneField(
@@ -583,3 +633,19 @@ class CouncilPermission(models.Model):
                 except Exception:
                     labels.append(f)
         return labels
+
+    def apply_voting_member_core_permissions(self, granted_by_user=None, notes='منح الصلاحيات الأساسية للأعضاء من لهم حق التصويت'):
+        """Grant the 11 core voting member permissions and clear all other permissions."""
+        for f in self.ALL_PERMISSION_FIELDS:
+            setattr(self, f, f in self.VOTING_MEMBER_CORE_PERMISSIONS)
+        if granted_by_user:
+            self.granted_by = granted_by_user
+        if notes:
+            self.notes = notes
+        self.save()
+        return self
+
+    def is_voting_member_core(self):
+        """Check if granted permissions match the voting member core set."""
+        granted_set = {f for f in self.ALL_PERMISSION_FIELDS if getattr(self, f, False)}
+        return granted_set == set(self.VOTING_MEMBER_CORE_PERMISSIONS)
