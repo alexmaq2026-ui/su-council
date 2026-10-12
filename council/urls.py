@@ -100,6 +100,8 @@ urlpatterns = [
     path('api/topics/<int:topic_pk>/quick-view/', live_session_views.api_topic_quick_view, name='api_topic_quick_view'),
     path('api/sessions/<int:session_pk>/quorum/', live_session_views.api_session_quorum, name='api_session_quorum'),
     path('api/sessions/<int:session_pk>/active-topic/', live_session_views.api_session_active_topic, name='api_session_active_topic'),
+    path('api/sessions/<int:session_pk>/lifecycle-control/', live_session_views.api_session_lifecycle_control, name='api_session_lifecycle_control'),
+    path('api/sessions/<int:session_pk>/delegate-control/', live_session_views.api_session_delegate_control, name='api_session_delegate_control'),
 
     # APIs for Speech Queue (SpeakRequest)
     path('api/sessions/<int:session_pk>/speak/toggle/', live_session_views.api_speak_request_toggle, name='api_speak_request_toggle'),

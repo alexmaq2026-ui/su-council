@@ -195,6 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
     {% if permission_obj.can_delete_topic %}'can_delete_topic',{% endif %}
     {% if permission_obj.can_change_topic_status %}'can_change_topic_status',{% endif %}
     {% if permission_obj.can_import_topics %}'can_import_topics',{% endif %}
+    {% if permission_obj.can_postpone_suspend_topic %}'can_postpone_suspend_topic',{% endif %}
     {% if permission_obj.can_add_table %}'can_add_table',{% endif %}
     {% if permission_obj.can_edit_table %}'can_edit_table',{% endif %}
     {% if permission_obj.can_delete_table %}'can_delete_table',{% endif %}
@@ -224,6 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
     {% if permission_obj.can_approve_new_session %}'can_approve_new_session',{% endif %}
     {% if permission_obj.can_view_live_session %}'can_view_live_session',{% endif %}
     {% if permission_obj.can_start_session_live %}'can_start_session_live',{% endif %}
+    {% if permission_obj.can_suspend_resume_session %}'can_suspend_resume_session',{% endif %}
     {% if permission_obj.can_set_topic_timer %}'can_set_topic_timer',{% endif %}
     {% if permission_obj.can_manage_speak_requests %}'can_manage_speak_requests',{% endif %}
     {% if permission_obj.can_request_speak %}'can_request_speak',{% endif %}

@@ -36,7 +36,9 @@ def live_session_context(request):
         is_controller = bool(user.is_super or user.can_start_session_live)
         has_voting_right = bool(getattr(user, 'can_vote', False))
         # يقتصر القفل الصارم على الأعضاء أصحاب حق التصويت فقط؛ أما الكادر الإداري والمساعد فيتاح له التنقل بحرية
-        is_member_live_lockdown = bool(is_on_live_page and not is_controller and has_voting_right)
+        # وفي حالة تعليق الجلسة (الاستراحة)، يتم تحرير شاشات جميع الأعضاء فوراً
+        is_session_suspended = bool(getattr(active_session, 'is_suspended', False))
+        is_member_live_lockdown = bool(is_on_live_page and not is_controller and has_voting_right and not is_session_suspended)
 
         return {
             'global_live_session': active_session,
@@ -44,6 +46,8 @@ def live_session_context(request):
             'is_on_live_page': is_on_live_page,
             'is_live_controller': is_controller,
             'is_member_live_lockdown': is_member_live_lockdown,
+            'is_session_suspended': is_session_suspended,
+            'session_suspension_reason': getattr(active_session, 'suspension_reason', ''),
             'global_live_url': live_url,
         }
     except Exception:

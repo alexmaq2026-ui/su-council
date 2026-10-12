@@ -8,11 +8,17 @@ import sqlite3
 import psycopg2
 from psycopg2.extras import execute_values
 
+from dotenv import load_dotenv
+load_dotenv()
+
 SQLITE_PATH = "db.sqlite3"
 SUPABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://postgres.hhqrohrclfekmjqhlaet:Esk777513858@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
+    "postgresql://postgres.hhqrohrclfekmjqhlaet:Esk777513858@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?sslmode=require"
 )
+if "sslmode=require" not in SUPABASE_URL:
+    sep = "&" if "?" in SUPABASE_URL else "?"
+    SUPABASE_URL = f"{SUPABASE_URL}{sep}sslmode=require"
 
 def log(msg):
     print(msg, flush=True)
@@ -71,7 +77,7 @@ for t in sorted(all_sqlite_tables):
     if t not in ordered_tables:
         ordered_tables.append(t)
 
-pg_conn = psycopg2.connect(SUPABASE_URL, connect_timeout=15)
+pg_conn = psycopg2.connect(SUPABASE_URL, connect_timeout=35)
 pg_conn.autocommit = False
 pg_cur = pg_conn.cursor()
 

@@ -31,6 +31,8 @@ SESSION_STAGE_ORDER = ['draft', 'publishing', 'active', 'partial_close', 'frozen
 TOPIC_STATUS = [
     ('pending',    'مُدرج بجدول الأعمال'),
     ('discussing', 'قيد النقاش'),
+    ('suspended',  'معلق مؤقتاً'),
+    ('postponed',  'مؤجل'),
     ('voted',      'تم التصويت'),
     ('closed',     'مغلق'),
 ]
@@ -114,6 +116,23 @@ class CouncilSession(models.Model):
         related_name='+', verbose_name='آخر موضوع نشط في الجلسة'
     )
 
+    # Live suspension / recess tracking (استراحة وتعليق مؤقت للجلسة الحية)
+    is_suspended              = models.BooleanField('معلقة مؤقتاً (استراحة)', default=False)
+    suspended_at              = models.DateTimeField('وقت تعليق الجلسة', null=True, blank=True)
+    suspension_reason         = models.CharField('سبب التعليق / الاستراحة', max_length=255, blank=True)
+    resumed_at                = models.DateTimeField('وقت استئناف الجلسة', null=True, blank=True)
+
+    # Phase 3 Live Leadership & Dynamic Delegation (قيادة وتفويض إدارة الجلسة الحية)
+    chair_user                = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='chaired_sessions', verbose_name='رئيس الجلسة (المستخدم)'
+    )
+    live_controller           = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='controlled_live_sessions', verbose_name='المتحكم المفوض بالجلسة الحية'
+    )
+    live_controller_delegated_at = models.DateTimeField('وقت تفويض الإدارة', null=True, blank=True)
+
     created_by                = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
         related_name='created_sessions', verbose_name='أنشأها'
@@ -134,6 +153,58 @@ class CouncilSession(models.Model):
     def __str__(self):
         cum = f' ({self.session_cumulative_number})' if self.session_cumulative_number else ''
         return f'الجلسة رقم {self.session_number}{cum} – {self.date}'
+
+    def get_chair_user(self):
+        """Returns the User object representing the President/Chair of this session."""
+        if self.chair_user_id:
+            return self.chair_user
+        try:
+            from council.models import EntitySeat
+            pres_seat = EntitySeat.objects.filter(seat_type='presidency', is_active=True).first()
+            if pres_seat and pres_seat.primary_rep:
+                return pres_seat.primary_rep
+        except Exception:
+            pass
+        from django.contrib.auth import get_user_model
+        UserModel = get_user_model()
+        return UserModel.objects.filter(title='رئيس_الجامعة').first()
+
+    def is_user_president(self, user):
+        """Check if the given user is the President/Chair of this session."""
+        if not user or not user.is_authenticated:
+            return False
+        chair = self.get_chair_user()
+        if chair and chair.pk == user.pk:
+            return True
+        if getattr(user, 'title', None) == 'رئيس_الجامعة':
+            return True
+        return False
+
+    def user_can_manage_live_controls(self, user):
+        """
+        Check if user is currently allowed to operate live session controls:
+        1. President of the session ALWAYS has sovereign control.
+        2. Delegated live_controller has active control granted by the President.
+        3. Superuser has control only if no president is set/online and nobody is delegated.
+        """
+        if not user or not user.is_authenticated:
+            return False
+        if self.is_user_president(user):
+            return True
+        if self.live_controller_id and self.live_controller_id == user.pk:
+            return True
+        if getattr(user, 'is_super', False) and not self.live_controller_id:
+            chair = self.get_chair_user()
+            if not chair or chair.pk == user.pk:
+                return True
+        return False
+
+    def get_chair_display_name(self):
+        """Return clean display title for the session chair."""
+        chair = self.get_chair_user()
+        if chair:
+            return chair.full_name
+        return self.chair_name or 'رئيس المجلس'
 
     def get_stats(self):
         """Return quick stats for dashboard."""
@@ -652,12 +723,10 @@ class Topic(models.Model):
         blank=True,
         help_text='أدخل الأسماء مفصولة بفاصلة – تُستخدم في البحث'
     )
-    status            = models.CharField('حالة الموضوع', max_length=15, choices=[
-        ('pending',    'مُدرج بجدول الأعمال'),
-        ('discussing', 'قيد النقاش'),
-        ('voted',      'تم التصويت'),
-        ('closed',     'مغلق'),
-    ], default='pending')
+    status            = models.CharField('حالة الموضوع', max_length=20, choices=TOPIC_STATUS, default='pending')
+    postponed_to      = models.CharField('جهة / موعد التأجيل', max_length=200, blank=True, help_text='مثال: الجلسة القادمة أو للجنة الشؤون الأكاديمية')
+    postpone_reason   = models.TextField('سبب ومبرر التأجيل', blank=True)
+    suspended_at      = models.DateTimeField('وقت التعليق المؤقت', null=True, blank=True)
     created_by        = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
         related_name='created_topics', verbose_name='أضافه'
@@ -1056,10 +1125,11 @@ class TopicDisplayState(models.Model):
     for a topic in real-time under the direct control of the Council President.
     """
     DISPLAY_STATUS_CHOICES = [
-        ('hidden', 'مطوي / مخفي'),
-        ('shown',  'معروض للنقاش (بدون تصويت)'),
-        ('voting', 'مفتوح للتصويت'),
-        ('closed', 'مغلق ومحسوب النتائج'),
+        ('hidden',    'مطوي / مخفي'),
+        ('shown',     'معروض للنقاش (بدون تصويت)'),
+        ('voting',    'مفتوح للتصويت'),
+        ('suspended', 'معلق مؤقتاً (تخطي أثناء الانعقاد)'),
+        ('closed',    'مغلق ومحسوب النتائج'),
     ]
 
     topic              = models.OneToOneField(
@@ -1271,6 +1341,34 @@ class ExitPermit(models.Model):
 
     def __str__(self):
         return f'{self.member.full_name} – إذن خروج ({self.get_status_display()})'
+
+
+# ── Live Session Presence (Manager Tracking & Dynamic Delegation) ────────────
+class LiveSessionPresence(models.Model):
+    """
+    Tracks presence of operators / co-pilots connected to the live session cockpit.
+    Allows the Council President to see who is present and selectively enable/freeze them.
+    """
+    session   = models.ForeignKey(
+        CouncilSession, on_delete=models.CASCADE,
+        related_name='live_presences', verbose_name='الجلسة'
+    )
+    user      = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='live_session_presences', verbose_name='المستخدم'
+    )
+    joined_at = models.DateTimeField('وقت الدخول', auto_now_add=True)
+    last_seen = models.DateTimeField('آخر ظهور', auto_now=True)
+    is_active = models.BooleanField('متصل حالياً', default=True)
+
+    class Meta:
+        verbose_name = 'حضور المشغل بالجلسة الحية'
+        verbose_name_plural = 'سجل حضور المشغلين بالجلسات الحية'
+        unique_together = ('session', 'user')
+        ordering = ['-last_seen']
+
+    def __str__(self):
+        return f'{self.user.full_name} في {self.session}'
 
 
 # ==============================================================================

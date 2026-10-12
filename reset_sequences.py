@@ -5,18 +5,24 @@ reset_sequences.py
 """
 import os
 import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv()
 
 SUPABASE_URL = os.environ.get(
     "DATABASE_URL",
     "postgresql://postgres.hhqrohrclfekmjqhlaet:Esk777513858@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?sslmode=require"
 )
+if "sslmode=require" not in SUPABASE_URL:
+    sep = "&" if "?" in SUPABASE_URL else "?"
+    SUPABASE_URL = f"{SUPABASE_URL}{sep}sslmode=require"
 
 print("=" * 55)
 print("  إعادة ضبط تسلسلات PostgreSQL لمشروع مجلس الجامعة...")
 print("=" * 55)
 
 try:
-    conn = psycopg2.connect(SUPABASE_URL, connect_timeout=15)
+    conn = psycopg2.connect(SUPABASE_URL, connect_timeout=35)
     conn.autocommit = True
     cur = conn.cursor()
 

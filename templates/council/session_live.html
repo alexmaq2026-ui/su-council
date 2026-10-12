@@ -1,35 +1,73 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{% if can_start_session_live %}غرفة إدارة الجلسة الحية{% else %}الجلسة المنعقدة الحية{% endif %} – {{ session }} | نظام مجلس الجامعة{% endblock %}
+{% block title %}{% if is_president %}غرفة رئاسة وإدارة الجلسة الحية{% elif is_delegated %}غرفة إدارة الجلسة الحية (مفوّض بالإدارة){% elif is_frozen_manager %}قاعة الانعقاد الحي (معاون - الأدوات مجمدة){% elif can_start_session_live %}غرفة إدارة الجلسة الحية{% else %}الجلسة المنعقدة الحية{% endif %} – {{ session }} | نظام مجلس الجامعة{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ضبط وترشيق واجهة قاعة الجلسة الحية وشاشة الرئاسة */
+  .live-command-bar {
+    border: 1px solid rgba(27, 54, 93, 0.12) !important;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  }
+  .uc-navbar {
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
+  }
+  .brand-icon {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 1rem !important;
+  }
+  .brand-title {
+    font-size: 1rem !important;
+  }
+  .brand-sub {
+    font-size: 0.65rem !important;
+  }
+  .live-tool-btn {
+    font-size: 0.76rem !important;
+    padding: 0.25rem 0.6rem !important;
+    font-weight: 600;
+  }
+  #session-recording-player {
+    height: 24px;
+    max-width: 130px;
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-3 px-lg-4" dir="rtl">
+<div class="container-fluid pt-2 pb-3 px-lg-3" dir="rtl">
 
-  <!-- =========================================================================
-       1. شريط رأس الجلسة الحية والمعلومات الأساسية
-       ========================================================================= -->
   <!-- =========================================================================
        1. شريط القيادة الموحد فائق الرشاقة للجلسة الحية (Ultra-Compact Live Command Bar)
        ========================================================================= -->
-  <div class="card shadow-sm border-0 mb-2 bg-white" style="border-radius: 10px;">
+  <div class="card shadow-sm border-0 mb-2 bg-white live-command-bar">
     <div class="card-body py-2 px-3">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
         
-        <!-- الجانب الأيمن: عنوان الجلسة، الحالة، النصاب، ونسبة الإنجاز -->
+        <!-- الجانب الأيمن: هوية الجلسة، الحالة، النصاب، ونسبة الإنجاز -->
         <div class="d-flex flex-wrap align-items-center gap-2">
-          {% if can_start_session_live %}
-            <span class="badge bg-danger px-2 py-1 text-white animate-pulse" style="font-size: 0.72rem;">إدارة الجلسة • LIVE</span>
+          {% if is_president %}
+            <span id="role-live-badge" class="badge bg-danger px-2 py-1 text-white shadow-sm" style="font-size: 0.74rem;"><i class="bi bi-shield-lock-fill me-1"></i>رئاسة الجلسة • LIVE</span>
+          {% elif is_delegated %}
+            <span id="role-live-badge" class="badge bg-success px-2 py-1 text-white shadow-sm" style="font-size: 0.74rem;"><i class="bi bi-person-check-fill me-1"></i>مفوّض بالإدارة • LIVE</span>
+          {% elif is_frozen_manager %}
+            <span id="role-live-badge" class="badge bg-warning text-dark px-2 py-1 fw-bold border border-warning" style="font-size: 0.74rem;"><i class="bi bi-lock-fill me-1"></i>معاون بالجلسة • الأدوات مجمدة</span>
+          {% elif can_start_session_live %}
+            <span id="role-live-badge" class="badge bg-danger px-2 py-1 text-white shadow-sm" style="font-size: 0.74rem;">إدارة الجلسة • LIVE</span>
           {% else %}
-            <span class="badge bg-success px-2 py-1 text-white animate-pulse" style="font-size: 0.72rem;">انعقاد مباشر • LIVE</span>
+            <span id="role-live-badge" class="badge bg-success px-2 py-1 text-white shadow-sm" style="font-size: 0.74rem;">انعقاد مباشر • LIVE</span>
           {% endif %}
           
-          <h5 class="mb-0 fw-bold text-navy text-truncate" style="color: #1B365D; max-width: 440px;" title="{{ session.name|default:session }}">
+          <h6 class="mb-0 fw-bold text-navy text-truncate" style="color: #1B365D; max-width: 360px;" title="{{ session.name|default:session }}">
             {{ session.name|default:session }}
-          </h5>
+          </h6>
 
           {% if session.session_cumulative_number %}
-            <span class="badge bg-light text-muted border d-none d-sm-inline" style="font-size: 0.70rem;">رقم تراكمي: {{ session.session_cumulative_number }}</span>
+            <span class="badge bg-light text-muted border d-none d-md-inline" style="font-size: 0.70rem;">رقم تراكمي: {{ session.session_cumulative_number }}</span>
           {% endif %}
 
           <!-- شارة النصاب المدمجة الذكية -->
@@ -47,12 +85,148 @@
           </span>
         </div>
 
-        <!-- الجانب الأيسر: التسجيل الصوتي، جدول الأعمال، والأدوات السريعة -->
+        <!-- الجانب الأيسر: شريط أدوات الرئاسة المنظم فائق الرشاقة -->
         <div class="d-flex flex-wrap align-items-center gap-2">
           
-          <!-- تحكم التسجيل الصوتي المدمج للرئيس -->
+          {% if can_suspend_session %}
+          <!-- 1. أزرار دورة حياة الجلسة (الحالة ورفع الجلسة) -->
+          <div class="d-inline-flex align-items-center gap-1">
+            <!-- زر تعليق الجلسة (استراحة) ⏸️ يظهر فقط عند الانعقاد النشط -->
+            <button type="button" id="btn-session-suspend"
+                    class="btn btn-sm btn-outline-warning text-dark bg-warning bg-opacity-10 py-1 px-2 fw-bold border-warning shadow-sm live-tool-btn {% if is_suspended %}d-none{% endif %}"
+                    onclick="openSessionSuspendModal()" title="تعليق الجلسة مؤقتاً لأخذ استراحة صلاة أو تشاور وفك قيد شاشات الأعضاء">
+              <i class="bi bi-pause-circle-fill text-warning me-1"></i>
+              <span>تعليق الجلسة (استراحة)</span>
+            </button>
+
+            <!-- زر استئناف الجلسة ▶️ يظهر فقط عند التعليق والاستراحة -->
+            <button type="button" id="btn-session-resume"
+                    class="btn btn-sm btn-success text-white py-1 px-3 fw-bold shadow-sm animate-pulse live-tool-btn {% if not is_suspended %}d-none{% endif %}"
+                    onclick="resumeSessionDeliberations()" title="استئناف الجلسة وإعادة تفعيل وضع الانعقاد المباشر">
+              <i class="bi bi-play-circle-fill me-1"></i>
+              <span>استئناف الجلسة ▶️</span>
+            </button>
+
+            <!-- زر رفع الجلسة ⏹️ -->
+            <button type="button" id="btn-session-adjourn"
+                    class="btn btn-sm btn-outline-danger py-1 px-2 fw-bold shadow-sm live-tool-btn"
+                    onclick="openSessionAdjournModal()" title="رفع الجلسة رسمياً وإنهاء المداولات ونقلها لصياغة واعتماد القرارات">
+              <i class="bi bi-stop-circle-fill text-danger me-1"></i>
+              <span>رفع الجلسة</span>
+            </button>
+          </div>
+          {% endif %}
+
+          <!-- 2. أدوات المتابعة والقاعة (الحضور، المعاونون، مطالعة الجداول) -->
+          <div class="d-inline-flex align-items-center gap-1">
+            {% if can_view_attendance %}
+            <button type="button" class="btn btn-sm btn-outline-light py-1 px-2 fw-bold text-navy bg-white border shadow-sm live-tool-btn"
+                    data-bs-toggle="modal" data-bs-target="#quickAttendanceModal" title="عرض كشف الحضور والتمثيل والنصاب دون مغادرة القاعة الحية">
+              <i class="bi bi-people-fill text-primary me-1"></i>
+              <span>كشف الحضور ({{ quorum_info.present_count }}/{{ quorum_info.total_seats }})</span>
+            </button>
+            {% endif %}
+
+            {% if is_president or user.is_super %}
+            <!-- زر وقائمة المعاونين المتصلين بالجلسة الحية -->
+            <div class="dropdown d-inline-block" id="coPilotsDropdownContainer">
+              <button class="btn btn-sm btn-outline-light text-navy bg-white py-1 px-2 fw-bold border shadow-sm dropdown-toggle d-inline-flex align-items-center gap-1 live-tool-btn"
+                      type="button" id="btnCoPilotsDropdown" data-bs-toggle="dropdown" aria-expanded="false"
+                      title="المعاونون المتصلون بالجلسة وتفويض تشغيل الأدوات">
+                <i class="bi bi-person-gear text-primary me-1"></i>
+                <span>المعاونون</span>
+                <span class="badge bg-primary text-white rounded-pill px-1.5" id="online-managers-badge-count">{{ online_managers_count }}</span>
+                <span class="badge bg-success text-white ms-1" id="active-controller-pill" style="{% if not active_controller %}display:none;{% endif %}">
+                  مفوّض: <span id="active-controller-pill-name">{{ active_controller.full_name|default:''|truncatechars:10 }}</span>
+                </span>
+              </button>
+              <div class="dropdown-menu dropdown-menu-end shadow-lg p-3 border-0" aria-labelledby="btnCoPilotsDropdown" style="width: 390px; max-width: 95vw; border-radius: 12px; z-index: 1060;">
+                <div class="d-flex justify-content-between align-items-center pb-2 mb-2 border-bottom">
+                  <div>
+                    <h6 class="fw-bold mb-0 text-navy" style="color: #1B365D;"><i class="bi bi-sliders me-1 text-primary"></i>المعاونون المتصلون بالجلسة</h6>
+                    <small class="text-muted" style="font-size: 0.70rem;">التمكين والتجميد اللحظي لأدوات التشغيل</small>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 fw-bold" id="btn-quick-revoke-all" onclick="revokeDelegation()" title="سحب التفويض فوراً واستعادة القيادة الحصرية للرئيس" style="font-size: 0.72rem; {% if not active_controller %}display:none;{% endif %}">
+                    <i class="bi bi-lock-fill"></i> تجميد واستعادة
+                  </button>
+                </div>
+
+                <div id="active-controller-callout" class="alert alert-success py-2 px-2 mb-2 d-flex justify-content-between align-items-center" style="{% if not active_controller %}display:none;{% endif %}">
+                  <div class="small">
+                    <strong class="text-success d-block"><i class="bi bi-check-circle-fill me-1"></i>المتحكم المفوّض حالياً:</strong>
+                    <span id="active-controller-callout-name" class="fw-bold text-dark">{{ active_controller.full_name|default:'' }}</span>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-danger py-1 px-2 fw-bold shadow-sm" onclick="revokeDelegation()" title="سحب التفويض فوراً">
+                    <i class="bi bi-lock-fill me-1"></i>تجميد
+                  </button>
+                </div>
+
+                <p class="text-muted small mb-2" style="font-size: 0.75rem; line-height: 1.4;">
+                  أي معاون يدخل الجلسة تظل أدواته <strong>مجمدة</strong> تلقائياً، ويمكنك تمكينه بالضغط على "تمكين"، أو تجميد الأدوات في أي لحظة:
+                </p>
+
+                <div class="list-group list-group-flush mb-1" id="online-managers-list" style="max-height: 260px; overflow-y: auto;">
+                  {% for m in online_managers %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center p-2 rounded mb-1 {% if m.is_delegated %}bg-success bg-opacity-10 border border-success{% else %}bg-light{% endif %}" id="manager-item-{{ m.id }}">
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="avatar-circle-sm bg-navy text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; font-size: 0.75rem; background-color: #1B365D;">
+                          {{ m.avatar_initials }}
+                        </div>
+                        <div>
+                          <div class="fw-bold text-dark small" style="line-height: 1.2;">{{ m.name }}</div>
+                          <div class="text-muted" style="font-size: 0.70rem;">{{ m.title }}</div>
+                          <div class="small" style="font-size: 0.68rem;">
+                            {% if m.is_online %}
+                              <span class="text-success"><i class="bi bi-circle-fill" style="font-size: 6px;"></i> متصل الآن</span>
+                            {% else %}
+                              <span class="text-muted">آخر ظهور: {{ m.last_seen }}</span>
+                            {% endif %}
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        {% if m.is_delegated %}
+                          <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2 fw-bold" onclick="revokeDelegation()" title="تجميد الأدوات واستعادة التحكم">
+                            <i class="bi bi-lock-fill"></i> تجميد
+                          </button>
+                        {% else %}
+                          <button type="button" class="btn btn-sm btn-outline-success py-1 px-2 fw-bold" onclick="delegateControl({{ m.id }}, '{{ m.name|escapejs }}')" title="تمكين هذا المعاون من تشغيل وإدارة الجلسة">
+                            <i class="bi bi-unlock-fill"></i> تمكين
+                          </button>
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% empty %}
+                    <div class="text-center py-3 text-muted small" id="no-managers-msg">
+                      <i class="bi bi-people text-secondary fs-3 d-block mb-1"></i>
+                      لا يوجد معاونون متصلون بالجلسة حالياً.
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
+            <button type="button" class="btn btn-sm btn-outline-light py-1 px-2 fw-bold text-navy bg-white border shadow-sm live-tool-btn"
+                    onclick="openTopicInspector({{ active_topic.pk|default:0 }})" title="مطالعة وتصفح نصوص وجداول الموضوع في لوحة جانبية دون مغادرة القاعة">
+              <i class="bi bi-layout-sidebar-inset text-info me-1"></i>
+              <span>مطالعة الجداول</span>
+            </button>
+
+            <!-- زر استعراض جدول الأعمال للعضو -->
+            {% if not can_start_session_live %}
+            <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 fw-bold d-inline-flex align-items-center gap-1 live-tool-btn"
+                    onclick="toggleMemberAgendaRibbon(event)" id="agenda-ribbon-btn" style="border-radius: 20px;">
+              <i class="bi bi-journal-text"></i>
+              <span>جدول الأعمال ({{ total_topics_count }})</span>
+              <i class="bi bi-chevron-down ms-1" id="agenda-ribbon-icon"></i>
+            </button>
+            {% endif %}
+          </div>
+
+          <!-- 3. تحكم التسجيل الصوتي المدمج للرئيس -->
           {% if can_control_recording %}
-          <div class="d-flex align-items-center gap-1 bg-light py-1 px-2 rounded border" style="font-size: 0.76rem;">
+          <div class="d-inline-flex align-items-center gap-1 bg-light py-1 px-2 rounded border" style="font-size: 0.74rem;">
             <span id="recording-status-badge" class="badge {% if recording.started_at and not recording.ended_at %}bg-danger animate-pulse{% else %}bg-secondary{% endif %}" style="font-size: 0.68rem;">
               {% if recording.started_at and not recording.ended_at %}
                 {% if recording.is_paused %}مؤقت{% else %}تسجيل{% endif %}
@@ -65,16 +239,16 @@
             </span>
             <span id="chunk-counter" style="display:none;">{{ recording.chunk_count }}</span>
             <div class="btn-group btn-group-sm">
-              <button id="btn-record-start" class="btn btn-sm btn-outline-danger py-0 px-2 fw-bold" onclick="startSessionRecording()" title="بدء / إعادة التسجيل">
+              <button id="btn-record-start" class="btn btn-sm btn-outline-danger py-0 px-2 fw-bold" onclick="startSessionRecording()" title="بدء / إعادة التسجيل" style="font-size: 0.72rem;">
                 {% if recording.audio_file %}إعادة التسجيل{% else %}🎙️ تسجيل{% endif %}
               </button>
               <button id="btn-record-pause" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="pauseSessionRecording()" style="display:none;" title="إيقاف مؤقت">⏸️</button>
               <button id="btn-record-resume" class="btn btn-sm btn-outline-success py-0 px-2" onclick="resumeSessionRecording()" style="display:none;" title="استئناف">▶️</button>
-              <button id="btn-record-stop" class="btn btn-sm btn-dark py-0 px-2 fw-bold" onclick="stopSessionRecording()" style="display:none;" title="إنهاء وحفظ">⏹️ إنهاء</button>
+              <button id="btn-record-stop" class="btn btn-sm btn-dark py-0 px-2 fw-bold" onclick="stopSessionRecording()" style="display:none;" title="إنهاء وحفظ" style="font-size: 0.72rem;">⏹️ إنهاء</button>
             </div>
             {% if recording.audio_file %}
               <div id="recording-playback-box" class="d-inline-flex align-items-center gap-1 ms-1">
-                <audio id="session-recording-player" controls preload="metadata" style="height: 24px; max-width: 140px;">
+                <audio id="session-recording-player" controls preload="metadata">
                   <source src="{{ recording.audio_file.url }}" type="audio/webm">
                 </audio>
                 <a id="btn-download-recording" href="{{ recording.audio_file.url }}" download="تسجيل_الجلسة_{{ session.session_number }}.webm" class="btn btn-sm btn-outline-primary py-0 px-1" title="تحميل">
@@ -89,46 +263,28 @@
 
           {% if not can_control_recording and recording.audio_file and user.can_listen_audio %}
           <!-- استماع التسجيل الصوتي للأعضاء -->
-          <div class="d-flex align-items-center gap-1 bg-light py-1 px-2 rounded border">
+          <div class="d-inline-flex align-items-center gap-1 bg-light py-1 px-2 rounded border">
             <span class="small fw-bold text-navy" style="font-size: 0.72rem;"><i class="bi bi-mic-fill text-success me-1"></i>التسجيل:</span>
-            <audio controls preload="metadata" style="height: 24px; max-width: 140px;">
+            <audio controls preload="metadata" style="height: 22px; max-width: 125px;">
               <source src="{{ recording.audio_file.url }}" type="audio/webm">
             </audio>
           </div>
           {% endif %}
 
-          <!-- زر استعراض جدول الأعمال للعضو -->
-          {% if not can_start_session_live %}
-          <button type="button" class="btn btn-sm btn-outline-primary py-1 px-3 fw-bold d-inline-flex align-items-center gap-1"
-                  onclick="toggleMemberAgendaRibbon(event)" id="agenda-ribbon-btn" style="border-radius: 20px;">
-            <i class="bi bi-journal-text"></i>
-            <span>جدول الأعمال ({{ total_topics_count }})</span>
-            <i class="bi bi-chevron-down ms-1" id="agenda-ribbon-icon"></i>
-          </button>
-          {% endif %}
-
-          <!-- أزرار الإجراءات السريعة والمطالعة داخل القاعة (دون مغادرتها) -->
-          <button type="button" class="btn btn-sm btn-outline-light py-1 px-2 fw-bold text-navy bg-white border shadow-sm d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#quickAttendanceModal" title="عرض كشف الحضور والتمثيل والنصاب دون مغادرة القاعة الحية">
-            <i class="bi bi-people-fill text-primary"></i>
-            <span>كشف الحضور ({{ quorum_info.present_count }}/{{ quorum_info.total_seats }})</span>
-          </button>
-
-          <button type="button" class="btn btn-sm btn-outline-light py-1 px-2 fw-bold text-navy bg-white border shadow-sm d-inline-flex align-items-center gap-1" onclick="openTopicInspector({{ active_topic.pk|default:0 }})" title="مطالعة وتصفح نصوص وجداول الموضوع في لوحة جانبية دون مغادرة القاعة">
-            <i class="bi bi-layout-sidebar-inset text-info"></i>
-            <span>مطالعة الجداول والموضوعات</span>
-          </button>
-
+          <!-- 4. التقارير والتفاصيل -->
           {% if can_start_session_live %}
+          <div class="btn-group btn-group-sm">
             {% if can_view_analytics %}
-              <a href="{% url 'council:session_analytics' session.pk %}" class="btn btn-outline-info btn-sm py-1 px-2 fw-bold" title="التقرير التحليلي">
+              <a href="{% url 'council:session_analytics' session.pk %}" class="btn btn-outline-info py-1 px-2 fw-bold live-tool-btn" title="التقرير التحليلي">
                 <i class="bi bi-graph-up me-1"></i>التحليلي
               </a>
             {% endif %}
             {% if user.can_view_sessions %}
-              <a href="{% url 'council:session_detail' session.pk %}" class="btn btn-outline-secondary btn-sm py-1 px-2" title="تفاصيل الجلسة">
+              <a href="{% url 'council:session_detail' session.pk %}" class="btn btn-outline-secondary py-1 px-2 live-tool-btn" title="تفاصيل الجلسة">
                 <i class="bi bi-file-text me-1"></i>تفاصيل
               </a>
             {% endif %}
+          </div>
           {% endif %}
 
         </div>
@@ -137,19 +293,61 @@
       <!-- تنبيه النصاب في حال النقص فقط (يختفي تماماً عند اكتمال النصاب) -->
       <div id="quorum-banner-container" class="{% if not quorum_info.is_achieved %}mt-2{% endif %}">
         {% if not quorum_info.is_achieved %}
-          <div class="alert alert-danger d-flex align-items-center justify-content-between p-2 mb-0 border-2 border-danger shadow-sm">
+          <div class="alert alert-danger d-flex align-items-center justify-content-between py-1 px-3 mb-0 border border-danger shadow-sm rounded-3">
             <div class="d-flex align-items-center gap-2">
-              <span class="fs-5">⚠️</span>
-              <div>
+              <i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i>
+              <div class="small">
                 <strong class="text-danger">تنبيه النصاب القانوني لم يكتمل بعد!</strong>
-                <span class="small d-block text-dark">
+                <span class="text-dark ms-1">
                   الحاضرون بالمقاعد: <strong>{{ quorum_info.present_count }}</strong> من أصل <strong>{{ quorum_info.total_seats }}</strong> مقعداً (المطلوب: <strong>{{ quorum_info.quorum_required }}</strong> مقعداً).
                 </span>
               </div>
             </div>
-            <span class="badge bg-danger fs-6 px-3 py-2">{{ quorum_info.quorum_percentage }}%</span>
+            <span class="badge bg-danger fs-6 px-2 py-1">{{ quorum_info.quorum_percentage }}%</span>
           </div>
         {% endif %}
+      </div>
+
+      <!-- شريط إشعار تعليق الجلسة (الاستراحة) الرشيق لجميع الحاضرين -->
+      <div id="session-suspended-banner" class="mt-2" style="{% if not is_suspended %}display: none;{% endif %}">
+        <div class="alert alert-warning border border-warning shadow-sm d-flex flex-wrap align-items-center justify-content-between py-1 px-3 mb-0 rounded-3" style="background-color: #fffbeb;">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark px-2 py-1 fw-bold fs-6"><i class="bi bi-pause-circle-fill me-1"></i>وضع الاستراحة</span>
+            <span class="small text-dark" id="session-suspended-reason-text">
+              السبب: <strong class="text-dark">{{ suspension_reason|default:"استراحة مؤقتة للجلسة" }}</strong> — تم تحرير شاشات جميع الأعضاء مؤقتاً لحين استئناف الانعقاد.
+            </span>
+          </div>
+          {% if can_suspend_session %}
+          <button class="btn btn-sm btn-success fw-bold px-3 py-1 shadow-sm d-inline-flex align-items-center gap-1 flex-shrink-0" onclick="resumeSessionDeliberations()">
+            <i class="bi bi-play-circle-fill"></i><span>استئناف الانعقاد الآن</span>
+          </button>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- شريط إشعار المعاون المجمد (الأدوات مجمدة بانتظار تمكين الرئيس) -->
+      <div id="frozen-manager-banner" class="mt-2" style="{% if not is_frozen_manager %}display: none;{% endif %}">
+        <div class="alert alert-warning border border-warning shadow-sm d-flex flex-wrap align-items-center justify-content-between py-1 px-3 mb-0 rounded-3" style="background-color: #fffbeb;">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-warning text-dark px-2 py-1 fw-bold fs-6"><i class="bi bi-lock-fill me-1"></i>الأدوات مجمدة</span>
+            <span class="small text-dark">
+              أنتم متواجدون بالجلسة بصلاحية معاون/مراقب. قيادة الجلسة محصورة برئيس المجلس (<strong class="text-dark">{{ chair_display_name }}</strong>). بمجرد منحكم التمكين ستنشط أدواتكم تلقائياً.
+            </span>
+          </div>
+          <span class="badge bg-warning text-dark border border-warning px-2 py-1 fw-bold small"><i class="bi bi-hourglass-split me-1"></i>بانتظار تمكين الرئيس</span>
+        </div>
+      </div>
+
+      <!-- شريط إشعار المعاون المفوّض -->
+      <div id="delegated-manager-banner" class="mt-2" style="{% if not is_delegated %}display: none;{% endif %}">
+        <div class="alert alert-success border border-success shadow-sm d-flex flex-wrap align-items-center justify-content-between py-1 px-3 mb-0 rounded-3">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-success text-white px-2 py-1 fw-bold fs-6"><i class="bi bi-check-circle-fill me-1"></i>مفوّض بالإدارة</span>
+            <span class="small text-dark">
+              تم تفويضك رسمياً بإدارة وتشغيل الجلسة الحية من قِبل رئيس المجلس. جميع أدوات التشغيل نشطة الآن.
+            </span>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -246,46 +444,44 @@
   {% endif %}
 
   {% if not can_start_session_live and can_vote %}
-  <!-- بطاقة إشعار وضع الانضباط والقاعة المغلقة لشاشة العضو المصوت -->
-  <div class="card border-0 mb-3 shadow-sm rounded-3 overflow-hidden text-white" style="background: linear-gradient(135deg, #1B365D 0%, #0f3460 100%); border-right: 5px solid #facc15 !important;">
-    <div class="card-body p-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-      <div class="d-flex align-items-center gap-3">
-        <div class="rounded-circle bg-warning bg-opacity-20 p-2 text-warning fs-3">
-          <i class="bi bi-shield-lock-fill"></i>
-        </div>
-        <div>
-          <h6 class="mb-1 fw-bold text-warning">قاعة الاجتماع المباشرة (وضع انضباط المداولات مفعل)</h6>
-          <small class="text-white-50 d-block">
-            تطبيقاً للائحة المجلس: جميع أزرار وروابط النظام متوقفة ومقفلة. متاح لك فقط: <strong>طلب الكلمة</strong>، <strong>مطالعة جدول الأعمال</strong>، و<strong>التصويت</strong> عند فتحه بتوجيه رئيس المجلس.
-          </small>
-        </div>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <span class="badge bg-warning text-dark fw-bold px-3 py-2 shadow-sm">
+  <!-- شريط إشعار وضع الانضباط الرشيق لشاشة العضو المصوت (يختفي تلقائياً أثناء وضع الاستراحة) -->
+  <div id="member-discipline-banner" class="alert mb-2 py-1.5 px-3 border-0 rounded-3 shadow-sm text-white d-flex flex-wrap align-items-center justify-content-between gap-2"
+       style="background: linear-gradient(90deg, #1B365D 0%, #0f3460 100%); border-right: 4px solid #facc15 !important; {% if is_suspended %}display: none;{% endif %}">
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge bg-warning text-dark fw-bold px-2 py-1" style="font-size: 0.72rem;">
+        <i class="bi bi-shield-lock-fill me-1"></i>وضع انضباط المداولات
+      </span>
+      <span class="small text-white-50" style="font-size: 0.78rem;">
+        تطبيقاً للائحة المجلس: شاشات الأعضاء مخصصة للمداولات المباشرة. متاح لك: <strong>طلب الكلمة</strong> و<strong>التصويت</strong> عند فتحه بتوجيه رئيس المجلس.
+      </span>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      {% if user_exit_permit and user_exit_permit.status == 'approved' %}
+        <span class="badge bg-secondary text-white fw-bold px-2 py-1 shadow-sm" style="font-size: 0.72rem;">
+          <i class="bi bi-box-arrow-right me-1"></i>مغادر بإذن رسمي
+        </span>
+      {% else %}
+        <span class="badge bg-warning text-dark fw-bold px-2 py-1 shadow-sm" style="font-size: 0.72rem;">
           <i class="bi bi-person-check-fill me-1"></i>عضو مجلس حاضر (حق تصويت)
         </span>
-      </div>
+      {% endif %}
     </div>
   </div>
   {% elif not can_start_session_live and not can_vote %}
-  <!-- بطاقة الكادر الإداري والمساعد: غير مقيدة بالقفل الصارم لممارسة المهام بحرية -->
-  <div class="card border-0 mb-3 shadow-sm rounded-3 overflow-hidden bg-white border-start border-4 border-info">
-    <div class="card-body p-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-      <div class="d-flex align-items-center gap-3">
-        <div class="rounded-circle bg-info bg-opacity-10 p-2 text-info fs-3">
-          <i class="bi bi-person-gear"></i>
-        </div>
-        <div>
-          <h6 class="mb-1 fw-bold text-navy">متابعة ومساندة إدارية للجلسة الحية</h6>
-          <small class="text-muted d-block">
-            حساب مساندة إدارية وسكرتارية (بدون حق تصويت) — يمكنك التنقل في شاشات النظام لممارسة مهامك الإدارية بحرية كاملة بحسب الصلاحيات الممنوحة لك.
-          </small>
-        </div>
-      </div>
-      <span class="badge bg-info text-dark px-3 py-2 fw-bold">
-        <i class="bi bi-shield-check me-1"></i>كادر إداري ومساعد (تنقل حر)
+  <!-- شريط الكادر الإداري والمساعد الرشيق -->
+  <div id="staff-support-banner" class="alert mb-2 py-1.5 px-3 border-0 rounded-3 shadow-sm bg-white border-start border-4 border-info d-flex flex-wrap align-items-center justify-content-between gap-2"
+       style="{% if is_suspended %}display: none;{% endif %}">
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge bg-info text-dark fw-bold px-2 py-1" style="font-size: 0.72rem;">
+        <i class="bi bi-person-gear me-1"></i>مساندة إدارية
+      </span>
+      <span class="small text-muted" style="font-size: 0.78rem;">
+        حساب مساندة إدارية وسكرتارية (بدون حق تصويت) — تنقل حر لمتابعة المهام الإدارية بحسب الصلاحيات.
       </span>
     </div>
+    <span class="badge bg-info text-dark px-2 py-1 fw-bold" style="font-size: 0.72rem;">
+      <i class="bi bi-shield-check me-1"></i>كادر مساعد
+    </span>
   </div>
   {% endif %}
 
@@ -320,16 +516,20 @@
       <div class="card shadow-sm border-0 mb-3 bg-white">
         <div class="card-header bg-white border-bottom py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div>
-            {% if can_start_session_live %}
+            {% if can_start_session_live or is_frozen_manager %}
               <span class="fw-bold text-navy" style="color: #1B365D;">جدول إدارة مواضيع الجلسة ({{ topics|length }} موضوعاً)</span>
-              <span class="small text-muted ms-2">اضغط على المحور أو الموضوع للتحكم والعرض</span>
+              {% if is_frozen_manager %}
+                <span id="topics-header-subtext" class="small text-warning fw-bold ms-2">🔒 (أدوات التحكم مجمدة بانتظار تمكين الرئيس)</span>
+              {% else %}
+                <span id="topics-header-subtext" class="small text-muted ms-2">اضغط على المحور أو الموضوع للتحكم والعرض</span>
+              {% endif %}
             {% else %}
               <span class="fw-bold text-navy" style="color: #1B365D;">
                 <i class="bi bi-broadcast text-danger me-1 animate-pulse"></i>منصة المداولة والتصويت المباشر
               </span>
             {% endif %}
           </div>
-          {% if can_start_session_live and topics_by_category %}
+          {% if topics_by_category and can_start_session_live or topics_by_category and is_frozen_manager %}
           <div class="d-flex align-items-center gap-1">
             <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" onclick="setAllLiveCategories(true)">فتح الكل</button>
             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="setAllLiveCategories(false)">طي الكل</button>
@@ -337,7 +537,7 @@
           {% endif %}
         </div>
         <div class="p-2" id="topics-list-group">
-          {% if not can_start_session_live %}
+          {% if not can_start_session_live and not is_frozen_manager %}
             <!-- رسالة للمشاركين في حال لم يكن هناك موضوع معروض على المنصة بعد -->
             <div id="member-no-active-stage" class="p-5 text-center text-muted" style="{% if active_topic %}display:none;{% endif %}">
               <span class="fs-1 d-block mb-2 text-navy">🏛️</span>
@@ -347,8 +547,8 @@
           {% endif %}
 
           {% for cat in topics_by_category %}
-            <div class="mb-2 border rounded-3 overflow-hidden live-cat-wrapper {% if not can_start_session_live %}border-0 mb-0{% endif %}" id="cat-wrapper-{{ forloop.counter }}">
-              {% if can_start_session_live %}
+            <div class="mb-2 border rounded-3 overflow-hidden live-cat-wrapper {% if not can_start_session_live and not is_frozen_manager %}border-0 mb-0{% endif %}" id="cat-wrapper-{{ forloop.counter }}">
+              {% if can_start_session_live or is_frozen_manager %}
               <div class="p-2 px-3 d-flex align-items-center justify-content-between text-white live-cat-bar"
                    style="background-color: #1B365D; cursor: pointer; user-select: none;"
                    onclick="toggleLiveCategory({{ forloop.counter }})">
@@ -365,19 +565,24 @@
               </div>
               {% endif %}
 
-              <div id="live-cat-body-{{ forloop.counter }}" class="live-cat-body list-group list-group-flush" style="display: {% if cat.has_active or not can_start_session_live %}block{% else %}none{% endif %};">
+              <div id="live-cat-body-{{ forloop.counter }}" class="live-cat-body list-group list-group-flush" style="display: {% if cat.has_active or not can_start_session_live and not is_frozen_manager %}block{% else %}none{% endif %};">
                 {% for t in cat.topics %}
                   <div class="list-group-item p-3 topic-item {% if t.pk == active_topic.pk %}border-start border-primary border-4 bg-light{% endif %}"
                        id="topic-row-{{ t.pk }}"
                        data-cat-idx="{{ forloop.parentloop.counter }}"
-                       style="{% if not can_start_session_live and t.pk != active_topic.pk %}display: none;{% endif %}">
+                       style="{% if not can_start_session_live and not is_frozen_manager and t.pk != active_topic.pk %}display: none;{% endif %}">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                       <div class="flex-grow-1" style="cursor: pointer;" onclick="toggleTopicDetails({{ t.pk }})">
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                           <span class="badge bg-navy text-white" style="background-color: #1B365D;">{{ t.ordinal_label }}</span>
-                          <span class="badge topic-state-badge-{{ t.pk }} {% if t.display_state.display_status == 'voting' %}bg-success{% elif t.display_state.display_status == 'shown' %}bg-info text-dark{% elif t.display_state.display_status == 'closed' %}bg-dark{% else %}bg-secondary{% endif %}">
-                            {{ t.display_state.get_display_status_display }}
+                          <span class="badge topic-state-badge-{{ t.pk }} {% if t.status == 'postponed' %}bg-danger{% elif t.status == 'suspended' or t.display_state.display_status == 'suspended' %}bg-warning text-dark{% elif t.display_state.display_status == 'voting' %}bg-success{% elif t.display_state.display_status == 'shown' %}bg-info text-dark{% elif t.display_state.display_status == 'closed' %}bg-dark{% else %}bg-secondary{% endif %}">
+                            {% if t.status == 'postponed' %}⏳ مؤجل{% elif t.status == 'suspended' or t.display_state.display_status == 'suspended' %}⏸️ معلق مؤقتاً{% else %}{{ t.display_state.get_display_status_display }}{% endif %}
                           </span>
+                          {% if t.status == 'postponed' and t.postponed_to %}
+                            <span class="badge bg-light text-danger border border-danger border-opacity-50" title="وجهة التأجيل">
+                              إلى: {{ t.postponed_to }}
+                            </span>
+                          {% endif %}
                           <span id="topic-decision-badge-{{ t.pk }}" class="badge bg-success bg-opacity-10 text-success border border-success" style="{% if not t.has_decision_flag %}display:none;{% endif %}">
                             ✓ القرار معتمد
                           </span>
@@ -393,31 +598,86 @@
                         {% endif %}
                       </div>
 
-                      <!-- أزرار تحكم الرئيس بالموضوع -->
-                      {% if can_start_session_live or can_set_topic_timer %}
-                      <div class="d-flex align-items-center gap-1 flex-shrink-0">
-                        {% if can_start_session_live %}
-                        <button class="btn btn-sm btn-outline-primary btn-show-{{ t.pk }}" onclick="controlTopic({{ t.pk }}, 'show')" title="عرض الموضوع للنقاش" {% if t.display_state.display_status == 'shown' or t.display_state.display_status == 'voting' %}style="display:none;"{% endif %}>
-                          عرض للنقاش
+                      <!-- أزرار تحكم رئيس المجلس بالموضوع (شريط تنفيذي ذكي وموحد) -->
+                      {% if can_start_session_live or is_frozen_manager or can_set_topic_timer or can_postpone_topic %}
+                      <div class="d-flex align-items-center gap-1.5 flex-shrink-0 live-control-action-group ms-auto ms-sm-0" data-topic-id="{{ t.pk }}">
+                        
+                        <!-- الزر القيادي المباشر بحسب مرحلة الموضوع -->
+                        <button class="btn btn-sm btn-outline-primary btn-show-{{ t.pk }} live-ctrl-btn px-2.5 py-1 fw-bold shadow-sm"
+                                onclick="controlTopic({{ t.pk }}, 'show')"
+                                title="عرض الموضوع للنقاش على المنصة لجميع الأعضاء"
+                                style="font-size: 0.76rem; {% if t.display_state.display_status != 'hidden' or t.status == 'postponed' or t.status == 'voted' or t.status == 'closed' %}display:none;{% endif %}"
+                                {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                          <i class="bi bi-play-circle-fill me-1"></i>عرض للنقاش
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary btn-hide-{{ t.pk }}" onclick="controlTopic({{ t.pk }}, 'hide')" title="إغلاق الموضوع" {% if t.display_state.display_status == 'hidden' %}style="display:none;"{% endif %}>
-                          إغلاق الموضوع
+
+                        <button class="btn btn-sm btn-success btn-open-vote-{{ t.pk }} live-ctrl-btn px-2.5 py-1 fw-bold shadow-sm"
+                                onclick="controlTopic({{ t.pk }}, 'open_voting')"
+                                title="فتح باب التصويت المباشر للأعضاء"
+                                style="font-size: 0.76rem; {% if t.display_state.display_status != 'shown' or t.status == 'postponed' or t.status == 'voted' or t.status == 'closed' %}display:none;{% endif %}"
+                                {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                          <i class="bi bi-check2-square me-1"></i>فتح التصويت
                         </button>
-                        <button class="btn btn-sm btn-success btn-open-vote-{{ t.pk }}" onclick="controlTopic({{ t.pk }}, 'open_voting')" title="فتح باب التصويت" {% if t.display_state.display_status == 'voting' %}style="display:none;"{% endif %}>
-                          فتح التصويت
+
+                        <button class="btn btn-sm btn-danger btn-close-vote-{{ t.pk }} live-ctrl-btn px-2.5 py-1 fw-bold shadow-sm animate-pulse"
+                                onclick="controlTopic({{ t.pk }}, 'close_voting')"
+                                title="إغلاق التصويت وحساب النتائج"
+                                style="font-size: 0.76rem; {% if t.display_state.display_status != 'voting' or t.status == 'postponed' or t.status == 'voted' or t.status == 'closed' %}display:none;{% endif %}"
+                                {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                          <i class="bi bi-stop-circle me-1"></i>إغلاق التصويت
                         </button>
-                        <button class="btn btn-sm btn-danger btn-close-vote-{{ t.pk }}" onclick="controlTopic({{ t.pk }}, 'close_voting')" title="إغلاق التصويت" {% if t.display_state.display_status != 'voting' %}style="display:none;"{% endif %}>
-                          إغلاق التصويت
+
+                        <button class="btn btn-sm btn-outline-secondary btn-hide-{{ t.pk }} live-ctrl-btn px-2 py-1 fw-bold"
+                                onclick="controlTopic({{ t.pk }}, 'hide')"
+                                title="إنهاء العرض وإخفاء الموضوع"
+                                style="font-size: 0.76rem; {% if t.display_state.display_status != 'shown' or t.status == 'postponed' or t.status == 'voted' or t.status == 'closed' %}display:none;{% endif %}"
+                                {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                          <i class="bi bi-eye-slash me-1"></i>إغلاق
                         </button>
-                        {% endif %}
-                        {% if can_set_topic_timer %}
-                        <button class="btn btn-sm btn-outline-info" onclick="promptTimer({{ t.pk }})" title="ضبط المؤقت">
-                          المؤقت
+
+                        <!-- زر المعاينة والمطالعة المباشرة -->
+                        <button type="button" class="btn btn-sm btn-outline-light text-navy bg-white border shadow-sm px-2 py-1"
+                                onclick="event.stopPropagation(); openTopicInspector({{ t.pk }})"
+                                title="مطالعة الحيثيات والجداول والمستندات في لوحة جانبية"
+                                style="font-size: 0.76rem;">
+                          <i class="bi bi-file-earmark-text text-primary me-1"></i>معاينة
                         </button>
-                        {% endif %}
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); openTopicInspector({{ t.pk }})" title="مطالعة الحيثيات والجداول والمستندات في لوحة جانبية">
-                          <i class="bi bi-eye"></i> معاينة
-                        </button>
+
+                        <!-- قائمة الخيارات والإجراءات المساندة (تأجيل، تعليق، المؤقت) -->
+                        <div class="dropdown d-inline-block">
+                          <button class="btn btn-sm btn-outline-light text-navy bg-white border shadow-sm dropdown-toggle px-2 py-1"
+                                  type="button" id="topicMenu-{{ t.pk }}" data-bs-toggle="dropdown" aria-expanded="false"
+                                  title="خيارات إضافية للموضوع" style="font-size: 0.76rem;"
+                                  {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                            <i class="bi bi-three-dots me-1"></i>خيارات
+                          </button>
+                          <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1" aria-labelledby="topicMenu-{{ t.pk }}" style="font-size: 0.8rem; border-radius: 8px; z-index: 1050;">
+                            <li>
+                              <button type="button" class="dropdown-item py-1.5 px-3 rounded btn-suspend-topic-{{ t.pk }} live-ctrl-btn"
+                                      onclick="suspendTopicAction({{ t.pk }})"
+                                      style="{% if t.status == 'suspended' or t.status == 'postponed' or t.status == 'voted' or t.status == 'closed' %}display:none;{% endif %}"
+                                      {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                                <i class="bi bi-pause-circle text-warning me-2"></i>تعليق الموضوع مؤقتاً
+                              </button>
+                            </li>
+                            <li>
+                              <button type="button" class="dropdown-item py-1.5 px-3 rounded btn-postpone-topic-{{ t.pk }} live-ctrl-btn"
+                                      onclick="openPostponeTopicModal({{ t.pk }}, '{{ t.title|escapejs }}')"
+                                      style="{% if t.status == 'postponed' or t.status == 'voted' or t.status == 'closed' %}display:none;{% endif %}"
+                                      {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                                <i class="bi bi-hourglass-split text-danger me-2"></i>تأجيل الموضوع لجلسة قادمة
+                              </button>
+                            </li>
+                            <li>
+                              <button type="button" class="dropdown-item py-1.5 px-3 rounded live-ctrl-btn"
+                                      onclick="promptTimer({{ t.pk }})"
+                                      {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                                <i class="bi bi-stopwatch text-info me-2"></i>ضبط مؤقت زمني
+                              </button>
+                            </li>
+                          </ul>
+                        </div>
+
                       </div>
                       {% endif %}
                     </div>
@@ -927,6 +1187,115 @@
 </div>
 {% endif %}
 
+<!-- Modal تعليق الجلسة مؤقتاً (استراحة) -->
+<div class="modal fade" id="sessionSuspendModal" tabindex="-1" aria-labelledby="sessionSuspendModalLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header text-white" style="background: linear-gradient(135deg, #d97706 0%, #b45309 100%);">
+        <h5 class="modal-title fw-bold" id="sessionSuspendModalLabel">
+          <i class="bi bi-pause-circle-fill me-2"></i>تعليق انعقاد الجلسة مؤقتاً (استراحة)
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <div class="modal-body p-4 bg-light">
+        <div class="p-3 mb-3 bg-white rounded border border-warning shadow-sm">
+          <p class="small text-dark mb-0">
+            <strong>توجيه رئيس المجلس:</strong> سيتم تعليق الجلسة الحية مؤقتاً، وتجميد مؤقتات النقاش والتسجيل الصوتي، و<strong>تحرير شاشات جميع الأعضاء فوراً</strong> لتمكينهم من تصفح ملفاتهم أو أخذ الاستراحة.
+          </p>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-navy">سبب الاستراحة والتعليق المؤقت:</label>
+          <select id="session_suspend_reason_select" class="form-select mb-2" onchange="if(this.value==='other'){document.getElementById('session_suspend_reason_custom').style.display='block';}else{document.getElementById('session_suspend_reason_custom').style.display='none';}">
+            <option value="استراحة صلاة">استراحة صلاة</option>
+            <option value="استراحة غداء وتناول وجبة">استراحة غداء وتناول وجبة</option>
+            <option value="تشاور داخلي بين أعضاء المجلس">تشاور داخلي بين أعضاء المجلس</option>
+            <option value="فترة راحة قصيرة">فترة راحة قصيرة</option>
+            <option value="other">سبب آخر (تخصيص)...</option>
+          </select>
+          <input type="text" id="session_suspend_reason_custom" class="form-control" placeholder="اكتب سبب التعليق المخصص..." style="display:none;">
+        </div>
+      </div>
+      <div class="modal-footer bg-white border-top">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+        <button type="button" class="btn btn-warning btn-sm fw-bold px-3 text-dark" onclick="confirmSessionSuspend()">
+          <i class="bi bi-pause-fill me-1"></i>تأكيد تعليق الجلسة وتحرير القاعة
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal رفع الجلسة وإنهاء المداولات -->
+<div class="modal fade" id="sessionAdjournModal" tabindex="-1" aria-labelledby="sessionAdjournModalLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header text-white" style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);">
+        <h5 class="modal-title fw-bold" id="sessionAdjournModalLabel">
+          <i class="bi bi-stop-circle-fill me-2"></i>رفع الجلسة وإنهاء المداولات الحية
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <div class="modal-body p-4 bg-light">
+        <div class="alert alert-danger shadow-sm border-2 border-danger mb-0">
+          <h6 class="fw-bold mb-2">تأكيد رفع الجلسة رقم {{ session.session_number }}:</h6>
+          <p class="small mb-0">
+            سيؤدي هذا الإجراء إلى <strong>إنهاء المداولات الحية رسمياً</strong>، وتوثيق وقت الانتهاء الفعلي في المحضر، وإيقاف التسجيل الصوتي، ونقل الجلسة إلى مرحلة <strong>«الإغلاق الجزئي – صياغة واعتماد القرارات»</strong> وتحرير شاشات جميع الأعضاء نهائياً.
+          </p>
+        </div>
+      </div>
+      <div class="modal-footer bg-white border-top">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">تراجع</button>
+        <button type="button" class="btn btn-danger btn-sm fw-bold px-3" onclick="confirmSessionAdjourn()">
+          <i class="bi bi-check-lg me-1"></i>تأكيد رفع الجلسة الآن
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal تأجيل الموضوع -->
+<div class="modal fade" id="topicPostponeModal" tabindex="-1" aria-labelledby="topicPostponeModalLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header text-white" style="background: linear-gradient(135deg, #1B365D 0%, #2A5298 100%);">
+        <h5 class="modal-title fw-bold" id="topicPostponeModalLabel">
+          <i class="bi bi-hourglass-split me-2 text-warning"></i>تأجيل الموضوع رسمياً
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <div class="modal-body p-4 bg-light">
+        <input type="hidden" id="postpone_target_topic_id" value="">
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-navy">الموضوع المراد تأجيله:</label>
+          <div id="postpone_target_topic_title" class="p-2 bg-white rounded border small fw-bold text-dark text-truncate"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-navy">وجهة وموعد التأجيل:</label>
+          <select id="postpone_destination_select" class="form-select mb-2" onchange="if(this.value==='other'){document.getElementById('postpone_destination_custom').style.display='block';}else{document.getElementById('postpone_destination_custom').style.display='none';}">
+            <option value="الجلسة القادمة">الجلسة القادمة لمجلس الجامعة</option>
+            <option value="لجنة الشؤون الأكاديمية لمزيد من الدراسة">لجنة الشؤون الأكاديمية لمزيد من الدراسة</option>
+            <option value="إعادة للجهة العارضة لاستيفاء الأوليات">إعادة للجهة العارضة لاستيفاء الأوليات</option>
+            <option value="لجنة الدراسات العليا والبحث العلمي">لجنة الدراسات العليا والبحث العلمي</option>
+            <option value="الشؤون القانونية للإفادة">الشؤون القانونية للإفادة</option>
+            <option value="other">جهة أخرى (تخصيص)...</option>
+          </select>
+          <input type="text" id="postpone_destination_custom" class="form-control" placeholder="اكتب وجهة التأجيل المخصصة..." style="display:none;">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-navy">مبررات وأسباب التأجيل (لتوثيقها في المحضر):</label>
+          <textarea id="postpone_reason_text" class="form-control" rows="3" placeholder="اكتب حيثيات وتوجيه المجلس في تأجيل هذا الموضوع..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer bg-white border-top">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+        <button type="button" class="btn btn-danger btn-sm fw-bold px-3" onclick="confirmPostponeTopic()">
+          <i class="bi bi-hourglass-split me-1"></i>تأكيد تأجيل الموضوع
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal طلب الإذن بالمغادرة -->
 {% if can_request_exit_permit %}
 <div class="modal fade" id="exitPermitModal" tabindex="-1" aria-labelledby="exitPermitModalLabel" aria-hidden="true" dir="rtl">
@@ -956,9 +1325,10 @@
 </div>
 {% endif %}
 
+{% if can_view_attendance %}
 <!-- =========================================================================
      نافذة كشف الحضور والتمثيل الحية (Quick Attendance Modal)
-     تمكن الرئيس والجميع من مطالعة كشف الحضور فوراً دون مغادرة القاعة الحية
+     تمكن الرئيس والمخولين من مطالعة كشف الحضور فوراً دون مغادرة القاعة الحية
      ========================================================================= -->
 <div class="modal fade" id="quickAttendanceModal" tabindex="-1" aria-labelledby="quickAttendanceModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -1078,6 +1448,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 <!-- =========================================================================
      لوحة مطالعة المواضيع والجداول الجانبية (Topic Inspector Drawer)
@@ -1164,9 +1535,16 @@
      ========================================================================= -->
 <script>
 const SESSION_ID = {{ session.pk }};
-const IS_CONTROLLER = {{ is_controller|yesno:"true,false" }};
+let IS_CONTROLLER = {{ is_controller|yesno:"true,false" }};
+const IS_PRESIDENT = {{ is_president|yesno:"true,false" }};
+let IS_DELEGATED = {{ is_delegated|yesno:"true,false" }};
+let IS_FROZEN_MANAGER = {{ is_frozen_manager|yesno:"true,false" }};
+let ACTIVE_CONTROLLER_ID = {{ active_controller.pk|default:0 }};
 const CAN_MANAGE_SPEAK = {{ can_manage_speak_requests|yesno:"true,false" }};
 const CAN_VOTE = {{ can_vote|yesno:"true,false" }};
+const CAN_SUSPEND_SESSION = {{ can_suspend_session|yesno:"true,false" }};
+const CAN_POSTPONE_TOPIC = {{ can_postpone_topic|yesno:"true,false" }};
+let IS_SESSION_SUSPENDED_CLIENT = {{ is_suspended|yesno:"true,false" }};
 let currentActiveSpeakerId = {{ active_speaker.pk|default:0 }};
 let currentActiveTopicId = {{ active_topic.pk|default:0 }};
 let mediaRecorder = null;
@@ -1176,8 +1554,372 @@ let lastChunkUploadPromise = Promise.resolve();
 let timerIntervals = {};
 let timerRemainingMap = {};
 
+// ── دوال تفويض وتمكين وإدارة المعاونين بالجلسة الحية ──
+function delegateControl(userId, userName) {
+  if (!confirm(`هل ترغب في تمكين الأخ / ${userName} من إدارة وتشغيل الجلسة الحية؟`)) return;
+
+  fetch(`/api/sessions/${SESSION_ID}/delegate-control/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({ action: 'delegate', user_id: userId })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      ACTIVE_CONTROLLER_ID = data.controller_id;
+      showToastAlert(data.message, 'success');
+      pollQueue();
+    } else {
+      alert(data.error || 'حدث خطأ أثناء تفويض الإدارة.');
+    }
+  });
+}
+
+function revokeDelegation() {
+  if (!confirm('هل ترغب في استعادة التحكم الحصري وتجميد أدوات الإدارة لجميع المعاونين؟')) return;
+
+  fetch(`/api/sessions/${SESSION_ID}/delegate-control/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({ action: 'revoke' })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      ACTIVE_CONTROLLER_ID = 0;
+      showToastAlert(data.message, 'info');
+      pollQueue();
+    } else {
+      alert(data.error || 'حدث خطأ أثناء سحب التفويض.');
+    }
+  });
+}
+
+function showToastAlert(msg, type = 'info') {
+  const existing = document.getElementById('floating-live-toast');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'floating-live-toast';
+  div.className = `alert alert-${type} shadow-lg border-2 border-${type} position-fixed top-0 start-50 translate-middle-x mt-3 py-2 px-4 fw-bold`;
+  div.style.zIndex = '9999';
+  div.style.borderRadius = '30px';
+  div.innerHTML = `<span>${msg}</span>`;
+  document.body.appendChild(div);
+  setTimeout(() => { if (div) div.remove(); }, 4000);
+}
+
+function applyLiveControlState(canControl) {
+  IS_CONTROLLER = canControl;
+
+  // تحديث شارات الحالة في الشريط العلوي
+  const roleBadge = document.getElementById('role-live-badge');
+  if (roleBadge) {
+    if (IS_PRESIDENT) {
+      roleBadge.className = 'badge bg-danger px-2 py-1 text-white animate-pulse';
+      roleBadge.innerHTML = '<i class="bi bi-shield-lock-fill me-1"></i>رئاسة الجلسة • LIVE';
+    } else if (canControl) {
+      roleBadge.className = 'badge bg-success px-2 py-1 text-white animate-pulse';
+      roleBadge.innerHTML = '<i class="bi bi-person-check-fill me-1"></i>مفوّض بالإدارة • LIVE';
+    } else {
+      roleBadge.className = 'badge bg-warning text-dark px-2 py-1 fw-bold border border-warning';
+      roleBadge.innerHTML = '<i class="bi bi-lock-fill me-1"></i>معاون بالجلسة • الأدوات مجمدة';
+    }
+  }
+
+  // تحديث أشرطة الإشعار للمشغل
+  const frozenBanner = document.getElementById('frozen-manager-banner');
+  const delegatedBanner = document.getElementById('delegated-manager-banner');
+  if (frozenBanner) {
+    frozenBanner.style.display = (!canControl && !IS_PRESIDENT) ? 'block' : 'none';
+  }
+  if (delegatedBanner) {
+    delegatedBanner.style.display = (canControl && !IS_PRESIDENT) ? 'block' : 'none';
+  }
+
+  // تحديث النص الفرعي في هيدر المواضيع
+  const topicsSubtext = document.getElementById('topics-header-subtext');
+  if (topicsSubtext) {
+    if (!canControl && !IS_PRESIDENT) {
+      topicsSubtext.className = 'small text-warning fw-bold ms-2';
+      topicsSubtext.innerHTML = '🔒 (أدوات التحكم مجمدة بانتظار تمكين الرئيس)';
+    } else {
+      topicsSubtext.className = 'small text-muted ms-2';
+      topicsSubtext.innerHTML = 'اضغط على المحور أو الموضوع للتحكم والعرض';
+    }
+  }
+
+  // تفعيل أو تجميد أزرار التحكم بجميع المواضيع
+  document.querySelectorAll('.live-ctrl-btn').forEach(btn => {
+    btn.disabled = !canControl;
+    if (!canControl) {
+      btn.setAttribute('data-frozen', 'true');
+      btn.style.opacity = '0.45';
+      btn.style.cursor = 'not-allowed';
+    } else {
+      btn.removeAttribute('data-frozen');
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+    }
+  });
+}
+
+function updateOnlineManagersUI(managers, activeControllerId, activeControllerName) {
+  const badgeCount = document.getElementById('online-managers-badge-count');
+  const pill = document.getElementById('active-controller-pill');
+  const pillName = document.getElementById('active-controller-pill-name');
+  const callout = document.getElementById('active-controller-callout');
+  const calloutName = document.getElementById('active-controller-callout-name');
+  const quickRevoke = document.getElementById('btn-quick-revoke-all');
+  const listEl = document.getElementById('online-managers-list');
+
+  const onlineCount = (managers || []).filter(m => m.is_online).length;
+  if (badgeCount) badgeCount.innerText = onlineCount;
+
+  if (activeControllerId && activeControllerName) {
+    if (pill) {
+      pill.style.display = 'inline-block';
+      if (pillName) pillName.innerText = activeControllerName.slice(0, 12);
+    }
+    if (callout) {
+      callout.style.display = 'flex';
+      if (calloutName) calloutName.innerText = activeControllerName;
+    }
+    if (quickRevoke) quickRevoke.style.display = 'inline-block';
+  } else {
+    if (pill) pill.style.display = 'none';
+    if (callout) callout.style.display = 'none';
+    if (quickRevoke) quickRevoke.style.display = 'none';
+  }
+
+  if (listEl) {
+    if (!managers || managers.length === 0) {
+      listEl.innerHTML = `
+        <div class="text-center py-3 text-muted small" id="no-managers-msg">
+          <i class="bi bi-people text-secondary fs-3 d-block mb-1"></i>
+          لا يوجد معاونون متصلون بالجلسة حالياً.
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    managers.forEach(m => {
+      const isDel = m.is_delegated;
+      html += `
+        <div class="list-group-item d-flex justify-content-between align-items-center p-2 rounded mb-1 ${isDel ? 'bg-success bg-opacity-10 border border-success' : 'bg-light'}" id="manager-item-${m.id}">
+          <div class="d-flex align-items-center gap-2">
+            <div class="avatar-circle-sm bg-navy text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; font-size: 0.75rem; background-color: #1B365D;">
+              ${m.avatar_initials}
+            </div>
+            <div>
+              <div class="fw-bold text-dark small" style="line-height: 1.2;">${m.name}</div>
+              <div class="text-muted" style="font-size: 0.70rem;">${m.title}</div>
+              <div class="small" style="font-size: 0.68rem;">
+                ${m.is_online ? '<span class="text-success"><i class="bi bi-circle-fill" style="font-size: 6px;"></i> متصل الآن</span>' : `<span class="text-muted">آخر ظهور: ${m.last_seen}</span>`}
+              </div>
+            </div>
+          </div>
+          <div>
+            ${isDel ? `
+              <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2 fw-bold" onclick="revokeDelegation()" title="تجميد الأدوات واستعادة التحكم">
+                <i class="bi bi-lock-fill"></i> تجميد
+              </button>
+            ` : `
+              <button type="button" class="btn btn-sm btn-outline-success py-1 px-2 fw-bold" onclick="delegateControl(${m.id}, '${m.name.replace(/'/g, "\\'")}')" title="تمكين هذا المعاون من تشغيل وإدارة الجلسة">
+                <i class="bi bi-unlock-fill"></i> تمكين
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+    });
+    listEl.innerHTML = html;
+  }
+}
+
+// ── وظائف تعليق واستئناف ورفع الجلسة الحية ──
+function openSessionSuspendModal() {
+  const modalEl = document.getElementById('sessionSuspendModal');
+  if (modalEl) {
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+  }
+}
+
+function confirmSessionSuspend() {
+  const sel = document.getElementById('session_suspend_reason_select');
+  const custom = document.getElementById('session_suspend_reason_custom');
+  let reason = (sel && sel.value === 'other') ? (custom.value.trim() || 'استراحة مخصصة') : (sel ? sel.value : 'استراحة مؤقتة للجلسة');
+
+  fetch(`/api/sessions/${SESSION_ID}/lifecycle-control/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({ action: 'suspend', reason: reason })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      IS_SESSION_SUSPENDED_CLIENT = true;
+      const modalEl = document.getElementById('sessionSuspendModal');
+      if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+      const btnSusp = document.getElementById('btn-session-suspend');
+      const btnRes = document.getElementById('btn-session-resume');
+      if (btnSusp) btnSusp.classList.add('d-none');
+      if (btnRes) btnRes.classList.remove('d-none');
+      const suspBanner = document.getElementById('session-suspended-banner');
+      if (suspBanner) suspBanner.style.display = 'block';
+      const discBanner = document.getElementById('member-discipline-banner');
+      if (discBanner) discBanner.style.display = 'none';
+      const staffBanner = document.getElementById('staff-support-banner');
+      if (staffBanner) staffBanner.style.display = 'none';
+      pollQueue();
+      alert('تم تعليق الجلسة مؤقتاً وفك قيد شاشات الأعضاء بنجاح.');
+    } else {
+      alert(data.error || 'حدث خطأ أثناء تعليق الجلسة.');
+    }
+  });
+}
+
+function resumeSessionDeliberations() {
+  if (!confirm('هل ترغب في استئناف انعقاد الجلسة الحية وإعادة تفعيل قاعة المداولات؟')) return;
+
+  fetch(`/api/sessions/${SESSION_ID}/lifecycle-control/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({ action: 'resume' })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      IS_SESSION_SUSPENDED_CLIENT = false;
+      const btnSusp = document.getElementById('btn-session-suspend');
+      const btnRes = document.getElementById('btn-session-resume');
+      if (btnSusp) btnSusp.classList.remove('d-none');
+      if (btnRes) btnRes.classList.add('d-none');
+      const suspBanner = document.getElementById('session-suspended-banner');
+      if (suspBanner) suspBanner.style.display = 'none';
+      const discBanner = document.getElementById('member-discipline-banner');
+      if (discBanner) discBanner.style.display = 'flex';
+      const staffBanner = document.getElementById('staff-support-banner');
+      if (staffBanner) staffBanner.style.display = 'flex';
+      pollQueue();
+      alert('تم استئناف الجلسة وإعادة تفعيل وضع الانعقاد بنجاح.');
+    } else {
+      alert(data.error || 'حدث خطأ أثناء استئناف الجلسة.');
+    }
+  });
+}
+
+function openSessionAdjournModal() {
+  const modalEl = document.getElementById('sessionAdjournModal');
+  if (modalEl) {
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+  }
+}
+
+function confirmSessionAdjourn() {
+  fetch(`/api/sessions/${SESSION_ID}/lifecycle-control/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({ action: 'adjourn' })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      alert('تم رفع الجلسة وتوثيق وقت الانتهاء بنجاح.');
+      window.location.href = data.redirect_url || `/sessions/${SESSION_ID}/`;
+    } else {
+      alert(data.error || 'حدث خطأ أثناء رفع الجلسة.');
+    }
+  });
+}
+
+// ── وظائف تعليق وتأجيل الموضوعات ──
+function suspendTopicAction(topicId) {
+  if (!confirm('هل تريد تعليق مناقشة هذا الموضوع مؤقتاً والانتقال للموضوع التالي؟ (يمكن العودة له لاحقاً)')) return;
+
+  fetch(`/api/topics/${topicId}/control/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({ action: 'suspend_topic' })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      updateTopicUI(topicId, data);
+      pollQueue();
+    } else {
+      alert(data.error || 'حدث خطأ أثناء تعليق الموضوع.');
+    }
+  });
+}
+
+function openPostponeTopicModal(topicId, topicTitle) {
+  document.getElementById('postpone_target_topic_id').value = topicId;
+  const titleBox = document.getElementById('postpone_target_topic_title');
+  if (titleBox) titleBox.innerText = topicTitle;
+
+  const modalEl = document.getElementById('topicPostponeModal');
+  if (modalEl) {
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+  }
+}
+
+function confirmPostponeTopic() {
+  const topicId = document.getElementById('postpone_target_topic_id').value;
+  const destSel = document.getElementById('postpone_destination_select');
+  const destCustom = document.getElementById('postpone_destination_custom');
+  let dest = (destSel && destSel.value === 'other') ? (destCustom.value.trim() || 'جهة أخرى') : (destSel ? destSel.value : 'الجلسة القادمة');
+  const reason = document.getElementById('postpone_reason_text').value.trim();
+
+  fetch(`/api/topics/${topicId}/control/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({ action: 'postpone_topic', postponed_to: dest, reason: reason })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      const modalEl = document.getElementById('topicPostponeModal');
+      if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+      updateTopicUI(topicId, data);
+      pollQueue();
+      alert('تم تأجيل الموضوع رسمياً بنجاح.');
+    } else {
+      alert(data.error || 'حدث خطأ أثناء تأجيل الموضوع.');
+    }
+  });
+}
+
 // 1. التحكم بالمواضيع (عرض، طي، فتح تصويت، إغلاق تصويت)
 function controlTopic(topicId, action) {
+  if (!IS_CONTROLLER) {
+    showToastAlert('🔒 أدوات التحكم بالجلسة مجمدة حالياً بانتظار تمكين رئيس الجلسة.', 'warning');
+    return;
+  }
   fetch(`/api/topics/${topicId}/control/`, {
     method: 'POST',
     headers: {
@@ -1347,24 +2089,43 @@ function renderTimerDigits(digitsEl, seconds) {
 // 3. تحديث واجهة الموضوع
 function updateTopicUI(topicId, data) {
   const stateBadge = document.querySelector(`.topic-state-badge-${topicId}`);
-  if (stateBadge && data.display_status_label) {
-    stateBadge.innerText = data.display_status_label;
-    stateBadge.className = `badge topic-state-badge-${topicId} ` +
-      (data.display_status === 'voting' ? 'bg-success' :
-      (data.display_status === 'shown' ? 'bg-info text-dark' :
-      (data.display_status === 'closed' ? 'bg-dark' : 'bg-secondary')));
+  if (stateBadge) {
+    if (data.topic_status === 'postponed') {
+      stateBadge.innerText = '⏳ مؤجل' + (data.postponed_to ? ` (إلى: ${data.postponed_to})` : '');
+      stateBadge.className = `badge topic-state-badge-${topicId} bg-danger text-white`;
+    } else if (data.topic_status === 'suspended' || data.display_status === 'suspended') {
+      stateBadge.innerText = '⏸️ معلق مؤقتاً';
+      stateBadge.className = `badge topic-state-badge-${topicId} bg-warning text-dark`;
+    } else if (data.display_status_label) {
+      stateBadge.innerText = data.display_status_label;
+      stateBadge.className = `badge topic-state-badge-${topicId} ` +
+        (data.display_status === 'voting' ? 'bg-success' :
+        (data.display_status === 'shown' ? 'bg-info text-dark' :
+        (data.display_status === 'closed' ? 'bg-dark' : 'bg-secondary')));
+    }
   }
 
-  // أزرار الرئيس
+  // أزرار تحكم الرئيس
   const btnShow = document.querySelector(`.btn-show-${topicId}`);
   const btnHide = document.querySelector(`.btn-hide-${topicId}`);
   const btnOpenVote = document.querySelector(`.btn-open-vote-${topicId}`);
   const btnCloseVote = document.querySelector(`.btn-close-vote-${topicId}`);
+  const btnSuspend = document.querySelector(`.btn-suspend-topic-${topicId}`);
+  const btnPostpone = document.querySelector(`.btn-postpone-topic-${topicId}`);
 
-  if (btnShow) btnShow.style.display = (data.display_status === 'shown' || data.display_status === 'voting') ? 'none' : 'inline-block';
-  if (btnHide) btnHide.style.display = data.display_status === 'hidden' ? 'none' : 'inline-block';
-  if (btnOpenVote) btnOpenVote.style.display = data.display_status === 'voting' ? 'none' : 'inline-block';
-  if (btnCloseVote) btnCloseVote.style.display = data.display_status === 'voting' ? 'inline-block' : 'none';
+  const isClosedOrVotedOrPostponed = (data.topic_status === 'postponed' || data.topic_status === 'voted' || data.topic_status === 'closed' || data.display_status === 'closed');
+
+  if (btnShow) btnShow.style.display = (data.display_status === 'hidden' && !isClosedOrVotedOrPostponed) ? 'inline-block' : 'none';
+  if (btnHide) btnHide.style.display = (data.display_status === 'shown' && !isClosedOrVotedOrPostponed) ? 'inline-block' : 'none';
+  if (btnOpenVote) btnOpenVote.style.display = (data.display_status === 'shown' && !isClosedOrVotedOrPostponed) ? 'inline-block' : 'none';
+  if (btnCloseVote) btnCloseVote.style.display = (data.display_status === 'voting' && !isClosedOrVotedOrPostponed) ? 'inline-block' : 'none';
+
+  if (btnSuspend) {
+    btnSuspend.style.display = (data.topic_status === 'suspended' || data.display_status === 'suspended' || isClosedOrVotedOrPostponed) ? 'none' : 'block';
+  }
+  if (btnPostpone) {
+    btnPostpone.style.display = isClosedOrVotedOrPostponed ? 'none' : 'block';
+  }
 
   // طي المواضيع الأخرى التي طُويت تلقائياً
   if (data.folded_topic_ids && Array.isArray(data.folded_topic_ids)) {
@@ -1802,6 +2563,70 @@ function pollQueue() {
     .then(res => res.json())
     .then(data => {
       if (!data.ok) return;
+
+      // -1) مزامنة صلاحية التحكم والتفويض الحي للشاشة
+      if (typeof data.is_user_controller !== 'undefined') {
+        const wasController = IS_CONTROLLER;
+        const nowController = !!data.is_user_controller;
+        ACTIVE_CONTROLLER_ID = data.active_controller_id || 0;
+
+        if (!wasController && nowController && !IS_PRESIDENT) {
+          showToastAlert('🎉 تم تمكينك من إدارة وتشغيل الجلسة الحية من قِبل رئيس المجلس!', 'success');
+          applyLiveControlState(true);
+        } else if (wasController && !nowController && !IS_PRESIDENT) {
+          showToastAlert('🔒 تم تجميد أدوات التحكم واستعادتها من قِبل رئيس المجلس.', 'warning');
+          applyLiveControlState(false);
+        }
+      }
+
+      // إذا كان المستخدم هو رئيس المجلس أو مدير النظام، نحدّث قائمة المعاونين المتصلين لحظياً
+      if (IS_PRESIDENT && data.online_managers) {
+        updateOnlineManagersUI(data.online_managers, data.active_controller_id, data.active_controller_name);
+      }
+
+      // 0) التحقق من انتهاء أو رفع الجلسة الحية
+      if (data.session_status === 'partial_close' || data.session_status === 'closed') {
+        alert('تم رفع الجلسة وإنهاء المداولات الحية من قبل رئيس المجلس.');
+        window.location.href = `/sessions/${SESSION_ID}/`;
+        return;
+      }
+
+      // 1) مزامنة حالة تعليق واستراحة الجلسة (Recess)
+      if (typeof data.is_suspended !== 'undefined') {
+        IS_SESSION_SUSPENDED_CLIENT = !!data.is_suspended;
+        const suspBanner = document.getElementById('session-suspended-banner');
+        const suspReasonText = document.getElementById('session-suspended-reason-text');
+        if (suspBanner) {
+          suspBanner.style.display = data.is_suspended ? 'block' : 'none';
+        }
+        if (suspReasonText && data.suspension_reason) {
+          suspReasonText.innerHTML = `السبب: <strong class="text-dark">${data.suspension_reason}</strong> — تم تحرير شاشات جميع الأعضاء ويمكنكم تصفح ملفاتكم أو مغادرة القاعة مؤقتاً لحين استئناف الانعقاد.`;
+        }
+        const discBanner = document.getElementById('member-discipline-banner');
+        if (discBanner) {
+          discBanner.style.display = data.is_suspended ? 'none' : 'flex';
+        }
+        const staffBanner = document.getElementById('staff-support-banner');
+        if (staffBanner) {
+          staffBanner.style.display = data.is_suspended ? 'none' : 'flex';
+        }
+        const btnSusp = document.getElementById('btn-session-suspend');
+        const btnRes = document.getElementById('btn-session-resume');
+        if (btnSusp) {
+          if (data.is_suspended) {
+            btnSusp.classList.add('d-none');
+          } else {
+            btnSusp.classList.remove('d-none');
+          }
+        }
+        if (btnRes) {
+          if (data.is_suspended) {
+            btnRes.classList.remove('d-none');
+          } else {
+            btnRes.classList.add('d-none');
+          }
+        }
+      }
 
       // أ) المتحدث الحالي
       const spBox = document.getElementById('active-speaker-box');
@@ -2454,6 +3279,9 @@ document.addEventListener('DOMContentLoaded', () => {
           !href.includes('/attachments/') && !href.includes('/recordings/') &&
           !href.includes('/media/') && !href.includes('/logout/')) {
         a.addEventListener('click', (e) => {
+          if (IS_SESSION_SUSPENDED_CLIENT) {
+            return true; // مسموح بالتنقل وتصفح الملفات أثناء تعليق واستراحة الجلسة
+          }
           e.preventDefault();
           alert('أنت الآن داخل قاعة الجلسة الحية لمجلس الجامعة.\nتطبيقاً للائحة المجلس: جميع أزرار وروابط التنقل الخارجي متوقفة أثناء انعقاد الجلسة؛ متاح لك فقط طلب الكلمة، مطالعة جدول الأعمال، والتصويت عند فتحه بتوجيه رئيس المجلس.');
         });

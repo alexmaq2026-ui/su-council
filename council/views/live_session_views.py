@@ -33,17 +33,25 @@ from django.views.decorators.http import require_POST, require_GET
 from council.models import (
     CouncilSession, Topic, Vote, EntitySeat, Attendance,
     TopicDisplayState, SpeakRequest, SessionRecording, ExitPermit,
-    TOPIC_CATEGORIES, user_can_view_drafts
+    LiveSessionPresence, TOPIC_CATEGORIES, user_can_view_drafts
 )
 
 
-def user_can_control_live(user):
+def user_can_control_live(user, session=None):
     """
     Check if the authenticated user has permission to control live session:
-    Only Super Admin or users explicitly granted can_start_session_live.
+    - If session is provided:
+        1. President of the session ALWAYS has sovereign control.
+        2. Delegated live_controller has active control granted by the President.
+        3. Super Admin has control if no conflict.
+        4. Other users with can_start_session_live remain FROZEN until enabled by President.
+    - If session is None:
+        Generic permission check for navigation/menu.
     """
     if not user or not user.is_authenticated:
         return False
+    if session is not None:
+        return session.user_can_manage_live_controls(user)
     if getattr(user, 'is_super', False):
         return True
     return bool(getattr(user, 'can_start_session_live', False))
@@ -67,7 +75,39 @@ def session_live_view(request, session_pk):
         messages.error(request, 'لا يمكنك استعراض هذه الجلسة.')
         return redirect('/dashboard/')
 
-    is_controller = user_can_control_live(user)
+    # ── Manager Presence Tracking in Live Session ──
+    if user.is_super or user.can_start_session_live:
+        LiveSessionPresence.objects.update_or_create(
+            session=session, user=user,
+            defaults={'last_seen': timezone.now(), 'is_active': True}
+        )
+
+    is_president = session.is_user_president(user)
+    is_controller = session.user_can_manage_live_controls(user)
+    is_delegated = bool(session.live_controller_id and session.live_controller_id == user.pk)
+    is_frozen_manager = bool((user.is_super or user.can_start_session_live) and not is_controller)
+
+    # Online Managers List for the President's Command Panel
+    presence_cutoff = timezone.now() - timezone.timedelta(minutes=10)
+    manager_presences = (
+        LiveSessionPresence.objects.filter(session=session)
+        .select_related('user')
+        .order_by('-last_seen')
+    )
+    online_managers = []
+    for p in manager_presences:
+        if session.is_user_president(p.user):
+            continue
+        is_online = (p.last_seen >= presence_cutoff) and p.is_active
+        online_managers.append({
+            'id': p.user.pk,
+            'name': p.user.full_name,
+            'title': p.user.official_title or p.user.get_title_display(),
+            'avatar_initials': getattr(p.user, 'avatar_initials', '') or p.user.full_name[:2],
+            'is_online': is_online,
+            'is_delegated': bool(session.live_controller_id == p.user.pk),
+            'last_seen': p.last_seen.strftime('%H:%M:%S'),
+        })
 
     # Fetch topics once with all related objects prefetched
     raw_topics = list(
@@ -185,29 +225,33 @@ def session_live_view(request, session_pk):
         session=session, status='pending'
     ).select_related('member', 'seat')
 
+    can_view_attendance = bool(user.is_super or user.can_view_attendance or user.can_manage_attendance or is_controller)
+
     # Real-time attendance list for in-cockpit attendance modal
-    existing_att = {
-        a.member_id: a
-        for a in session.attendances.select_related('member', 'seat', 'proxy_user').all()
-    }
-    from accounts.models import User as CouncilUserModel
-    all_council_members = CouncilUserModel.objects.filter(is_active=True).exclude(title='مدير_النظام').order_by('order', 'id')
     attendance_list = []
-    for m in all_council_members:
-        att = existing_att.get(m.pk)
-        attendance_list.append({
-            'member': m,
-            'seat': att.seat if att else None,
-            'status': att.status if att else 'unrecorded',
-            'status_display': att.get_status_display() if att else 'لم يُرصد',
-            'is_proxy': att.is_proxy if att else False,
-            'proxy_name': att.proxy_name if att else '',
-        })
+    if can_view_attendance:
+        existing_att = {
+            a.member_id: a
+            for a in session.attendances.select_related('member', 'seat', 'proxy_user').all()
+        }
+        from accounts.models import User as CouncilUserModel
+        all_council_members = CouncilUserModel.objects.filter(is_active=True).exclude(title='مدير_النظام').order_by('order', 'id')
+        for m in all_council_members:
+            att = existing_att.get(m.pk)
+            attendance_list.append({
+                'member': m,
+                'seat': att.seat if att else None,
+                'status': att.status if att else 'unrecorded',
+                'status_display': att.get_status_display() if att else 'لم يُرصد',
+                'is_proxy': att.is_proxy if att else False,
+                'proxy_name': att.proxy_name if att else '',
+            })
 
     recording = SessionRecording.objects.filter(session=session).first()
 
     context = {
         'session': session,
+        'can_view_attendance': can_view_attendance,
         'attendance_list': attendance_list,
         'topics': topics,
         'topics_by_category': topics_by_category,
@@ -215,15 +259,27 @@ def session_live_view(request, session_pk):
         'completed_topics_count': completed_topics_count,
         'total_topics_count': total_topics_count,
         'progress_pct': progress_pct,
+        'is_president': is_president,
+        'is_delegated': is_delegated,
+        'is_frozen_manager': is_frozen_manager,
         'is_controller': is_controller,
         'can_start_session_live': is_controller,
-        'can_set_topic_timer': user.is_super or user.can_set_topic_timer or is_controller,
-        'can_draft_decision': (user.is_super or user.can_draft_decision or is_controller) and not session.is_frozen(),
-        'can_manage_speak_requests': user.is_super or user.can_manage_speak_requests,
+        'active_controller': session.live_controller,
+        'online_managers': online_managers,
+        'online_managers_count': len([m for m in online_managers if m['is_online']]),
+        'chair_user': session.get_chair_user(),
+        'chair_display_name': session.get_chair_display_name(),
+        'can_set_topic_timer': is_controller,
+        'can_suspend_session': is_controller,
+        'can_postpone_topic': is_controller,
+        'is_suspended': getattr(session, 'is_suspended', False),
+        'suspension_reason': getattr(session, 'suspension_reason', ''),
+        'can_draft_decision': (is_controller or user.can_draft_decision) and not session.is_frozen(),
+        'can_manage_speak_requests': is_controller or (user.is_super and not session.live_controller_id),
         'can_request_speak': user.is_super or user.can_request_speak,
-        'can_control_recording': user.is_super or user.can_control_recording,
+        'can_control_recording': is_controller or user.can_control_recording,
         'can_request_exit_permit': user.is_super or user.can_request_exit_permit,
-        'can_approve_exit_permit': user.is_super or user.can_approve_exit_permit,
+        'can_approve_exit_permit': is_controller or user.can_approve_exit_permit,
         'can_vote': user.is_super or user.can_vote,
         'can_view_projector': user.is_super or user.can_view_projector,
         'can_view_analytics': user.is_super or user.can_view_analytics,
@@ -396,17 +452,29 @@ def api_topic_control(request, topic_pk):
     action = data.get('action')
     user = request.user
 
+    topic = get_object_or_404(Topic.objects.select_related('session'), pk=topic_pk)
+    session = topic.session
+
+    # Strict live control gatekeeper: tools must be authorized by the President
+    if not session.user_can_manage_live_controls(user):
+        return JsonResponse({
+            'ok': False,
+            'error': 'أدوات التحكم بالجلسة الحية مجمدة حالياً بانتظار تمكين رئيس الجلسة.'
+        }, status=403)
+
     if action in ('set_timer', 'stop_timer'):
-        if not (user.is_super or user.can_set_topic_timer or user.can_start_session_live):
+        if not (user.is_super or user.can_set_topic_timer or session.user_can_manage_live_controls(user)):
             return JsonResponse({'ok': False, 'error': 'ليس لديك صلاحية لضبط المؤقت الزمني للمواضيع.'}, status=403)
+    elif action in ('suspend_topic', 'postpone_topic'):
+        if not (user.is_super or getattr(user, 'can_postpone_suspend_topic', False) or session.user_can_manage_live_controls(user)):
+            return JsonResponse({'ok': False, 'error': 'ليس لديك صلاحية لتعليق أو تأجيل مواضيع جدول الأعمال.'}, status=403)
     elif action == 'save_decision':
-        if not (user.is_super or user.can_draft_decision or user.can_start_session_live):
+        if not (user.is_super or user.can_draft_decision or session.user_can_manage_live_controls(user)):
             return JsonResponse({'ok': False, 'error': 'ليس لديك صلاحية لصياغة أو اعتماد القرار.'}, status=403)
     else:
-        if not (user.is_super or user.can_start_session_live):
+        if not session.user_can_manage_live_controls(user):
             return JsonResponse({'ok': False, 'error': 'غير مصرح لك بالتحكم بالجلسة الحية.'}, status=403)
 
-    topic = get_object_or_404(Topic, pk=topic_pk)
     state = topic.get_display_state()
     folded_topic_ids = []
 
@@ -431,6 +499,27 @@ def api_topic_control(request, topic_pk):
             state.display_status = 'hidden'
             state.save()
             msg = 'تم طي الموضوع.'
+
+        elif action == 'suspend_topic':
+            state.display_status = 'suspended'
+            state.timer_started_at = None
+            state.save()
+            topic.status = 'suspended'
+            topic.suspended_at = timezone.now()
+            topic.save(update_fields=['status', 'suspended_at'])
+            msg = f'تم تعليق الموضوع «{topic.title}» مؤقتاً ويمكن العودة إليه في أي وقت.'
+
+        elif action == 'postpone_topic':
+            postpone_reason = (data.get('reason') or '').strip()
+            postponed_to = (data.get('postponed_to') or 'الجلسة القادمة').strip()
+            state.display_status = 'closed'
+            state.timer_started_at = None
+            state.save()
+            topic.status = 'postponed'
+            topic.postpone_reason = postpone_reason
+            topic.postponed_to = postponed_to
+            topic.save(update_fields=['status', 'postpone_reason', 'postponed_to'])
+            msg = f'تم تأجيل الموضوع «{topic.title}» رسمياً إلى {postponed_to}.'
 
         elif action == 'open_voting':
             other_shown = TopicDisplayState.objects.filter(
@@ -498,7 +587,7 @@ def api_topic_control(request, topic_pk):
             return JsonResponse({'ok': False, 'error': 'إجراء غير معروف.'}, status=400)
 
         # Update last_active_topic on session to persist active position
-        if action in ('show', 'open_voting', 'close_voting', 'set_timer', 'save_decision'):
+        if action in ('show', 'open_voting', 'close_voting', 'set_timer', 'save_decision', 'suspend_topic', 'postpone_topic'):
             if topic.session.last_active_topic_id != topic.pk:
                 topic.session.last_active_topic = topic
                 topic.session.save(update_fields=['last_active_topic'])
@@ -512,6 +601,7 @@ def api_topic_control(request, topic_pk):
         'ok': True,
         'message': msg,
         'topic_id': topic.pk,
+        'topic_status': topic.status,
         'folded_topic_ids': folded_topic_ids,
         'display_status': state.display_status,
         'display_status_label': state.get_display_status_display(),
@@ -522,7 +612,165 @@ def api_topic_control(request, topic_pk):
         'percentages': percentages,
         'has_decision': has_dec,
         'decision_text': dec_text,
+        'postponed_to': getattr(topic, 'postponed_to', ''),
+        'postpone_reason': getattr(topic, 'postpone_reason', ''),
     })
+
+
+# ── Session Lifecycle Control API (Suspend / Resume / Adjourn) ────────────────
+@login_required(login_url='/login/')
+@require_POST
+def api_session_lifecycle_control(request, session_pk):
+    """
+    Allows President or authorized users with can_suspend_resume_session to:
+    - suspend: recess the session, pause recording/timer, release member lockdown
+    - resume: resume the session, restore lockdown and deliberations
+    - adjourn: formally close live deliberations, move to partial_close stage
+    """
+    user = request.user
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    try:
+        data = json.loads(request.body) if request.body else request.POST
+    except Exception:
+        data = request.POST
+
+    action = data.get('action')
+
+    if not session.user_can_manage_live_controls(user):
+        return JsonResponse({'ok': False, 'error': 'أدوات تعليق أو رفع الجلسة مجمدة حالياً بانتظار تمكين رئيس الجلسة.'}, status=403)
+
+    if action in ('suspend', 'resume'):
+        if not (user.is_super or getattr(user, 'can_suspend_resume_session', False) or session.user_can_manage_live_controls(user)):
+            return JsonResponse({'ok': False, 'error': 'غير مصرح لك بتعليق أو استئناف الجلسة.'}, status=403)
+    elif action == 'adjourn':
+        if not (user.is_super or getattr(user, 'can_suspend_resume_session', False) or user.can_advance_session_stage or session.user_can_manage_live_controls(user)):
+            return JsonResponse({'ok': False, 'error': 'غير مصرح لك برفع أو إنهاء الجلسة.'}, status=403)
+    else:
+        return JsonResponse({'ok': False, 'error': 'إجراء غير معروف.'}, status=400)
+
+    with transaction.atomic():
+        if action == 'suspend':
+            reason = (data.get('reason') or 'استراحة مؤقتة للجلسة').strip()
+            session.is_suspended = True
+            session.suspended_at = timezone.now()
+            session.suspension_reason = reason
+            session.save(update_fields=['is_suspended', 'suspended_at', 'suspension_reason'])
+
+            # Pause continuous recording if active and unpaused
+            rec = getattr(session, 'recording', None)
+            if rec and rec.started_at and not rec.ended_at and not rec.is_paused:
+                rec.is_paused = True
+                rec.paused_at = timezone.now()
+                rec.save(update_fields=['is_paused', 'paused_at'])
+
+            msg = f'تم تعليق الجلسة مؤقتاً ({reason})، وفُك قيد شاشات الأعضاء بنجاح.'
+            return JsonResponse({'ok': True, 'action': 'suspend', 'is_suspended': True, 'reason': reason, 'message': msg})
+
+        elif action == 'resume':
+            session.is_suspended = False
+            session.resumed_at = timezone.now()
+            session.save(update_fields=['is_suspended', 'resumed_at'])
+            msg = 'تم استئناف انعقاد الجلسة الحية وإعادة تفعيل قاعة المداولات بنجاح.'
+            return JsonResponse({'ok': True, 'action': 'resume', 'is_suspended': False, 'message': msg})
+
+        elif action == 'adjourn':
+            from council.models import SessionStageLog, STAGE_LABELS
+            old_stage = session.status
+            session.status = 'partial_close'
+            session.is_suspended = False
+            session.end_time = timezone.localtime().time()
+            session.stage_changed_at = timezone.now()
+            session.stage_changed_by = request.user
+            session.save(update_fields=['status', 'is_suspended', 'end_time', 'stage_changed_at', 'stage_changed_by'])
+
+            # Stop recording if running
+            rec = getattr(session, 'recording', None)
+            if rec and rec.started_at and not rec.ended_at:
+                rec.ended_at = timezone.now()
+                rec.is_paused = False
+                rec.save(update_fields=['ended_at', 'is_paused'])
+
+            SessionStageLog.objects.create(
+                session=session, from_stage=old_stage, to_stage='partial_close',
+                changed_by=request.user, reason='رفع الجلسة وإنهاء المداولات الحية من شاشة القاعة',
+            )
+
+            msg = 'تم رفع الجلسة وتوثيق وقت الانتهاء بنجاح. تم نقل الجلسة إلى مرحلة صياغة واعتماد القرارات.'
+            return JsonResponse({
+                'ok': True,
+                'action': 'adjourn',
+                'status': 'partial_close',
+                'redirect_url': f'/sessions/{session.pk}/',
+                'message': msg
+            })
+
+
+# ── Dynamic Session Control Delegation API (President & Co-Pilot) ────────────
+@login_required(login_url='/login/')
+@require_POST
+def api_session_delegate_control(request, session_pk):
+    """
+    Allows the Council President (or Super Admin) to:
+    - 'delegate': dynamically grant active control to an online manager
+    - 'revoke': freeze all delegates and reclaim exclusive sovereign control for the President
+    """
+    user = request.user
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    if not (session.is_user_president(user) or user.is_super):
+        return JsonResponse({
+            'ok': False,
+            'error': 'عذراً، حق تفويض وإدارة صلاحيات الجلسة محصور حصراً برئيس الجلسة.'
+        }, status=403)
+
+    try:
+        data = json.loads(request.body) if request.body else request.POST
+    except Exception:
+        data = request.POST
+
+    action = data.get('action')
+
+    with transaction.atomic():
+        if action == 'delegate':
+            target_user_id = data.get('user_id') or data.get('manager_id')
+            if not target_user_id:
+                return JsonResponse({'ok': False, 'error': 'معرف المستخدم المطلوب تفويضه مفقود.'}, status=400)
+            from django.contrib.auth import get_user_model
+            UserModel = get_user_model()
+            target_user = get_object_or_404(UserModel, pk=target_user_id)
+
+            session.live_controller = target_user
+            session.live_controller_delegated_at = timezone.now()
+            session.save(update_fields=['live_controller', 'live_controller_delegated_at'])
+
+            return JsonResponse({
+                'ok': True,
+                'action': 'delegate',
+                'controller_id': target_user.pk,
+                'controller_name': target_user.full_name,
+                'controller_title': target_user.official_title or target_user.get_title_display(),
+                'message': f'تم تفويض إدارة الجلسة بنجاح إلى: {target_user.full_name}.'
+            })
+
+        elif action == 'revoke':
+            prev = session.live_controller
+            session.live_controller = None
+            session.live_controller_delegated_at = None
+            session.save(update_fields=['live_controller', 'live_controller_delegated_at'])
+
+            msg = 'تم استعادة التحكم الحصري وتجميد أدوات الإدارة لجميع المعاونين بنجاح.'
+            if prev:
+                msg = f'تم استعادة التحكم وتجميد أدوات المعاون ({prev.full_name}) بنجاح.'
+
+            return JsonResponse({
+                'ok': True,
+                'action': 'revoke',
+                'message': msg
+            })
+
+        else:
+            return JsonResponse({'ok': False, 'error': 'إجراء غير صالح.'}, status=400)
 
 
 # ── Topic Live Status Query API ──────────────────────────────────────────────
@@ -625,13 +873,16 @@ def api_speak_request_action(request, request_pk):
     - complete (end speech, record speech end offset)
     - pass (pass turn)
     - reject (reject request)
-    Requires can_manage_speak_requests permission.
     """
-    if not (request.user.is_super or request.user.can_manage_speak_requests):
-        return JsonResponse({'ok': False, 'error': 'غير مصرح لك بإدارة طابور المداخلات.'}, status=403)
-
     sr = get_object_or_404(SpeakRequest.objects.select_related('session', 'member'), pk=request_pk)
     session = sr.session
+
+    if not session.user_can_manage_live_controls(request.user):
+        return JsonResponse({'ok': False, 'error': 'أدوات إدارة طابور الكلمة مجمدة حالياً بانتظار تمكين رئيس الجلسة.'}, status=403)
+
+    if not (request.user.is_super or request.user.can_manage_speak_requests or session.user_can_manage_live_controls(request.user)):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح لك بإدارة طابور المداخلات.'}, status=403)
+
     recording = getattr(session, 'recording', None)
 
     try:
@@ -701,6 +952,13 @@ def api_speak_queue(request, session_pk):
         return JsonResponse({'ok': False, 'error': 'غير مصرح لك بعرض بيانات الجلسة الحية.'}, status=403)
 
     session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    # Heartbeat presence tracking for operators/managers
+    if user.is_authenticated and (user.is_super or user.can_start_session_live):
+        LiveSessionPresence.objects.update_or_create(
+            session=session, user=user,
+            defaults={'last_seen': timezone.now(), 'is_active': True}
+        )
 
     active_speaker = SpeakRequest.objects.filter(
         session=session, status='speaking'
@@ -777,6 +1035,9 @@ def api_speak_queue(request, session_pk):
             'presenting_entity': t.presenting_entity or '',
             'memo_number': t.memo_number or '',
             'memo_date': str(t.memo_date) if t.memo_date else '',
+            'topic_status': t.status,
+            'postponed_to': getattr(t, 'postponed_to', ''),
+            'postpone_reason': getattr(t, 'postpone_reason', ''),
             'display_status': st.display_status,
             'display_status_label': st.get_display_status_display(),
             'allocated_minutes': st.allocated_minutes,
@@ -809,6 +1070,28 @@ def api_speak_queue(request, session_pk):
     ]
     user_ep = ExitPermit.objects.filter(session=session, member=request.user).first()
 
+    # Online Managers List for Dynamic Cockpit Updates
+    presence_cutoff = timezone.now() - timezone.timedelta(minutes=10)
+    manager_presences = (
+        LiveSessionPresence.objects.filter(session=session)
+        .select_related('user')
+        .order_by('-last_seen')
+    )
+    online_managers = []
+    for p in manager_presences:
+        if session.is_user_president(p.user):
+            continue
+        is_online = (p.last_seen >= presence_cutoff) and p.is_active
+        online_managers.append({
+            'id': p.user.pk,
+            'name': p.user.full_name,
+            'title': p.user.official_title or p.user.get_title_display(),
+            'avatar_initials': getattr(p.user, 'avatar_initials', '') or p.user.full_name[:2],
+            'is_online': is_online,
+            'is_delegated': bool(session.live_controller_id == p.user.pk),
+            'last_seen': p.last_seen.strftime('%H:%M:%S'),
+        })
+
     return JsonResponse({
         'ok': True,
         'active_speaker': active_data,
@@ -822,9 +1105,19 @@ def api_speak_queue(request, session_pk):
         'total_topics_count': total_topics_count,
         'progress_pct': progress_pct,
         'topics_state': topics_state,
+        'is_suspended': getattr(session, 'is_suspended', False),
+        'suspension_reason': getattr(session, 'suspension_reason', ''),
+        'session_status': session.status,
         'pending_exit_permits': pending_exits,
         'user_exit_status': user_ep.status if user_ep else None,
         'user_exit_time': user_ep.exit_time.strftime('%H:%M') if (user_ep and user_ep.exit_time) else '',
+        'active_controller_id': session.live_controller_id,
+        'active_controller_name': session.live_controller.full_name if session.live_controller else None,
+        'active_controller_title': (session.live_controller.official_title or session.live_controller.get_title_display()) if session.live_controller else None,
+        'is_user_controller': session.user_can_manage_live_controls(request.user),
+        'is_president': session.is_user_president(request.user),
+        'chair_name': session.get_chair_display_name(),
+        'online_managers': online_managers,
     })
 
 
@@ -837,10 +1130,11 @@ def api_session_recording_action(request, session_pk):
     start, pause, resume, stop.
     Requires can_control_recording permission.
     """
-    if not (request.user.is_super or request.user.can_control_recording):
-        return JsonResponse({'ok': False, 'error': 'غير مصرح لك بالتحكم في تسجيل الجلسة.'}, status=403)
-
     session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    if not (request.user.is_super or session.user_can_manage_live_controls(request.user) or request.user.can_control_recording):
+        return JsonResponse({'ok': False, 'error': 'أدوات التحكم بتسجيل الجلسة مجمدة حالياً بانتظار تمكين رئيس الجلسة.'}, status=403)
+
     recording, _ = SessionRecording.objects.get_or_create(session=session)
 
     try:

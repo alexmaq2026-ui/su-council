@@ -324,6 +324,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     def can_change_topic_status(self): return self._has_perm('can_change_topic_status')
     @property
     def can_import_topics(self):       return self._has_perm('can_import_topics')
+    @property
+    def can_postpone_suspend_topic(self): return self._has_perm('can_postpone_suspend_topic')
 
     # 3. Tables
     @property
@@ -394,6 +396,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     def can_view_live_session(self):     return self._has_perm('can_view_live_session')
     @property
     def can_start_session_live(self):    return self._has_perm('can_start_session_live')
+    @property
+    def can_suspend_resume_session(self): return self._has_perm('can_suspend_resume_session')
     @property
     def can_set_topic_timer(self):       return self._has_perm('can_set_topic_timer')
     @property
@@ -466,6 +470,7 @@ class CouncilPermission(models.Model):
         # 2. Topics
         'can_view_topics', 'can_add_topic', 'can_edit_topic',
         'can_delete_topic', 'can_change_topic_status', 'can_import_topics',
+        'can_postpone_suspend_topic',
         # 3. Tables
         'can_add_table', 'can_edit_table', 'can_delete_table',
         # 4. Attachments
@@ -484,7 +489,8 @@ class CouncilPermission(models.Model):
         'can_manage_delegates', 'can_change_password',
         # 9. Lifecycle & Live Session
         'can_advance_session_stage', 'can_reopen_frozen_session', 'can_approve_new_session',
-        'can_view_live_session', 'can_start_session_live', 'can_set_topic_timer',
+        'can_view_live_session', 'can_start_session_live', 'can_suspend_resume_session',
+        'can_set_topic_timer',
         'can_manage_speak_requests', 'can_request_speak', 'can_control_recording',
         'can_request_exit_permit', 'can_approve_exit_permit',
         'can_view_projector', 'can_view_analytics',
@@ -528,12 +534,13 @@ class CouncilPermission(models.Model):
     can_verify_integrity    = models.BooleanField('فحص مطابقة البصمة التشفيرية وتحميل PDF المؤرشف', default=False)
 
     # 2. Topics Screens & Operations
-    can_view_topics         = models.BooleanField('عرض تفاصيل الموضوعات والحيثيات والقرارات', default=False)
-    can_add_topic           = models.BooleanField('إضافة موضوع جديد', default=False)
-    can_edit_topic          = models.BooleanField('تعديل موضوع قائم', default=False)
-    can_delete_topic        = models.BooleanField('حذف موضوع', default=False)
-    can_change_topic_status = models.BooleanField('تغيير حالة الموضوع', default=False)
-    can_import_topics       = models.BooleanField('استيراد مواضيع من Word', default=False)
+    can_view_topics            = models.BooleanField('عرض تفاصيل الموضوعات والحيثيات والقرارات', default=False)
+    can_add_topic              = models.BooleanField('إضافة موضوع جديد', default=False)
+    can_edit_topic             = models.BooleanField('تعديل موضوع قائم', default=False)
+    can_delete_topic           = models.BooleanField('حذف موضوع', default=False)
+    can_change_topic_status    = models.BooleanField('تغيير حالة الموضوع', default=False)
+    can_import_topics          = models.BooleanField('استيراد مواضيع من Word', default=False)
+    can_postpone_suspend_topic = models.BooleanField('تعليق وتأجيل موضوعات جدول الأعمال أثناء الانعقاد', default=False)
 
     # 3. Tables Operations
     can_add_table           = models.BooleanField('إضافة وبناء جداول البيانات', default=False)
@@ -572,19 +579,20 @@ class CouncilPermission(models.Model):
     can_change_password       = models.BooleanField('تغيير كلمة المرور الخاصة بالحساب', default=False)
 
     # 9. Session Lifecycle & Live Session Management
-    can_advance_session_stage = models.BooleanField('نقل الجلسة بين المراحل الخمس', default=False)
-    can_reopen_frozen_session = models.BooleanField('إعادة فتح الجلسة المجمّدة (+ تأكيد كلمة المرور)', default=False)
-    can_approve_new_session   = models.BooleanField('الموافقة على جلسة جديدة قبل إغلاق السابقة', default=False)
-    can_view_live_session     = models.BooleanField('دخول غرفة الجلسة الحية (Live)', default=False)
-    can_start_session_live    = models.BooleanField('إدارة الجلسة الحية وفتح التصويت وإنهاؤه', default=False)
-    can_set_topic_timer       = models.BooleanField('ضبط وقت المواضيع وتمديده', default=False)
-    can_manage_speak_requests = models.BooleanField('إدارة طلبات المداخلة (سماح / رفض / إنهاء)', default=False)
-    can_request_speak         = models.BooleanField('طلب المداخلة في الجلسة', default=False)
-    can_control_recording     = models.BooleanField('التحكم في التسجيل الصوتي للجلسة (بدء / إيقاف / إنهاء)', default=False)
-    can_request_exit_permit   = models.BooleanField('طلب الإذن بالخروج النهائي من الجلسة', default=False)
-    can_approve_exit_permit   = models.BooleanField('البتّ في طلبات الإذن بالخروج', default=False)
-    can_view_projector        = models.BooleanField('عرض شاشة القاعة البروجكتر (Projector)', default=False)
-    can_view_analytics        = models.BooleanField('عرض شاشة التقرير التحليلي للجلسة', default=False)
+    can_advance_session_stage  = models.BooleanField('نقل الجلسة بين المراحل الخمس', default=False)
+    can_reopen_frozen_session  = models.BooleanField('إعادة فتح الجلسة المجمّدة (+ تأكيد كلمة المرور)', default=False)
+    can_approve_new_session    = models.BooleanField('الموافقة على جلسة جديدة قبل إغلاق السابقة', default=False)
+    can_view_live_session      = models.BooleanField('دخول غرفة الجلسة الحية (Live)', default=False)
+    can_start_session_live     = models.BooleanField('إدارة الجلسة الحية وفتح التصويت وإنهاؤه', default=False)
+    can_suspend_resume_session = models.BooleanField('تعليق واستئناف ورفع الجلسة الحية (وتحرير القاعة)', default=False)
+    can_set_topic_timer        = models.BooleanField('ضبط وقت المواضيع وتمديده', default=False)
+    can_manage_speak_requests  = models.BooleanField('إدارة طلبات المداخلة (سماح / رفض / إنهاء)', default=False)
+    can_request_speak          = models.BooleanField('طلب المداخلة في الجلسة', default=False)
+    can_control_recording      = models.BooleanField('التحكم في التسجيل الصوتي للجلسة (بدء / إيقاف / إنهاء)', default=False)
+    can_request_exit_permit    = models.BooleanField('طلب الإذن بالخروج النهائي من الجلسة', default=False)
+    can_approve_exit_permit    = models.BooleanField('البتّ في طلبات الإذن بالخروج', default=False)
+    can_view_projector         = models.BooleanField('عرض شاشة القاعة البروجكتر (Projector)', default=False)
+    can_view_analytics         = models.BooleanField('عرض شاشة التقرير التحليلي للجلسة', default=False)
 
     # 10. Search, Notifications, Smart Reader & Audit
     can_search_minutes        = models.BooleanField('استخدام شاشة البحث في المحاضر', default=False)
