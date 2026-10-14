@@ -109,7 +109,9 @@ class DecisionForm(forms.ModelForm):
         text = self.cleaned_data.get('decision_text', '').strip()
         if not text:
             raise forms.ValidationError('نص القرار لا يمكن أن يكون فارغاً.')
-        return text
+        import re
+        clean = re.sub(r'^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]*', '', text).strip()
+        return clean or text
 
 
 class VoteForm(forms.Form):

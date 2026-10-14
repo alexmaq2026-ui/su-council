@@ -2,16 +2,114 @@
 
 {% block title %}{{ page_title }}{% endblock %}
 
+{% block extra_css %}
+<style>
+  .table-grid-wrapper {
+    background: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    overflow: hidden;
+  }
+  .grid-table {
+    margin-bottom: 0;
+    font-size: 0.88rem;
+  }
+  .grid-table th {
+    background-color: #1a365d !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    vertical-align: middle;
+    text-align: center;
+    padding: 10px 8px;
+    border: 1px solid #2d4373 !important;
+    white-space: nowrap;
+  }
+  .grid-table td {
+    padding: 4px;
+    vertical-align: middle;
+    border: 1px solid #e2e8f0;
+  }
+  .grid-cell-input {
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 0.88rem;
+    width: 100%;
+    min-width: 110px;
+    background: transparent;
+    transition: all 0.15s ease-in-out;
+  }
+  .grid-cell-input:focus {
+    background: #ffffff;
+    border-color: #3182ce;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.25);
+  }
+  .grid-row-num {
+    background-color: #f7fafc;
+    color: #4a5568;
+    font-weight: 700;
+    text-align: center;
+    width: 48px;
+    min-width: 48px;
+    user-select: none;
+  }
+  .col-chip {
+    background: #edf2f7;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    padding: 6px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .col-chip.sum-active {
+    background: #fefcbf;
+    border-color: #ecc94b;
+    color: #744210;
+  }
+  .col-chip .btn-sum-toggle {
+    cursor: pointer;
+    border: none;
+    background: #e2e8f0;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #4a5568;
+  }
+  .col-chip.sum-active .btn-sum-toggle {
+    background: #d69e2e;
+    color: #ffffff;
+  }
+  .totals-row {
+    background-color: #fffaf0 !important;
+    font-weight: 700;
+    color: #744210;
+    border-top: 2px solid #ecc94b !important;
+  }
+  .totals-row td {
+    padding: 8px !important;
+  }
+</style>
+{% endblock %}
+
 {% block page_header %}
-<div class="page-header py-3">
+<div class="page-header py-3 bg-navy text-white">
   <div class="container-fluid px-3 px-md-4">
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
       <div>
-        <h1 class="page-title fs-5 mb-0">{{ page_title }}</h1>
-        <small class="text-muted">الموضوع: {{ topic.title }} (الجلسة رقم {{ session.session_number }})</small>
+        <h1 class="page-title fs-5 mb-0 text-white">
+          <i class="bi bi-table me-2 text-gold"></i>{{ page_title }}
+        </h1>
+        <small class="text-white-50">الموضوع: <strong>{{ topic.title }}</strong> (الجلسة رقم {{ session.session_number }})</small>
       </div>
       <div>
-        <a href="{% url 'council:topic_detail' pk=topic.pk %}" class="btn btn-outline-light btn-sm">العودة للموضوع</a>
+        <a href="{% url 'council:topic_detail' pk=topic.pk %}" class="btn btn-outline-light btn-sm">
+          <i class="bi bi-arrow-right me-1"></i>العودة للموضوع
+        </a>
       </div>
     </div>
   </div>
@@ -19,95 +117,810 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid px-3 px-md-4">
+<div class="container-fluid px-3 px-md-4 my-3">
   <div class="row justify-content-center">
-    <div class="col-12 col-lg-9">
-      <div class="uc-card shadow-sm">
-        <div class="uc-card-header bg-navy text-white d-flex justify-content-between align-items-center">
-          <h5 class="mb-0 fs-6">{% if table %}تعديل بيانات الجدول{% else %}إنشاء جدول ديناميكي جديد{% endif %}</h5>
-          <span class="badge bg-gold text-dark">محرك الجداول والحسابات الآلية</span>
-        </div>
-        <div class="uc-card-body p-4">
-          <form method="post">
-            {% csrf_token %}
+    <div class="col-12 col-xl-11">
 
-            <!-- Table Preset Selection -->
-            <div class="row g-3 mb-3">
-              <div class="col-12 col-md-6">
-                <label class="form-label fw-bold">نوع أو قالب الجدول</label>
+      <form method="post" id="table-main-form">
+        {% csrf_token %}
+
+        <!-- Hidden inputs storing actual JSON and fallback text -->
+        <input type="hidden" name="headers_json" id="hidden_headers_json">
+        <input type="hidden" name="rows_json" id="hidden_rows_json">
+        <input type="hidden" name="sum_columns_json" id="hidden_sum_columns_json">
+        <input type="hidden" name="headers" id="hidden_headers_raw">
+        <input type="hidden" name="rows_data" id="hidden_rows_raw">
+        <input type="hidden" name="sum_columns" id="hidden_sum_columns_raw">
+
+        <!-- 1. General Setup Card -->
+        <div class="uc-card shadow-sm mb-4">
+          <div class="uc-card-header bg-navy text-white d-flex justify-content-between align-items-center py-2 px-3">
+            <span class="fw-bold"><i class="bi bi-gear-fill me-1 text-gold"></i>إعدادات وهوية الجدول</span>
+            <span class="badge bg-gold text-dark" id="table-mode-badge">قالب معتمد</span>
+          </div>
+          <div class="uc-card-body p-3 p-md-4">
+            <div class="row g-3">
+              <div class="col-12 col-md-5">
+                <label class="form-label fw-bold small text-navy">نوع وقالب الجدول</label>
                 <select name="table_type" id="table-type-select" class="form-select form-select-sm">
                   {% for val, label in preset_choices %}
-                    <option value="{{ val }}" {% if table and table.table_type == val %}selected{% endif %}>{{ label }}</option>
+                    <option value="{{ val }}" {% if table and table.table_type == val %}selected{% elif not table and val == 'appointment' %}selected{% endif %}>
+                      {{ label }}
+                    </option>
                   {% endfor %}
                 </select>
-                <small class="text-muted d-block mt-1">اختيار القالب يحدد تلقائياً رؤوس الأعمدة وإعدادات الجمع الحسابي.</small>
+                <div id="preset-hint" class="form-text text-muted small mt-1">
+                  <i class="bi bi-info-circle text-primary me-1"></i>اختيار القالب يضبط الأعمدة المعتمدة تلقائياً.
+                </div>
               </div>
 
-              <div class="col-12 col-md-6">
-                <label class="form-label fw-bold">عنوان أو وصف الجدول</label>
-                <input type="text" name="title" class="form-control form-control-sm" value="{{ table.title|default:'' }}" placeholder="مثال: كشف بأسماء المرشحين للتعيين">
+              <div class="col-12 col-md-7">
+                <label class="form-label fw-bold small text-navy">عنوان أو وصف الجدول المعروض في المحضر</label>
+                <input type="text" name="title" id="table-title-input" class="form-control form-control-sm" value="{{ table.title|default:'' }}" placeholder="مثال: كشف بأسماء المرشحين للتعيين">
+                <div class="form-text text-muted small mt-1">
+                  يمكنك ترك العنوان فارغاً وسيتم استخدام اسم القالب الافتراضي تلقائياً.
+                </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            <!-- Column Headers -->
-            <div class="mb-3">
-              <label class="form-label fw-bold">رؤوس الأعمدة (مفصولة بفاصلة ,)</label>
-              <input type="text" name="headers" id="headers-input" class="form-control form-control-sm" value="{{ headers_text }}" placeholder="م, الاسم, الكلية, الدرجة, المبلغ ($)...">
-              <small class="text-muted">أدخل أسماء الأعمدة مفصولة بفاصلة. يمكنك إضافة أعمدة جديدة أو حذف أعمدة حسب الحاجة.</small>
+        <!-- 2. Columns Designer & Customizer -->
+        <div class="uc-card shadow-sm mb-4">
+          <div class="uc-card-header bg-light d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <span class="fw-bold text-navy"><i class="bi bi-layout-three-columns me-1 text-gold"></i>أعمدة الجدول</span>
+              <span class="badge bg-secondary" id="columns-count-badge">0 أعمدة</span>
             </div>
-
-            <!-- Rows Data (Textarea for easy bulk paste or edit) -->
-            <div class="mb-3">
-              <label class="form-label fw-bold">بيانات الصفوف (كل سطر يمثل صفاً، والقيم مفصولة بفاصلة أو Tab)</label>
-              <textarea name="rows_data" class="form-control form-control-sm font-monospace" rows="10" placeholder="1, د. محمد عبدالله, كلية الهندسة, 500$&#10;2, د. أحمد علي, كلية الحاسوب, 300$">{{ rows_text }}</textarea>
-              <small class="text-muted">يمكنك نسخ البيانات مباشرة من ملف Excel أو Word ولصقها هنا.</small>
-            </div>
-
-            <!-- Auto-Sum Configuration -->
-            <div class="row g-3 mb-3">
-              <div class="col-12 col-md-6">
-                <label class="form-label fw-bold">أعمدة الجمع الرأسي التلقائي (أرقام الأعمدة تبدأ من 0)</label>
-                <input type="text" name="sum_columns" id="sum-columns-input" class="form-control form-control-sm" value="{{ sum_columns_text }}" placeholder="مثال: 7 أو 5">
-                <small class="text-muted">أدخل مؤشر العمود الرقمي المراد تجميع مبالغه أو أعداده آلياً في قاع الجدول.</small>
-              </div>
-
-              <div class="col-12 col-md-6">
-                <label class="form-label fw-bold">ملاحظات أسفل الجدول (اختياري)</label>
-                <input type="text" name="notes" class="form-control form-control-sm" value="{{ table.notes|default:'' }}" placeholder="ملاحظة تظهر في أسفل الجدول">
-              </div>
-            </div>
-
-            <div class="d-flex justify-content-between align-items-center pt-3 border-top">
-              <a href="{% url 'council:topic_detail' pk=topic.pk %}" class="btn btn-outline-secondary btn-sm">إلغاء</a>
-              <button type="submit" class="btn btn-navy btn-sm px-4">
-                {% if table %}حفظ التعديلات على الجدول{% else %}حفظ وبناء الجدول{% endif %}
+            <div class="d-flex gap-2">
+              <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2" id="btn-show-add-col">
+                <i class="bi bi-plus-circle me-1"></i>إضافة عمود جديد
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" data-bs-toggle="collapse" data-bs-target="#advanced-headers-collapse">
+                <i class="bi bi-code-slash me-1"></i>تحرير نصي سريع
               </button>
             </div>
-          </form>
+          </div>
+          <div class="uc-card-body p-3">
+
+            <!-- New Column Input Box (Toggleable) -->
+            <div id="add-col-box" class="p-3 bg-light rounded border mb-3 d-none">
+              <div class="row g-2 align-items-center">
+                <div class="col-12 col-md-6">
+                  <input type="text" id="new-col-name-input" class="form-control form-control-sm" placeholder="أدخل اسم العمود الجديد (مثال: الدرجة الوظيفية)">
+                </div>
+                <div class="col-auto">
+                  <div class="form-check form-check-inline small pt-1">
+                    <input class="form-check-input" type="checkbox" id="new-col-sum-checkbox">
+                    <label class="form-check-label" for="new-col-sum-checkbox">جمع رأسي تلقائي (&sum;)</label>
+                  </div>
+                </div>
+                <div class="col-auto">
+                  <button type="button" class="btn btn-sm btn-navy px-3" id="btn-confirm-add-col">إضافة للجدول</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-cancel-add-col">إلغاء</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Chips Container -->
+            <div class="d-flex flex-wrap gap-2 mb-2" id="columns-chips-container">
+              <!-- Rendered via JS -->
+            </div>
+
+            <!-- Advanced Text Editor Collapse -->
+            <div class="collapse mt-3" id="advanced-headers-collapse">
+              <div class="p-3 bg-light rounded border">
+                <label class="form-label small fw-bold text-muted">رؤوس الأعمدة كنص مفصول بفاصلة (,):</label>
+                <div class="input-group input-group-sm">
+                  <input type="text" id="raw-headers-text-input" class="form-control form-control-sm" dir="rtl">
+                  <button type="button" class="btn btn-secondary" id="btn-apply-raw-headers">تطبيق</button>
+                </div>
+                <small class="text-muted">ملاحظة: يمكنك تعديل أسماء الأعمدة مباشرة بالنقر عليها أو كتابتها هنا دفعة واحدة.</small>
+              </div>
+            </div>
+
+          </div>
         </div>
-      </div>
+
+        <!-- 3. Interactive Data Grid (The Spreadsheet) -->
+        <div class="uc-card shadow-sm mb-4">
+          <div class="uc-card-header bg-navy text-white d-flex justify-content-between align-items-center py-2 px-3 flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <span class="fw-bold"><i class="bi bi-grid-3x3 me-1 text-gold"></i>بيانات الصفوف (الجدول التفاعلي)</span>
+              <span class="badge bg-gold text-dark" id="rows-count-badge">0 سجل</span>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+              <button type="button" class="btn btn-success btn-sm py-1 px-3 fw-bold shadow-sm" id="btn-add-row">
+                <i class="bi bi-plus-lg me-1"></i>إضافة صف جديد
+              </button>
+              <button type="button" class="btn btn-light btn-sm py-1 px-2 text-navy fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#excelPasteModal">
+                <i class="bi bi-file-earmark-spreadsheet me-1 text-success"></i>لصق ذكي من Excel
+              </button>
+              <button type="button" class="btn btn-outline-light btn-sm py-1 px-2" id="btn-clear-all-rows">
+                <i class="bi bi-trash me-1"></i>تفريغ الصفوف
+              </button>
+            </div>
+          </div>
+
+          <div class="uc-card-body p-0">
+            <div class="table-responsive" style="max-height: 550px; overflow-y: auto;">
+              <table class="table grid-table align-middle text-center table-hover" id="interactive-grid-table">
+                <thead>
+                  <tr id="grid-header-row">
+                    <!-- Dynamic Headers Rendered by JS -->
+                  </tr>
+                </thead>
+                <tbody id="grid-body">
+                  <!-- Dynamic Rows Rendered by JS -->
+                </tbody>
+                <tfoot id="grid-tfoot" class="d-none">
+                  <tr class="totals-row" id="grid-totals-row">
+                    <!-- Dynamic Computed Totals Rendered by JS -->
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <!-- Empty State Notice -->
+            <div id="grid-empty-state" class="text-center py-5 d-none">
+              <div class="text-muted mb-3">
+                <i class="bi bi-table fs-1 d-block mb-2 text-secondary opacity-50"></i>
+                <h6 class="fw-bold">الجدول فارغ حتى الآن</h6>
+                <p class="small text-muted mb-3">اضغط على زر «إضافة صف جديد» لكتابة البيانات، أو استخدم «لصق ذكي من Excel» لملء الجدول بضغطة زر واحدة.</p>
+                <button type="button" class="btn btn-sm btn-success px-3" onclick="document.getElementById('btn-add-row').click();">
+                  <i class="bi bi-plus-lg me-1"></i>إضافة أول صف الآن
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="p-2 px-3 bg-light border-top d-flex justify-content-between align-items-center flex-wrap gap-2 small text-muted">
+            <div>
+              <i class="bi bi-lightbulb text-warning me-1"></i>
+              <strong>تلميح احترافي:</strong> يمكنك التنقل بين الخانات بمفتاح <kbd>Tab</kbd>، والضغط على <kbd>Tab</kbd> في آخر خلية يضيف صفاً جديداً تلقائياً!
+            </div>
+            <div>
+              <span id="active-sums-indicator" class="badge bg-warning text-dark d-none">
+                <i class="bi bi-calculator me-1"></i>الحسابات الآلية مفعلة
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Notes & Final Actions -->
+        <div class="uc-card shadow-sm mb-4">
+          <div class="uc-card-body p-3 p-md-4">
+            <div class="mb-3">
+              <label class="form-label fw-bold small text-navy">ملاحظات أو توصيات أسفل الجدول (اختياري)</label>
+              <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="أي ملاحظة أو شروط اعتماد تظهر في ذيل الجدول...">{{ table.notes|default:'' }}</textarea>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center pt-3 border-top flex-wrap gap-2">
+              <a href="{% url 'council:topic_detail' pk=topic.pk %}" class="btn btn-outline-secondary px-4">
+                <i class="bi bi-x me-1"></i>إلغاء والعودة للموضوع
+              </a>
+              <button type="submit" class="btn btn-navy px-4 py-2 fw-bold shadow">
+                <i class="bi bi-check2-circle me-1 text-gold"></i>
+                {% if table %}حفظ التعديلات على الجدول{% else %}حفظ وبناء الجدول النهائي{% endif %}
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </form>
+
     </div>
   </div>
 </div>
 
-<script>
-const PRESETS = {{ presets_json|safe }};
-const selectEl = document.getElementById('table-type-select');
-const headersInput = document.getElementById('headers-input');
-const sumInput = document.getElementById('sum-columns-input');
+<!-- Modal: Smart Excel Paste -->
+<div class="modal fade" id="excelPasteModal" tabindex="-1" aria-labelledby="excelPasteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-navy text-white py-2 px-3">
+        <h6 class="modal-title fs-6" id="excelPasteModalLabel">
+          <i class="bi bi-file-earmark-spreadsheet me-2 text-success"></i>اللصق الذكي المباشر من Excel / Word
+        </h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-3">
+        <div class="alert alert-info py-2 small mb-3">
+          <i class="bi bi-info-circle-fill me-1"></i>
+          قم بنسخ الخلايا أو الجدول من ملف <strong>Excel</strong> أو <strong>Word</strong> والصقها في المربع أدناه. سيتكفل النظام تلقائياً بتوزيع القيم في أعمدة وصفوف الجدول التفاعلي.
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">الصق البيانات هنا:</label>
+          <textarea id="excel-paste-textarea" class="form-control font-monospace small" rows="8" placeholder="الصق بيانات الإكسل هنا (Ctrl + V)..."></textarea>
+        </div>
+        <div class="form-check small">
+          <input class="form-check-input" type="checkbox" id="excel-replace-existing" checked>
+          <label class="form-check-label" for="excel-replace-existing">
+            استبدال البيانات الحالية بالبيانات المنسوخة (إلغاء التحديد لإضافة البيانات الجديدة بعد الصفوف الحالية)
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer py-2 px-3">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+        <button type="button" class="btn btn-sm btn-success fw-bold px-3" id="btn-apply-excel-paste">
+          <i class="bi bi-check2-all me-1"></i>تفريغ البيانات في الجدول
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
 
-selectEl.addEventListener('change', function() {
-  const chosen = this.value;
-  if (PRESETS[chosen] && !headersInput.value) {
-    headersInput.value = PRESETS[chosen].join(', ');
+{% block extra_js %}
+<script>
+(function() {
+  // Load initial datasets passed from backend
+  const PRESETS = {{ presets_json|safe }};
+  const PRESET_SUM_MAP = {{ preset_sum_cols_json|safe }};
+  let headers = {{ current_headers_json|safe }};
+  let rowsData = {{ current_rows_json|safe }};
+  let sumColumns = {{ current_sum_cols_json|safe }};
+
+  // DOM Elements
+  const tableTypeSelect = document.getElementById('table-type-select');
+  const titleInput = document.getElementById('table-title-input');
+  const modeBadge = document.getElementById('table-mode-badge');
+  const columnsChipsContainer = document.getElementById('columns-chips-container');
+  const columnsCountBadge = document.getElementById('columns-count-badge');
+  const rawHeadersInput = document.getElementById('raw-headers-text-input');
+  const interactiveGridTable = document.getElementById('interactive-grid-table');
+  const gridHeaderRow = document.getElementById('grid-header-row');
+  const gridBody = document.getElementById('grid-body');
+  const gridTfoot = document.getElementById('grid-tfoot');
+  const gridTotalsRow = document.getElementById('grid-totals-row');
+  const gridEmptyState = document.getElementById('grid-empty-state');
+  const rowsCountBadge = document.getElementById('rows-count-badge');
+  const activeSumsIndicator = document.getElementById('active-sums-indicator');
+
+  const btnShowAddCol = document.getElementById('btn-show-add-col');
+  const addColBox = document.getElementById('add-col-box');
+  const newColNameInput = document.getElementById('new-col-name-input');
+  const newColSumCheckbox = document.getElementById('new-col-sum-checkbox');
+  const btnConfirmAddCol = document.getElementById('btn-confirm-add-col');
+  const btnCancelAddCol = document.getElementById('btn-cancel-add-col');
+  const btnApplyRawHeaders = document.getElementById('btn-apply-raw-headers');
+
+  const btnAddRow = document.getElementById('btn-add-row');
+  const btnClearAllRows = document.getElementById('btn-clear-all-rows');
+  const mainForm = document.getElementById('table-main-form');
+
+  // Excel Paste Modal Elements
+  const excelPasteTextarea = document.getElementById('excel-paste-textarea');
+  const excelReplaceExisting = document.getElementById('excel-replace-existing');
+  const btnApplyExcelPaste = document.getElementById('btn-apply-excel-paste');
+
+  // 1. Initialize State
+  function init() {
+    const currentType = tableTypeSelect.value;
+    if ((!headers || headers.length === 0) && PRESETS[currentType]) {
+      headers = [...PRESETS[currentType]];
+      if (PRESET_SUM_MAP[currentType]) {
+        sumColumns = [...PRESET_SUM_MAP[currentType]];
+      }
+    } else if (!headers || headers.length === 0) {
+      headers = ['م', 'البيان', 'ملاحظات'];
+    }
+
+    // Default 1 blank row if creating a new table with 0 rows
+    if (!rowsData || rowsData.length === 0) {
+      rowsData = [];
+    }
+
+    renderAll();
   }
-  if (chosen === 'scopus_reward') {
-    sumInput.value = '7';
-  } else if (chosen === 'graduates') {
-    sumInput.value = '5';
-  } else if (chosen === 'hourly_contract') {
-    sumInput.value = '6';
+
+  // 2. Main Render Function
+  function renderAll() {
+    renderHeadersChips();
+    renderGridHeader();
+    renderGridBody();
+    updateLiveTotals();
+    updateUIBadges();
   }
-});
+
+  // Update UI Badges & Mode indicators
+  function updateUIBadges() {
+    const isCustom = tableTypeSelect.value === 'custom';
+    if (isCustom) {
+      modeBadge.textContent = 'جدول مخصص (حر)';
+      modeBadge.className = 'badge bg-info text-dark';
+    } else {
+      modeBadge.textContent = 'قالب معتمد';
+      modeBadge.className = 'badge bg-gold text-dark';
+    }
+
+    columnsCountBadge.textContent = `${headers.length} أعمدة`;
+    rowsCountBadge.textContent = `${rowsData.length} سجل`;
+    rawHeadersInput.value = headers.join(', ');
+
+    if (sumColumns && sumColumns.length > 0) {
+      activeSumsIndicator.classList.remove('d-none');
+    } else {
+      activeSumsIndicator.classList.add('d-none');
+    }
+
+    if (rowsData.length === 0) {
+      gridEmptyState.classList.remove('d-none');
+      interactiveGridTable.classList.add('d-none');
+    } else {
+      gridEmptyState.classList.add('d-none');
+      interactiveGridTable.classList.remove('d-none');
+    }
+  }
+
+  // 3. Render Columns Chips & Manager
+  function renderHeadersChips() {
+    columnsChipsContainer.innerHTML = '';
+    headers.forEach((h, idx) => {
+      const isSum = sumColumns.includes(idx);
+      const chip = document.createElement('div');
+      chip.className = `col-chip ${isSum ? 'sum-active' : ''}`;
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'fw-bold';
+      titleSpan.textContent = h;
+
+      // Sum toggle button
+      const sumBtn = document.createElement('button');
+      sumBtn.type = 'button';
+      sumBtn.className = 'btn-sum-toggle';
+      sumBtn.title = isSum ? 'إلغاء الجمع التلقائي لهذا العمود' : 'تفعيل الجمع التلقائي (∑) لهذا العمود';
+      sumBtn.innerHTML = `&sum; ${isSum ? 'يُجمع آلياً' : 'جمع'}`;
+      sumBtn.onclick = () => toggleSumColumn(idx);
+
+      // Delete Column Button (Allow deleting any column, warn if only 1 left)
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn btn-link text-danger p-0 ms-1';
+      delBtn.title = 'حذف هذا العمود';
+      delBtn.innerHTML = '<i class="bi bi-x-circle"></i>';
+      delBtn.onclick = () => deleteColumn(idx);
+
+      chip.appendChild(titleSpan);
+      chip.appendChild(sumBtn);
+      chip.appendChild(delBtn);
+      columnsChipsContainer.appendChild(chip);
+    });
+  }
+
+  // 4. Render Table Grid Headers
+  function renderGridHeader() {
+    gridHeaderRow.innerHTML = '';
+    headers.forEach((h, idx) => {
+      const th = document.createElement('th');
+      const isSum = sumColumns.includes(idx);
+      th.innerHTML = `${h} ${isSum ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.7rem;">&sum;</span>' : ''}`;
+      if (idx === 0 && (h === 'م' || h === '#')) {
+        th.style.width = '55px';
+      }
+      gridHeaderRow.appendChild(th);
+    });
+
+    // Action Header
+    const actionTh = document.createElement('th');
+    actionTh.style.width = '80px';
+    actionTh.textContent = 'إجراءات';
+    gridHeaderRow.appendChild(actionTh);
+  }
+
+  // 5. Render Table Grid Body
+  function renderGridBody() {
+    gridBody.innerHTML = '';
+    rowsData.forEach((row, rowIdx) => {
+      const tr = document.createElement('tr');
+
+      headers.forEach((h, colIdx) => {
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'grid-cell-input';
+        input.dataset.row = rowIdx;
+        input.dataset.col = colIdx;
+
+        // Auto sequence for column 'م'
+        let val = (row && row[colIdx] !== undefined) ? row[colIdx] : '';
+        if (colIdx === 0 && (h === 'م' || h === '#') && !val) {
+          val = rowIdx + 1;
+          row[colIdx] = String(val);
+        }
+        input.value = val;
+
+        // Sync input changes
+        input.addEventListener('input', (e) => {
+          row[colIdx] = e.target.value;
+          if (sumColumns.includes(colIdx)) {
+            updateLiveTotals();
+          }
+        });
+
+        // Smart Keyboard Navigation
+        input.addEventListener('keydown', (e) => {
+          handleKeyNavigation(e, rowIdx, colIdx);
+        });
+
+        // Direct paste into cell handling
+        input.addEventListener('paste', (e) => {
+          handleCellPaste(e, rowIdx, colIdx);
+        });
+
+        td.appendChild(input);
+        tr.appendChild(td);
+      });
+
+      // Actions Column (Delete row, Duplicate row)
+      const actionTd = document.createElement('td');
+      actionTd.className = 'text-center';
+      actionTd.innerHTML = `
+        <div class="d-flex justify-content-center gap-1">
+          <button type="button" class="btn btn-sm btn-outline-danger p-1 py-0" title="حذف هذا الصف" onclick="window.__gridDeleteRow(${rowIdx})">
+            <i class="bi bi-trash"></i>
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary p-1 py-0" title="نسخ الصف" onclick="window.__gridDuplicateRow(${rowIdx})">
+            <i class="bi bi-copy"></i>
+          </button>
+        </div>
+      `;
+      tr.appendChild(actionTd);
+
+      gridBody.appendChild(tr);
+    });
+  }
+
+  // 6. Keyboard Navigation (Tab, Enter, Arrows)
+  function handleKeyNavigation(e, rowIdx, colIdx) {
+    if (e.key === 'Tab' && !e.shiftKey && colIdx === headers.length - 1 && rowIdx === rowsData.length - 1) {
+      // At the very last cell: Tab adds a new row automatically!
+      e.preventDefault();
+      addNewRow(true);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (rowIdx < rowsData.length - 1) {
+        focusCell(rowIdx + 1, colIdx);
+      } else {
+        addNewRow(true, colIdx);
+      }
+    }
+  }
+
+  function focusCell(rowIdx, colIdx) {
+    setTimeout(() => {
+      const target = gridBody.querySelector(`input[data-row="${rowIdx}"][data-col="${colIdx}"]`);
+      if (target) {
+        target.focus();
+        target.select();
+      }
+    }, 20);
+  }
+
+  // 7. Direct Paste into Cell (Split tabular data)
+  function handleCellPaste(e, startRowIdx, startColIdx) {
+    const pasteData = (e.clipboardData || window.clipboardData).getData('text');
+    if (!pasteData || (!pasteData.includes('\t') && !pasteData.includes('\n'))) {
+      return; // Regular single string paste
+    }
+    e.preventDefault();
+
+    const lines = pasteData.trim().split(/\r\n|\r|\n/);
+    lines.forEach((line, rOffset) => {
+      const curRow = startRowIdx + rOffset;
+      if (curRow >= rowsData.length) {
+        rowsData.push(new Array(headers.length).fill(''));
+      }
+      const values = line.split('\t');
+      values.forEach((v, cOffset) => {
+        const curCol = startColIdx + cOffset;
+        if (curCol < headers.length) {
+          rowsData[curRow][curCol] = v.trim();
+        }
+      });
+    });
+
+    renderGridBody();
+    updateLiveTotals();
+    updateUIBadges();
+  }
+
+  // 8. Add / Delete / Duplicate Row Functions
+  function addNewRow(autoFocus = false, focusCol = 1) {
+    const newRow = new Array(headers.length).fill('');
+    // Auto-number if first col is 'م'
+    if (headers.length > 0 && (headers[0] === 'م' || headers[0] === '#')) {
+      newRow[0] = String(rowsData.length + 1);
+    }
+    rowsData.push(newRow);
+    renderGridBody();
+    updateLiveTotals();
+    updateUIBadges();
+
+    if (autoFocus) {
+      focusCell(rowsData.length - 1, focusCol < headers.length ? focusCol : 0);
+    }
+  }
+
+  window.__gridDeleteRow = function(rowIdx) {
+    rowsData.splice(rowIdx, 1);
+    // Recalculate 'م' if present
+    if (headers.length > 0 && (headers[0] === 'م' || headers[0] === '#')) {
+      rowsData.forEach((r, idx) => {
+        r[0] = String(idx + 1);
+      });
+    }
+    renderGridBody();
+    updateLiveTotals();
+    updateUIBadges();
+  };
+
+  window.__gridDuplicateRow = function(rowIdx) {
+    const copy = [...rowsData[rowIdx]];
+    if (headers.length > 0 && (headers[0] === 'م' || headers[0] === '#')) {
+      copy[0] = String(rowsData.length + 1);
+    }
+    rowsData.splice(rowIdx + 1, 0, copy);
+    renderGridBody();
+    updateLiveTotals();
+    updateUIBadges();
+    focusCell(rowIdx + 1, 1);
+  };
+
+  // 9. Columns Management Functions
+  function toggleSumColumn(colIdx) {
+    const pos = sumColumns.indexOf(colIdx);
+    if (pos > -1) {
+      sumColumns.splice(pos, 1);
+    } else {
+      sumColumns.push(colIdx);
+    }
+    renderHeadersChips();
+    renderGridHeader();
+    updateLiveTotals();
+    updateUIBadges();
+  }
+
+  function deleteColumn(colIdx) {
+    if (headers.length <= 1) {
+      alert('يجب أن يحتوي الجدول على عمود واحد على الأقل.');
+      return;
+    }
+    if (!confirm(`هل أنت متأكد من حذف العمود «${headers[colIdx]}»؟`)) {
+      return;
+    }
+
+    headers.splice(colIdx, 1);
+    rowsData.forEach(row => {
+      if (row.length > colIdx) {
+        row.splice(colIdx, 1);
+      }
+    });
+
+    // Update sum columns indices
+    sumColumns = sumColumns
+      .filter(idx => idx !== colIdx)
+      .map(idx => (idx > colIdx ? idx - 1 : idx));
+
+    renderAll();
+  }
+
+  function addColumn(colName, isSum = false) {
+    colName = colName.trim();
+    if (!colName) return;
+
+    headers.push(colName);
+    const newColIdx = headers.length - 1;
+    if (isSum) {
+      sumColumns.push(newColIdx);
+    }
+
+    rowsData.forEach(row => {
+      row.push('');
+    });
+
+    renderAll();
+  }
+
+  // 10. Live Auto-Sum Computation
+  function updateLiveTotals() {
+    if (!sumColumns || sumColumns.length === 0 || rowsData.length === 0) {
+      gridTfoot.classList.add('d-none');
+      return;
+    }
+
+    gridTfoot.classList.remove('d-none');
+    gridTotalsRow.innerHTML = '';
+
+    const totals = {};
+    sumColumns.forEach(cIdx => {
+      totals[cIdx] = 0;
+    });
+
+    rowsData.forEach(row => {
+      sumColumns.forEach(cIdx => {
+        if (row && row[cIdx] !== undefined) {
+          const val = String(row[cIdx]).replace(/[^\d.-]/g, '');
+          const num = parseFloat(val);
+          if (!isNaN(num)) {
+            totals[cIdx] += num;
+          }
+        }
+      });
+    });
+
+    headers.forEach((h, colIdx) => {
+      const td = document.createElement('td');
+      td.className = 'text-center fw-bold';
+
+      if (colIdx === 0) {
+        td.innerHTML = '<span class="badge bg-gold text-dark fs-6 px-3">الإجمالي</span>';
+      } else if (sumColumns.includes(colIdx)) {
+        const totalVal = totals[colIdx] || 0;
+        const formatted = totalVal % 1 === 0 ? totalVal.toLocaleString() : totalVal.toFixed(2);
+        td.innerHTML = `<span class="text-danger fs-6">${formatted}</span>`;
+      } else {
+        td.textContent = '—';
+      }
+      gridTotalsRow.appendChild(td);
+    });
+
+    // Action column blank space in footer
+    const actionTd = document.createElement('td');
+    gridTotalsRow.appendChild(actionTd);
+  }
+
+  // 11. Event Listeners
+  tableTypeSelect.addEventListener('change', function() {
+    const chosen = this.value;
+    if (PRESETS[chosen]) {
+      if (confirm('تغيير القالب سيقوم بإعادة ضبط الأعمدة لتطابق القالب المعتمد. هل تريد المتابعة؟')) {
+        headers = [...PRESETS[chosen]];
+        sumColumns = PRESET_SUM_MAP[chosen] ? [...PRESET_SUM_MAP[chosen]] : [];
+        if (!titleInput.value || Object.values(PRESETS).some(p => p.join(',') === headers.join(','))) {
+          titleInput.value = tableTypeSelect.options[tableTypeSelect.selectedIndex].text;
+        }
+        // Resize existing rows to match new header count
+        rowsData = rowsData.map(r => {
+          const newRow = new Array(headers.length).fill('');
+          r.slice(0, headers.length).forEach((val, i) => newRow[i] = val);
+          return newRow;
+        });
+        renderAll();
+      }
+    }
+    updateUIBadges();
+  });
+
+  btnShowAddCol.addEventListener('click', () => {
+    addColBox.classList.remove('d-none');
+    newColNameInput.focus();
+  });
+
+  btnCancelAddCol.addEventListener('click', () => {
+    addColBox.classList.add('d-none');
+    newColNameInput.value = '';
+    newColSumCheckbox.checked = false;
+  });
+
+  btnConfirmAddCol.addEventListener('click', () => {
+    const name = newColNameInput.value;
+    if (name) {
+      addColumn(name, newColSumCheckbox.checked);
+      addColBox.classList.add('d-none');
+      newColNameInput.value = '';
+      newColSumCheckbox.checked = false;
+    }
+  });
+
+  newColNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      btnConfirmAddCol.click();
+    }
+  });
+
+  btnApplyRawHeaders.addEventListener('click', () => {
+    const raw = rawHeadersInput.value.trim();
+    if (raw) {
+      headers = raw.split(',').map(s => s.trim()).filter(s => s);
+      // Clean sum columns
+      sumColumns = sumColumns.filter(idx => idx < headers.length);
+      renderAll();
+    }
+  });
+
+  btnAddRow.addEventListener('click', () => {
+    addNewRow(true);
+  });
+
+  btnClearAllRows.addEventListener('click', () => {
+    if (rowsData.length === 0) return;
+    if (confirm('هل أنت متأكد من تفريغ كافة صفوف الجدول؟')) {
+      rowsData = [];
+      renderGridBody();
+      updateLiveTotals();
+      updateUIBadges();
+    }
+  });
+
+  // Excel Modal Paste Execution
+  btnApplyExcelPaste.addEventListener('click', () => {
+    const text = excelPasteTextarea.value.trim();
+    if (!text) {
+      alert('يرجى لصق بيانات أولاً.');
+      return;
+    }
+
+    const lines = text.split(/\r\n|\r|\n/);
+    const newRows = [];
+
+    lines.forEach(line => {
+      line = line.trim();
+      if (!line) return;
+      const cells = line.includes('\t') ? line.split('\t') : line.split(',');
+      const row = new Array(headers.length).fill('');
+      cells.forEach((c, idx) => {
+        if (idx < headers.length) {
+          row[idx] = c.trim();
+        }
+      });
+      newRows.push(row);
+    });
+
+    if (excelReplaceExisting.checked) {
+      rowsData = newRows;
+    } else {
+      rowsData = rowsData.concat(newRows);
+    }
+
+    // Auto fix sequence 'م'
+    if (headers.length > 0 && (headers[0] === 'م' || headers[0] === '#')) {
+      rowsData.forEach((r, idx) => {
+        if (!r[0] || r[0] === '—') r[0] = String(idx + 1);
+      });
+    }
+
+    renderGridBody();
+    updateLiveTotals();
+    updateUIBadges();
+
+    // Close Modal
+    const modalEl = document.getElementById('excelPasteModal');
+    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+    if (modalInstance) modalInstance.hide();
+    excelPasteTextarea.value = '';
+  });
+
+  // Sync data to hidden inputs before form submission
+  mainForm.addEventListener('submit', function(e) {
+    // Read current values directly from inputs to avoid any missed edits
+    const currentRows = [];
+    const trList = gridBody.querySelectorAll('tr');
+
+    trList.forEach(tr => {
+      const rowVals = [];
+      const inputs = tr.querySelectorAll('.grid-cell-input');
+      inputs.forEach(inp => {
+        rowVals.push(inp.value.trim());
+      });
+      if (rowVals.some(v => v !== '')) {
+        currentRows.push(rowVals);
+      }
+    });
+
+    // Populate Hidden Inputs
+    document.getElementById('hidden_headers_json').value = JSON.stringify(headers);
+    document.getElementById('hidden_rows_json').value = JSON.stringify(currentRows);
+    document.getElementById('hidden_sum_columns_json').value = JSON.stringify(sumColumns);
+
+    document.getElementById('hidden_headers_raw').value = headers.join(', ');
+    document.getElementById('hidden_rows_raw').value = currentRows.map(r => r.join(', ')).join('\n');
+    document.getElementById('hidden_sum_columns_raw').value = sumColumns.join(', ');
+  });
+
+  // Initialize on page load
+  document.addEventListener('DOMContentLoaded', init);
+})();
 </script>
 {% endblock %}

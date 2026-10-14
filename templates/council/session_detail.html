@@ -2,21 +2,44 @@
 
 {% block title %}الجلسة رقم {{ session.session_number }} – {{ session.date }}{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* ترشيق وضبط هيدر تفاصيل الجلسة والأزرار */
+  .page-header {
+    padding: 0.9rem 1rem 0.75rem !important;
+  }
+  .session-header-btn {
+    border-radius: 6px !important;
+    padding: 0.28rem 0.65rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 600;
+  }
+  .session-number-badge {
+    font-size: 0.74rem !important;
+    padding: 0.2rem 0.55rem !important;
+  }
+  .stepper-stage-pill {
+    padding: 0.35rem 0.5rem !important;
+    font-size: 0.78rem !important;
+  }
+</style>
+{% endblock %}
+
 {% block page_header %}
 <div class="page-header">
   <div class="page-header-inner">
     <div>
       <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
         <span class="session-number-badge">الجلسة رقم {{ session.session_number }}{% if session.session_cumulative_number %} ({{ session.session_cumulative_number }}){% endif %}</span>
-        <span class="badge bg-{{ session.get_status_color }} fs-6 px-3 py-1">{{ session.get_status_icon }} {{ session.get_status_display }}</span>
+        <span class="badge bg-{{ session.get_status_color }} fs-6 px-2.5 py-1">{{ session.get_status_icon }} {{ session.get_status_display }}</span>
         {% if session_frozen %}
           <span class="badge bg-danger fs-6 px-2 py-1">🔒 مجمّدة</span>
         {% endif %}
       </div>
-      <h1 class="page-title">
+      <h1 class="page-title" style="font-size: 1.28rem;">
         {{ session.title|default:"جلسة مجلس الجامعة" }}
       </h1>
-      <div class="page-subtitle">
+      <div class="page-subtitle" style="font-size: 0.8rem;">
         {% if session.hijri_date %}<span class="badge bg-gold text-dark me-1">{{ session.hijri_date }}</span>{% endif %}
         <span>الموافق {{ session.date }}</span>
         {% if session.time %} · <span>{{ session.time }}</span>{% endif %}
@@ -25,62 +48,93 @@
       </div>
     </div>
     
+    <!-- حزمة الإجراءات التنفيذية المنظمة لهيدر الجلسة -->
     <div class="d-flex flex-wrap gap-2 align-items-center">
       {% if session.status == 'active' %}
-        <a href="{% url 'council:session_live' session_pk=session.pk %}" class="btn btn-danger btn-sm fw-bold px-3 py-1 shadow-sm border border-warning animate-pulse" style="background-color: #dc2626;">
-          <i class="bi bi-broadcast me-1"></i>العودة الفورية للقاعة الحية 🔴
+        <a href="{% url 'council:session_live' session_pk=session.pk %}" class="btn btn-danger btn-sm session-header-btn fw-bold px-3 py-1 shadow-sm border border-warning animate-pulse d-inline-flex align-items-center gap-1" style="background-color: #dc2626;">
+          <i class="bi bi-broadcast"></i><span>الانتقال للقاعة الحية 🔴</span>
         </a>
       {% endif %}
+      
       {% if user_can_view_analytics %}
-        <a href="{% url 'council:session_analytics' session_pk=session.pk %}" class="btn btn-outline-light btn-sm">
-          التقرير التحليلي
+        <a href="{% url 'council:session_analytics' session_pk=session.pk %}" class="btn btn-outline-light btn-sm session-header-btn d-inline-flex align-items-center gap-1">
+          <i class="bi bi-graph-up"></i><span>التقرير التحليلي</span>
         </a>
       {% endif %}
-      {% if user_can_export_minutes %}
-        <a href="{% url 'council:session_export' pk=session.pk %}" class="btn btn-gold btn-sm">
-          تصدير المحضر إلى Word
-        </a>
-      {% endif %}
+      
       {% if user_can_use_smart_reader %}
-        <button type="button" class="btn btn-warning text-dark btn-sm fw-bold shadow-sm" onclick="openSmartReader({sessionId: {{ session.pk }}})">
-          🎙️ القراءة الذكية للمحضر
+        <button type="button" class="btn btn-warning text-dark btn-sm session-header-btn fw-bold shadow-sm d-inline-flex align-items-center gap-1" onclick="openSmartReader({sessionId: {{ session.pk }}})">
+          <i class="bi bi-mic-fill"></i><span>القراءة الذكية للمحضر</span>
         </button>
       {% endif %}
-      {% if user.is_super or user.can_view_dispatch_log %}
-        <a href="{% url 'council:dispatch_log' %}?session={{ session.pk }}" class="btn btn-outline-light btn-sm" title="سجل تعميم القرارات">
-          <i class="bi bi-send-check me-1"></i>سجل التعميم
-        </a>
-      {% endif %}
-      {% if user.can_view_correspondence or user.can_send_decisions %}
-        <a href="{% url 'council:entity_correspondence' %}" class="btn btn-outline-light btn-sm" title="مراسلات الكليات">
-          <i class="bi bi-inbox-fill me-1"></i>المراسلات
-        </a>
-      {% endif %}
-      {% if user_can_manage_attendance %}
-        <a href="{% url 'council:session_attendance' pk=session.pk %}" class="btn btn-outline-light btn-sm">
-          كشف الحضور
-        </a>
-      {% endif %}
-      {% if user_can_add_topic %}
-        <a href="{% url 'council:topic_create' session_pk=session.pk %}" class="btn btn-light btn-sm text-navy fw-bold">
-          إضافة موضوع
-        </a>
-      {% endif %}
-      {% if user_can_import_topics %}
-        <a href="{% url 'council:topic_import' session_pk=session.pk %}" class="btn btn-outline-light btn-sm">
-          استيراد من Word
-        </a>
-      {% endif %}
-      {% if user_can_edit_session %}
-        <a href="{% url 'council:session_edit' pk=session.pk %}" class="btn btn-outline-light btn-sm" title="تعديل الجلسة">
-          تعديل
-        </a>
-      {% endif %}
-      {% if user_can_delete_session %}
-        <a href="{% url 'council:session_delete' pk=session.pk %}" class="btn btn-outline-danger btn-sm text-white border-white" title="حذف الجلسة">
-          حذف
-        </a>
-      {% endif %}
+
+      <!-- قائمة منسدلة لإدارة الجلسة ومستنداتها -->
+      <div class="dropdown d-inline-block">
+        <button class="btn btn-outline-light btn-sm session-header-btn dropdown-toggle d-inline-flex align-items-center gap-1" type="button" id="sessionActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-gear-fill"></i><span>إدارة الجلسة</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1" aria-labelledby="sessionActionsDropdown" style="font-size: 0.82rem; min-width: 195px; border-radius: 8px; z-index: 1050;">
+          {% if user_can_add_topic %}
+          <li>
+            <a class="dropdown-item py-1.5" href="{% url 'council:topic_create' session_pk=session.pk %}">
+              <i class="bi bi-plus-circle text-primary me-2"></i>إضافة موضوع جديد
+            </a>
+          </li>
+          <li><hr class="dropdown-divider my-1"></li>
+          {% endif %}
+          {% if user_can_export_minutes %}
+          <li>
+            <a class="dropdown-item py-1.5" href="{% url 'council:session_export' pk=session.pk %}">
+              <i class="bi bi-file-earmark-word text-primary me-2"></i>تصدير المحضر إلى Word
+            </a>
+          </li>
+          {% endif %}
+          {% if user_can_manage_attendance %}
+          <li>
+            <a class="dropdown-item py-1.5" href="{% url 'council:session_attendance' pk=session.pk %}">
+              <i class="bi bi-people text-info me-2"></i>كشف الحضور والتمثيل
+            </a>
+          </li>
+          {% endif %}
+          {% if user_can_import_topics %}
+          <li>
+            <a class="dropdown-item py-1.5" href="{% url 'council:topic_import' session_pk=session.pk %}">
+              <i class="bi bi-file-arrow-up text-success me-2"></i>استيراد مواضيع من Word
+            </a>
+          </li>
+          {% endif %}
+          {% if user.is_super or user.can_view_dispatch_log %}
+          <li>
+            <a class="dropdown-item py-1.5" href="{% url 'council:dispatch_log' %}?session={{ session.pk }}">
+              <i class="bi bi-send-check text-warning me-2"></i>سجل التعميم
+            </a>
+          </li>
+          {% endif %}
+          {% if user.can_view_correspondence or user.can_send_decisions %}
+          <li>
+            <a class="dropdown-item py-1.5" href="{% url 'council:entity_correspondence' %}">
+              <i class="bi bi-inbox-fill text-secondary me-2"></i>مراسلات الكليات
+            </a>
+          </li>
+          {% endif %}
+          {% if user_can_edit_session %}
+          <li><hr class="dropdown-divider my-1"></li>
+          <li>
+            <a class="dropdown-item py-1.5" href="{% url 'council:session_edit' pk=session.pk %}">
+              <i class="bi bi-pencil-square text-primary me-2"></i>تعديل بيانات الجلسة
+            </a>
+          </li>
+          {% endif %}
+          {% if user_can_delete_session %}
+          <li>
+            <a class="dropdown-item py-1.5 text-danger" href="{% url 'council:session_delete' pk=session.pk %}">
+              <i class="bi bi-trash3 text-danger me-2"></i>حذف الجلسة
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </div>
+
     </div>
   </div>
 </div>
@@ -88,66 +142,101 @@
 
 {% block content %}
 
-{% if session.status == 'active' or session.status == 'publishing' %}
+{% if session.status == 'active' %}
   {% with q=session.get_quorum_info %}
     {% if not q.is_achieved %}
-      <div class="alert alert-danger d-flex align-items-center justify-content-between p-3 mb-4 rounded-4 shadow-sm border-2 border-danger">
+      <div class="alert alert-danger d-flex align-items-center justify-content-between p-2.5 px-3 mb-3 rounded-3 shadow-sm border border-danger">
         <div class="d-flex align-items-center gap-2">
-          <span class="fs-4">⚠️</span>
-          <div>
+          <span class="fs-5">⚠️</span>
+          <div class="small">
             <strong class="text-danger">تنبيه النصاب القانوني لمجلس الجامعة لم يكتمل بعد!</strong>
-            <div class="small text-dark mt-1">
-              الحاضرون بالمقاعد: <strong>{{ q.present_count }}</strong> من أصل <strong>{{ q.total_seats }}</strong> مقعداً (النصاب المطلوب: <strong>{{ q.quorum_required }}</strong> مقعداً — المتبقي لاكتمال النصاب: <strong>{{ q.missing_count }}</strong> مقاعد).
-            </div>
+            <span class="text-dark ms-1">
+              الحاضرون: <strong>{{ q.present_count }}</strong> من <strong>{{ q.total_seats }}</strong> (المطلوب: <strong>{{ q.quorum_required }}</strong> مقعداً — المتبقي: <strong>{{ q.missing_count }}</strong>).
+            </span>
           </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-danger fs-6 px-3 py-2">{{ q.quorum_percentage }}%</span>
-        </div>
+        <span class="badge bg-danger fs-6 px-2.5 py-1">{{ q.quorum_percentage }}%</span>
       </div>
     {% endif %}
   {% endwith %}
 {% endif %}
 
-<!-- ══ شريط دورة حياة الجلسة (المراحل الخمس) ══ -->
-<div class="card mb-4 border-0 shadow-sm rounded-4 overflow-hidden">
-  <div class="card-body p-3 p-md-4 bg-white">
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+<!-- ══ شريط دورة حياة الجلسة (المراحل الخمس) فائق الرشاقة ══ -->
+<div class="card mb-3 border-0 shadow-sm rounded-3 overflow-hidden">
+  <div class="card-body py-2.5 px-3 bg-white">
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
       <div class="d-flex align-items-center gap-2">
-        <h6 class="fw-bold text-navy mb-0">
+        <h6 class="fw-bold text-navy mb-0" style="font-size: 0.88rem;">
           <i class="bi bi-arrow-repeat text-gold me-1"></i>دورة حياة الجلسة
         </h6>
-        <span class="text-muted small">| المرحلة الحالية: <strong class="text-{{ session.get_status_color }}">{{ session.get_status_display }}</strong></span>
+        <span class="text-muted small" style="font-size: 0.78rem;">| المرحلة الحالية: <strong class="text-{{ session.get_status_color }}">{{ session.get_status_display }}</strong></span>
       </div>
       
       <div class="d-flex gap-2">
         {% if user_can_advance %}
-          <button type="button" class="btn btn-sm btn-navy fw-bold px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#advanceStageModal">
+          <button type="button" class="btn btn-sm btn-navy fw-bold px-3 py-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#advanceStageModal" style="font-size: 0.78rem;">
             نقل للمرحلة التالية: {{ next_stage_label }} ←
           </button>
         {% endif %}
         
         {% if user_can_reopen %}
-          <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-3" data-bs-toggle="modal" data-bs-target="#reopenSessionModal">
+          <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-3 py-1" data-bs-toggle="modal" data-bs-target="#reopenSessionModal" style="font-size: 0.78rem;">
             🔓 إعادة فتح الجلسة المجمّدة
           </button>
         {% endif %}
       </div>
     </div>
 
-    <!-- 5-Stage Stepper Bar -->
-    <div class="row g-2 text-center align-items-center">
+    <!-- Desktop 5-Stage Stepper Bar (Tablet & Desktop) -->
+    <div class="d-none d-md-flex row g-2 text-center align-items-stretch">
       {% for stage_key, stage_label in session_stages %}
         <div class="col">
-          <div class="p-2 rounded-3 {% if session.status == stage_key %}bg-{{ session.get_status_color }} text-white fw-bold shadow-sm{% else %}bg-light text-muted border{% endif %}" style="font-size: 0.85rem;">
-            <div class="d-block mb-1">{{ forloop.counter }}</div>
-            <div>{{ stage_label }}</div>
+          <div class="rounded-3 stepper-stage-pill h-100 d-flex flex-column justify-content-center p-2 {% if session.status == stage_key %}bg-{{ session.get_status_color }} text-white fw-bold shadow-sm{% else %}bg-light text-muted border{% endif %}">
+            <div class="d-block mb-1 fw-bold" style="font-size: 0.75rem;">{{ forloop.counter }}</div>
+            <div style="font-size: 0.78rem; line-height: 1.35;">{{ stage_label }}</div>
           </div>
         </div>
         {% if not forloop.last %}
-          <div class="col-auto text-muted d-none d-md-block" style="font-size: 0.75rem;">←</div>
+          <div class="col-auto text-muted d-flex align-items-center px-0" style="font-size: 0.70rem;">←</div>
         {% endif %}
       {% endfor %}
+    </div>
+
+    <!-- Mobile Stepper (iPhone & Small Screens: Ultra-Clean Segmented Progress & Current Status) -->
+    <div class="d-md-none mt-1">
+      <!-- 5-Segment Progress Bar -->
+      <div class="d-flex gap-1.5 mb-2" style="height: 6px;">
+        {% for stage_key, stage_label in session_stages %}
+          <div class="flex-grow-1 rounded-pill {% if session.status == stage_key %}bg-{{ session.get_status_color }}{% else %}bg-secondary bg-opacity-25{% endif %}" style="height: 6px;"></div>
+        {% endfor %}
+      </div>
+
+      <!-- Current Stage Badge with Dropdown / Collapse for All Stages -->
+      <div class="p-2 px-2.5 rounded-3 bg-light border d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge rounded-pill bg-{{ session.get_status_color }} text-white px-2 py-1 fw-bold" style="font-size: 0.75rem;">
+            المرحلة الحالية
+          </span>
+          <span class="fw-bold text-navy small" style="font-size: 0.82rem;">{{ session.get_status_display }}</span>
+        </div>
+        <button class="btn btn-sm btn-link text-decoration-none text-muted p-0" type="button" data-bs-toggle="collapse" data-bs-target="#mobileAllStagesList" aria-expanded="false" style="font-size: 0.75rem;">
+          المراحل ▾
+        </button>
+      </div>
+
+      <!-- Collapsible Detailed Stages List for Mobile -->
+      <div class="collapse mt-2" id="mobileAllStagesList">
+        <div class="list-group list-group-flush border rounded-3 small">
+          {% for stage_key, stage_label in session_stages %}
+            <div class="list-group-item d-flex justify-content-between align-items-center p-2 {% if session.status == stage_key %}bg-{{ session.get_status_color }} text-white fw-bold{% else %}bg-white text-muted{% endif %}">
+              <span>{{ forloop.counter }}. {{ stage_label }}</span>
+              {% if session.status == stage_key %}
+                <span class="badge bg-white text-{{ session.get_status_color }} fw-bold">الحالية</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
     </div>
 
     {% if session_frozen %}
@@ -196,81 +285,54 @@
   </div>
 </div>
 
-<!-- ══ بطاقة تسجيل الجلسة الصوتي الكامل ══ -->
-{% if session_recording and session_recording.audio_file and user.can_listen_audio %}
-<div class="card mb-4 border-0 shadow-sm rounded-4 overflow-hidden" style="border-right: 5px solid #198754 !important;">
-  <div class="card-body p-3 p-md-4 bg-white">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-      <div class="d-flex align-items-center gap-3">
-        <div class="rounded-circle bg-success text-white p-3 d-flex align-items-center justify-content-center shadow-sm" style="width: 48px; height: 48px;">
-          <i class="bi bi-mic-fill fs-4"></i>
-        </div>
-        <div>
-          <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
-            <h6 class="fw-bold text-navy mb-0">التسجيل الصوتي المعتمد للجلسة</h6>
-            <span class="badge bg-success small"><i class="bi bi-check2-circle me-1"></i>تسجيل محفوظ</span>
-            <span class="badge bg-light text-dark border small">المدة: {{ session_recording.get_duration_display }}</span>
-          </div>
-          <div class="text-muted small">
-            {% if session_recording.recorded_by %}
-              <i class="bi bi-person-check me-1"></i>المشرف: <strong>{{ session_recording.recorded_by.get_full_name|default:session_recording.recorded_by.username }}</strong> &bull;
-            {% endif %}
-            {% if session_recording.started_at %}
-              <i class="bi bi-calendar-event me-1"></i>تاريخ التسجيل: <strong>{{ session_recording.started_at|date:"Y-m-d H:i" }}</strong>
-            {% endif %}
+<!-- ══ شريط المؤشرات والإحصاءات التنفيذي السريع (Executive KPI Strip) ══ -->
+<div class="card mb-3 border-0 shadow-sm rounded-3 overflow-hidden">
+  <div class="card-body p-2 px-3 bg-white">
+    <div class="row g-2 text-center align-items-center">
+      <div class="col-6 col-md-3 border-end">
+        <div class="d-flex align-items-center justify-content-center gap-2">
+          <span class="badge rounded-circle p-2 bg-primary bg-opacity-10 text-primary">
+            <i class="bi bi-journal-text fs-6"></i>
+          </span>
+          <div class="text-start">
+            <div class="fw-bold text-navy fs-5 lh-1">{{ stats.total }}</div>
+            <div class="text-muted" style="font-size: 0.74rem;">إجمالي الموضوعات</div>
           </div>
         </div>
       </div>
-      <div class="d-flex align-items-center gap-3 flex-grow-1 justify-content-md-end" style="min-width: 280px; max-width: 450px;">
-        <audio controls class="w-100 shadow-sm rounded-pill" preload="metadata" style="height: 42px;">
-          <source src="{{ session_recording.audio_file.url }}" type="audio/webm">
-          متصفحك لا يدعم تشغيل الصوت المباشر.
-        </audio>
-        <a href="{{ session_recording.audio_file.url }}" download="تسجيل_الجلسة_{{ session.session_number }}.webm" class="btn btn-outline-success btn-sm px-3 fw-bold flex-shrink-0" title="تحميل ملف التسجيل الصوتي">
-          <i class="bi bi-download me-1"></i>تحميل
-        </a>
+      <div class="col-6 col-md-3 border-end">
+        <div class="d-flex align-items-center justify-content-center gap-2">
+          <span class="badge rounded-circle p-2 bg-success bg-opacity-10 text-success">
+            <i class="bi bi-check2-circle fs-6"></i>
+          </span>
+          <div class="text-start">
+            <div class="fw-bold text-success fs-5 lh-1">{{ stats.voted }}</div>
+            <div class="text-muted" style="font-size: 0.74rem;">تم التصويت عليها</div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-<!-- Quick Stats Cards -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon bg-primary bg-opacity-10 text-primary">
-        <i class="bi bi-journal-text"></i>
+      <div class="col-6 col-md-3 border-end">
+        <div class="d-flex align-items-center justify-content-center gap-2">
+          <span class="badge rounded-circle p-2 bg-warning bg-opacity-10 text-warning">
+            <i class="bi bi-hourglass-split fs-6"></i>
+          </span>
+          <div class="text-start">
+            <div class="fw-bold text-warning-emphasis fs-5 lh-1">{{ stats.pending }}</div>
+            <div class="text-muted" style="font-size: 0.74rem;">قيد الانتظار والنقاش</div>
+          </div>
+        </div>
       </div>
-      <div class="stat-value">{{ stats.total }}</div>
-      <div class="stat-label">إجمالي الموضوعات</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon bg-success bg-opacity-10 text-success">
-        <i class="bi bi-check2-circle"></i>
+      <div class="col-6 col-md-3">
+        <div class="d-flex align-items-center justify-content-center gap-2">
+          <span class="badge rounded-circle p-2 bg-info bg-opacity-10 text-info">
+            <i class="bi bi-people fs-6"></i>
+          </span>
+          <div class="text-start">
+            <div class="fw-bold text-info-emphasis fs-5 lh-1">{{ attendances|length }}</div>
+            <div class="text-muted" style="font-size: 0.74rem;">أعضاء المجلس المسجلين</div>
+          </div>
+        </div>
       </div>
-      <div class="stat-value">{{ stats.voted }}</div>
-      <div class="stat-label">تم التصويت عليها</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon bg-warning bg-opacity-10 text-warning">
-        <i class="bi bi-hourglass-split"></i>
-      </div>
-      <div class="stat-value">{{ stats.pending }}</div>
-      <div class="stat-label">قيد الانتظار والنقاش</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon bg-info bg-opacity-10 text-info">
-        <i class="bi bi-people"></i>
-      </div>
-      <div class="stat-value">{{ attendances|length }}</div>
-      <div class="stat-label">أعضاء المجلس المسجلين</div>
     </div>
   </div>
 </div>
@@ -315,16 +377,16 @@
                style="cursor: pointer; user-select: none;"
                onclick="toggleCategorySection({{ forloop.counter }})">
             <div class="d-flex align-items-center gap-2">
-              <i id="cat-icon-{{ forloop.counter }}" class="bi bi-chevron-left" style="font-size: 0.95rem;"></i>
+              <i id="cat-icon-{{ forloop.counter }}" class="bi {% if forloop.first %}bi-chevron-down{% else %}bi-chevron-left{% endif %}" style="font-size: 0.95rem;"></i>
               <span class="fw-bold">{{ cat_label }}</span>
             </div>
             <div class="d-flex align-items-center gap-2">
-              <span id="cat-hint-{{ forloop.counter }}" class="small text-white-50 d-none d-sm-inline" style="font-size: 0.78rem;">اضغط لعرض المواضيع ▼</span>
+              <span id="cat-hint-{{ forloop.counter }}" class="small text-white-50 d-none d-sm-inline" style="font-size: 0.78rem;">{% if forloop.first %}اضغط للطي ▲{% else %}اضغط لعرض المواضيع ▼{% endif %}</span>
               <span class="badge rounded-pill px-3 py-1 fw-bold" style="background-color: #f3c65f; color: #11223A;">{{ topics|length }} موضوع</span>
             </div>
           </div>
 
-          <div id="cat-body-{{ forloop.counter }}" class="cat-topics-body flex-column gap-2 mt-2" style="display: none;">
+          <div id="cat-body-{{ forloop.counter }}" class="cat-topics-body flex-column gap-2 mt-2" style="{% if forloop.first %}display: flex;{% else %}display: none;{% endif %}">
             {% for t in topics %}
               <div class="topic-card category-{{ t.category }} p-3">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
@@ -477,6 +539,30 @@
           <p class="small text-muted mb-0" style="white-space: pre-line;">{{ session.agenda_notes }}</p>
         </div>
       </div>
+    {% endif %}
+
+    <!-- ══ بطاقة تسجيل الجلسة الصوتي الكامل (الشريط الجانبي) ══ -->
+    {% if session_recording and session_recording.audio_file and user.can_listen_audio %}
+    <div class="uc-card mb-4 shadow-sm border border-success border-opacity-25 overflow-hidden">
+      <div class="uc-card-header bg-success bg-opacity-10 text-success d-flex justify-content-between align-items-center py-2 px-3">
+        <h6 class="mb-0 fw-bold fs-7 d-flex align-items-center gap-1.5 text-success">
+          <i class="bi bi-mic-fill"></i>التسجيل الصوتي المعتمد
+        </h6>
+        <span class="badge bg-success small">المدة: {{ session_recording.get_duration_display }}</span>
+      </div>
+      <div class="uc-card-body p-3 bg-white">
+        <audio controls class="w-100 shadow-sm rounded-pill mb-2" preload="metadata" style="height: 38px;">
+          <source src="{{ session_recording.audio_file.url }}" type="audio/webm">
+          متصفحك لا يدعم تشغيل الصوت المباشر.
+        </audio>
+        <div class="d-flex justify-content-between align-items-center small text-muted">
+          <span>{% if session_recording.started_at %}<i class="bi bi-calendar-event me-1"></i>{{ session_recording.started_at|date:"Y-m-d H:i" }}{% endif %}</span>
+          <a href="{{ session_recording.audio_file.url }}" download="تسجيل_الجلسة_{{ session.session_number }}.webm" class="btn btn-sm btn-outline-success py-0 px-2 fw-bold" style="font-size: 0.75rem;">
+            <i class="bi bi-download me-1"></i>تحميل
+          </a>
+        </div>
+      </div>
+    </div>
     {% endif %}
 
     <!-- Attendance Card (5 Visual Statuses) -->

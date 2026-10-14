@@ -19,7 +19,7 @@
 </head>
 <body>
 
-{% if global_live_session and not is_on_live_page %}
+{% if global_live_session and not is_on_live_page and not is_on_active_session_detail and not is_on_active_session_topic %}
 <!-- 🔴 GLOBAL LIVE SESSION PERSISTENT BANNER ── يضمن عدم ضياع الجلسة الحية عند تصفح أي شاشة -->
 <div id="global-live-session-banner" class="global-live-banner py-2 px-3 text-white shadow d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: linear-gradient(90deg, #881337 0%, #b91c1c 40%, #991b1b 100%); border-bottom: 2px solid #facc15; z-index: 1060; position: sticky; top: 0;">
   <div class="d-flex align-items-center gap-2 flex-grow-1 overflow-hidden">

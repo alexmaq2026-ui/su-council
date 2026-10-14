@@ -44,19 +44,42 @@ def table_create_view(request, topic_pk):
         table_type = request.POST.get('table_type', 'custom')
         title = request.POST.get('title', '').strip()
         headers_raw = request.POST.get('headers', '').strip()
+        headers_json_raw = request.POST.get('headers_json', '').strip()
         rows_raw = request.POST.get('rows_data', '').strip()
+        rows_json_raw = request.POST.get('rows_json', '').strip()
         sum_cols_raw = request.POST.get('sum_columns', '').strip()
+        sum_cols_json_raw = request.POST.get('sum_columns_json', '').strip()
         notes = request.POST.get('notes', '').strip()
 
-        # Parse headers
-        if headers_raw:
+        # Parse headers (prefer JSON if provided)
+        headers = []
+        if headers_json_raw:
+            try:
+                parsed_h = json.loads(headers_json_raw)
+                if isinstance(parsed_h, list):
+                    headers = [str(h).strip() for h in parsed_h if str(h).strip()]
+            except Exception:
+                pass
+
+        if not headers and headers_raw:
             headers = [h.strip() for h in headers_raw.split(',') if h.strip()]
-        else:
+
+        if not headers:
             headers = PRESET_HEADERS_MAP.get(table_type, ['م', 'البيان', 'ملاحظات'])
 
-        # Parse rows (each line is a row, values separated by comma or tab)
+        # Parse rows (prefer JSON if provided)
         rows_data = []
-        if rows_raw:
+        if rows_json_raw:
+            try:
+                parsed_r = json.loads(rows_json_raw)
+                if isinstance(parsed_r, list):
+                    for r in parsed_r:
+                        if isinstance(r, list):
+                            rows_data.append([str(c) if c is not None else '' for c in r])
+            except Exception:
+                pass
+
+        if not rows_data and rows_raw:
             for line in rows_raw.splitlines():
                 line = line.strip()
                 if line:
@@ -66,14 +89,24 @@ def table_create_view(request, topic_pk):
                         row = [c.strip() for c in line.split(',')]
                     rows_data.append(row)
 
-        # Parse sum columns (comma-separated 0-indexed or 1-indexed integers)
+        # Parse sum columns (prefer JSON if provided)
         sum_columns = []
-        if sum_cols_raw:
+        if sum_cols_json_raw:
+            try:
+                parsed_s = json.loads(sum_cols_json_raw)
+                if isinstance(parsed_s, list):
+                    for c in parsed_s:
+                        if str(c).isdigit():
+                            sum_columns.append(int(c))
+            except Exception:
+                pass
+
+        if not sum_columns and sum_cols_raw:
             for c in sum_cols_raw.split(','):
                 c = c.strip()
                 if c.isdigit():
                     sum_columns.append(int(c))
-        elif table_type in PRESET_SUM_COLS_MAP:
+        elif not sum_columns and table_type in PRESET_SUM_COLS_MAP:
             sum_columns = PRESET_SUM_COLS_MAP[table_type]
 
         order = topic.tables.count() + 1
@@ -93,8 +126,16 @@ def table_create_view(request, topic_pk):
     context = {
         'topic': topic,
         'session': session,
+        'table': None,
         'preset_choices': TABLE_PRESET_CHOICES,
         'presets_json': json.dumps(PRESET_HEADERS_MAP, ensure_ascii=False),
+        'preset_sum_cols_json': json.dumps(PRESET_SUM_COLS_MAP, ensure_ascii=False),
+        'current_headers_json': json.dumps([], ensure_ascii=False),
+        'current_rows_json': json.dumps([], ensure_ascii=False),
+        'current_sum_cols_json': json.dumps([], ensure_ascii=False),
+        'headers_text': '',
+        'rows_text': '',
+        'sum_columns_text': '',
         'page_title': f'إضافة جدول جديد – {topic.title[:40]}',
     }
     return render(request, 'council/table_form.html', context)
@@ -115,17 +156,42 @@ def table_edit_view(request, pk):
         table.title = request.POST.get('title', '').strip() or table.title
         table.table_type = request.POST.get('table_type', table.table_type)
         headers_raw = request.POST.get('headers', '').strip()
+        headers_json_raw = request.POST.get('headers_json', '').strip()
         rows_raw = request.POST.get('rows_data', '').strip()
+        rows_json_raw = request.POST.get('rows_json', '').strip()
         sum_cols_raw = request.POST.get('sum_columns', '').strip()
+        sum_cols_json_raw = request.POST.get('sum_columns_json', '').strip()
         table.notes = request.POST.get('notes', '').strip()
 
         # Parse headers
-        if headers_raw:
-            table.headers = [h.strip() for h in headers_raw.split(',') if h.strip()]
+        headers = []
+        if headers_json_raw:
+            try:
+                parsed_h = json.loads(headers_json_raw)
+                if isinstance(parsed_h, list):
+                    headers = [str(h).strip() for h in parsed_h if str(h).strip()]
+            except Exception:
+                pass
+
+        if not headers and headers_raw:
+            headers = [h.strip() for h in headers_raw.split(',') if h.strip()]
+
+        if headers:
+            table.headers = headers
 
         # Parse rows
         rows_data = []
-        if rows_raw:
+        if rows_json_raw:
+            try:
+                parsed_r = json.loads(rows_json_raw)
+                if isinstance(parsed_r, list):
+                    for r in parsed_r:
+                        if isinstance(r, list):
+                            rows_data.append([str(c) if c is not None else '' for c in r])
+            except Exception:
+                pass
+
+        if not rows_data and rows_raw:
             for line in rows_raw.splitlines():
                 line = line.strip()
                 if line:
@@ -134,22 +200,33 @@ def table_edit_view(request, pk):
                     else:
                         row = [c.strip() for c in line.split(',')]
                     rows_data.append(row)
-            table.rows_data = rows_data
+
+        table.rows_data = rows_data
 
         # Parse sum columns
         sum_columns = []
-        if sum_cols_raw:
+        if sum_cols_json_raw:
+            try:
+                parsed_s = json.loads(sum_cols_json_raw)
+                if isinstance(parsed_s, list):
+                    for c in parsed_s:
+                        if str(c).isdigit():
+                            sum_columns.append(int(c))
+            except Exception:
+                pass
+
+        if not sum_columns and sum_cols_raw:
             for c in sum_cols_raw.split(','):
                 c = c.strip()
                 if c.isdigit():
                     sum_columns.append(int(c))
-            table.sum_columns = sum_columns
 
+        table.sum_columns = sum_columns
         table.save()
         messages.success(request, f'تم تحديث الجدول «{table.title}» بنجاح.')
         return redirect('council:topic_detail', pk=topic.pk)
 
-    # Format current rows as text for textarea editing
+    # Format current rows as text for textarea fallback
     rows_text_lines = []
     for r in table.rows_data:
         if isinstance(r, list):
@@ -161,10 +238,14 @@ def table_edit_view(request, pk):
         'topic': topic,
         'session': session,
         'preset_choices': TABLE_PRESET_CHOICES,
+        'presets_json': json.dumps(PRESET_HEADERS_MAP, ensure_ascii=False),
+        'preset_sum_cols_json': json.dumps(PRESET_SUM_COLS_MAP, ensure_ascii=False),
+        'current_headers_json': json.dumps(table.headers if isinstance(table.headers, list) else [], ensure_ascii=False),
+        'current_rows_json': json.dumps(table.rows_data if isinstance(table.rows_data, list) else [], ensure_ascii=False),
+        'current_sum_cols_json': json.dumps(table.sum_columns if isinstance(table.sum_columns, list) else [], ensure_ascii=False),
         'headers_text': ', '.join(table.headers) if isinstance(table.headers, list) else '',
         'rows_text': rows_text,
         'sum_columns_text': ', '.join(str(c) for c in table.sum_columns) if isinstance(table.sum_columns, list) else '',
-        'presets_json': json.dumps(PRESET_HEADERS_MAP, ensure_ascii=False),
         'page_title': f'تعديل جدول: {table.title}',
     }
     return render(request, 'council/table_form.html', context)

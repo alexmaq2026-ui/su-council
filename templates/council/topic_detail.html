@@ -4,7 +4,7 @@
 {% block title %}{{ topic.title }} – الجلسة {{ session.session_number }}{% endblock %}
 
 {% block page_header %}
-<div class="page-header">
+<div class="page-header py-3">
   <div class="page-header-inner">
     <div>
       <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
@@ -29,36 +29,65 @@
       </div>
     </div>
     
-    <div class="d-flex flex-wrap gap-2">
-      {% if user_can_use_smart_reader %}
-        <button type="button" class="btn btn-warning text-dark btn-sm fw-bold shadow-sm" onclick="openSmartReader({topicId: {{ topic.pk }}})">
-          🎙️ استماع بالقراءة الذكية للموضوع
-        </button>
-      {% endif %}
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <!-- 1. Live Session Launch / Direct Return Action -->
       {% if is_controller and session.status == 'active' %}
-        <button type="button" class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="launchTopicFromDetail({{ topic.pk }}, '{% url 'council:session_live' session_pk=session.pk %}')">
-          <i class="bi bi-broadcast-pin me-1"></i> طرح للجلسة الحية والتصويت ←
+        {% if topic.display_state.display_status == 'shown' or topic.display_state.display_status == 'voting' %}
+          <a href="{% url 'council:session_live' session_pk=session.pk %}?topic={{ topic.pk }}#topic-row-{{ topic.pk }}" class="btn btn-danger btn-sm fw-bold shadow-sm d-inline-flex align-items-center gap-1">
+            <i class="bi bi-broadcast"></i> المعروض حالياً بالقاعة ← انتقال
+          </a>
+        {% else %}
+          <button type="button" class="btn btn-danger btn-sm fw-bold shadow-sm d-inline-flex align-items-center gap-1" onclick="launchTopicFromDetail({{ topic.pk }}, '{% url 'council:session_live' session_pk=session.pk %}')">
+            <i class="bi bi-broadcast-pin"></i> طرح للجلسة الحية والتصويت ←
+          </button>
+        {% endif %}
+      {% endif %}
+
+      <!-- 2. Smart Reader Widget -->
+      {% if user_can_use_smart_reader %}
+        <button type="button" class="btn btn-warning text-dark btn-sm fw-bold shadow-sm d-inline-flex align-items-center gap-1" onclick="openSmartReader({topicId: {{ topic.pk }}})">
+          <i class="bi bi-mic-fill"></i> استماع بالقراءة الذكية
         </button>
       {% endif %}
+
+      <!-- 3. Return to Agenda -->
       {% if user.can_view_sessions %}
-        <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-light btn-sm">
-          <i class="bi bi-arrow-right me-1"></i>جدول الأعمال
+        <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-light btn-sm d-inline-flex align-items-center gap-1">
+          <i class="bi bi-card-list"></i> جدول الأعمال
         </a>
       {% endif %}
-      {% if user_can_edit_topic %}
-        <a href="{% url 'council:topic_edit' pk=topic.pk %}" class="btn btn-outline-light btn-sm">
-          <i class="bi bi-pencil me-1"></i>تعديل
-        </a>
-      {% endif %}
-      {% if user_can_add_table %}
-        <a href="{% url 'council:table_create' topic_pk=topic.pk %}" class="btn btn-gold btn-sm">
-          إضافة جدول للموضوع
-        </a>
-      {% endif %}
-      {% if user_can_delete_topic %}
-        <a href="{% url 'council:topic_delete' pk=topic.pk %}" class="btn btn-outline-danger btn-sm text-white border-white">
-          <i class="bi bi-trash me-1"></i>حذف
-        </a>
+
+      <!-- 4. Administrative Dropdown Menu [خيارات الموضوع] -->
+      {% if user_can_edit_topic or user_can_add_table or user_can_delete_topic %}
+        <div class="dropdown">
+          <button class="btn btn-outline-light btn-sm dropdown-toggle d-inline-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-sliders2"></i> خيارات الموضوع
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 py-2" style="font-size: 0.88rem; min-width: 190px;">
+            {% if user_can_edit_topic %}
+              <li>
+                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="{% url 'council:topic_edit' pk=topic.pk %}">
+                  <i class="bi bi-pencil text-primary"></i> تعديل بيانات الموضوع
+                </a>
+              </li>
+            {% endif %}
+            {% if user_can_add_table %}
+              <li>
+                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="{% url 'council:table_create' topic_pk=topic.pk %}">
+                  <i class="bi bi-table text-success"></i> إضافة جدول للموضوع
+                </a>
+              </li>
+            {% endif %}
+            {% if user_can_delete_topic %}
+              <li><hr class="dropdown-divider my-1"></li>
+              <li>
+                <a class="dropdown-item py-2 text-danger d-flex align-items-center gap-2" href="{% url 'council:topic_delete' pk=topic.pk %}">
+                  <i class="bi bi-trash"></i> حذف الموضوع
+                </a>
+              </li>
+            {% endif %}
+          </ul>
+        </div>
       {% endif %}
     </div>
   </div>
@@ -148,13 +177,28 @@
                 </tr>
               </thead>
               <tbody>
-                {% for row in tbl.rows_data %}
+                {% if tbl.rows_data %}
+                  {% for row in tbl.rows_data %}
+                    <tr>
+                      {% for cell in row %}
+                        <td class="py-2 px-2 border">{{ cell|default:"—" }}</td>
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                {% else %}
                   <tr>
-                    {% for cell in row %}
-                      <td class="py-2 px-2 border">{{ cell|default:"—" }}</td>
-                    {% endfor %}
+                    <td colspan="{{ tbl.headers|length }}" class="py-4 text-muted bg-white">
+                      <i class="bi bi-info-circle text-navy me-1"></i>
+                      لا توجد بيانات أو صفوف مضافة بعد. يمكنك الضغط على 
+                      {% if user_can_edit_table %}
+                        <a href="{% url 'council:table_edit' pk=tbl.pk %}" class="fw-bold text-navy text-decoration-underline">«تعديل الجدول»</a>
+                      {% else %}
+                        <strong>«تعديل الجدول»</strong>
+                      {% endif %}
+                      لإدخال الصفوف والبيانات.
+                    </td>
                   </tr>
-                {% endfor %}
+                {% endif %}
               </tbody>
               {% if tbl.get_formatted_total_row %}
                 <tfoot class="table-warning fw-bold border-top border-dark">
@@ -249,14 +293,14 @@
                     </div>
                   </div>
                   <div class="d-flex gap-2 align-items-center">
-                    <a href="{{ att.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary" title="معاينة وتحميل">
-                      <i class="bi bi-eye me-1"></i>معاينة
+                    <a href="{{ att.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1" title="معاينة وتحميل">
+                      <i class="bi bi-eye"></i><span>معاينة</span>
                     </a>
                     {% if user_can_delete_attachments %}
-                      <form method="post" action="{% url 'council:attachment_delete' pk=att.pk %}" onsubmit="return confirm('هل أنت متأكد من حذف هذا المرفق؟')">
+                      <form method="post" action="{% url 'council:attachment_delete' pk=att.pk %}" class="d-inline mb-0" onsubmit="return confirm('هل أنت متأكد من حذف هذا المرفق؟')">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline-danger btn-icon">
-                          <i class="bi bi-trash"></i>
+                        <button type="submit" class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1" title="حذف المستند المرفق">
+                          <i class="bi bi-trash3"></i><span>حذف</span>
                         </button>
                       </form>
                     {% endif %}
@@ -272,20 +316,28 @@
         {% endif %}
 
         {% if user_can_upload_attachments %}
-          <div class="p-3 bg-light rounded-3 border">
-            <h6 class="fw-bold mb-2"><i class="bi bi-cloud-arrow-up me-1 text-gold"></i>رفع مستند جديد (سحب إسكانر)</h6>
-            <form method="post" action="{% url 'council:attachment_upload' topic_pk=topic.pk %}" enctype="multipart/form-data" class="row g-2 align-items-center">
+          <div class="p-3 bg-light bg-opacity-75 rounded-3 border">
+            <h6 class="fw-bold text-navy mb-2.5 d-flex align-items-center gap-1.5" style="font-size: 0.88rem;">
+              <i class="bi bi-cloud-arrow-up-fill text-gold"></i>
+              <span>رفع مستند جديد أو سحب ضوئي (Scanner)</span>
+            </h6>
+            <form method="post" action="{% url 'council:attachment_upload' topic_pk=topic.pk %}" enctype="multipart/form-data">
               {% csrf_token %}
-              <div class="col-12 col-md-6">
-                <input type="file" name="file" class="form-control form-control-sm" required>
-              </div>
-              <div class="col-12 col-md-4">
-                <input type="text" name="description" class="form-control form-control-sm" placeholder="وصف المستند (اختياري)">
-              </div>
-              <div class="col-12 col-md-2">
-                <button type="submit" class="btn btn-navy btn-sm w-100">
-                  <i class="bi bi-upload me-1"></i>رفع
-                </button>
+              <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-5">
+                  <label class="form-label small text-muted mb-1 fw-semibold">ملف المستند (PDF أو صورة):</label>
+                  <input type="file" name="file" class="form-control form-control-sm bg-white" required>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label small text-muted mb-1 fw-semibold">وصف المستند (اختياري):</label>
+                  <input type="text" name="description" class="form-control form-control-sm bg-white" placeholder="مثال: مذكرة التعيين، السيرة الذاتية...">
+                </div>
+                <div class="col-12 col-md-3">
+                  <button type="submit" class="btn btn-navy btn-sm w-100 fw-bold d-inline-flex align-items-center justify-content-center gap-1 shadow-sm" style="padding-top: 0.45rem; padding-bottom: 0.45rem;">
+                    <i class="bi bi-upload"></i>
+                    <span>إرفاق المستند</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -304,20 +356,23 @@
         
         <!-- Recorder UI -->
         {% if user_can_record_audio %}
-        <div class="recorder-panel mb-4 p-4 text-center border rounded-4 bg-light">
+        <div class="recorder-panel mb-3 p-3 text-center border rounded-3 bg-light bg-opacity-75">
           <div class="record-waveform mb-2" id="record-waveform" style="display: none;">
             <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
           </div>
           
-          <button type="button" class="record-btn" id="record-btn" data-topic-id="{{ topic.pk }}" title="انقر لبدء / إيقاف التسجيل">
-            <i class="bi bi-mic-fill"></i>
-          </button>
+          <div class="d-flex align-items-center justify-content-center gap-3">
+            <button type="button" class="record-btn shadow-sm" id="record-btn" data-topic-id="{{ topic.pk }}" title="انقر لبدء / إيقاف التسجيل" style="width: 52px; height: 52px; font-size: 1.25rem;">
+              <i class="bi bi-mic-fill"></i>
+            </button>
+            <div class="text-start">
+              <div class="record-timer fw-bold text-danger fs-5 lh-1" id="record-timer">00:00</div>
+              <div class="text-muted small fw-bold mt-1" id="record-status" style="font-size: 0.78rem;">جاهز لتسجيل نقاش القاعة</div>
+            </div>
+          </div>
           
-          <div class="record-timer my-2" id="record-timer">00:00</div>
-          <div class="text-muted small fw-bold" id="record-status">جاهز لتسجيل نقاش القاعة</div>
-          
-          <div class="mt-3 col-md-6 mx-auto">
-            <input type="text" id="recording-label" class="form-control form-control-sm text-center" placeholder="تسمية التسجيل (مثال: مداخلة الأمين العام)">
+          <div class="mt-2.5 col-md-8 mx-auto">
+            <input type="text" id="recording-label" class="form-control form-control-sm text-center bg-white" placeholder="تسمية التسجيل (مثال: مداخلة الأمين العام)">
           </div>
         </div>
         {% endif %}
@@ -419,13 +474,6 @@
           <i class="bi bi-clock-history fs-5 text-warning"></i>
           <span class="small"><strong>باب التصويت مغلق حالياً لهذا الموضوع.</strong> يتم فتح وإغلاق التصويت بإشارة وتوجيه من رئيس المجلس في الجلسة الحية.</span>
         </div>
-        {% if is_controller and topic.session.status == 'active' %}
-          <div class="mb-3">
-            <button type="button" class="btn btn-danger btn-sm fw-bold w-100 shadow-sm py-2" onclick="launchTopicFromDetail({{ topic.pk }}, '{% url 'council:session_live' session_pk=topic.session.pk %}')">
-              <i class="bi bi-broadcast-pin me-1"></i> طرح هذا الموضوع الآن للجلسة الحية والتصويت ←
-            </button>
-          </div>
-        {% endif %}
       {% endif %}
 
       <!-- Live Vote Statistics -->
@@ -538,6 +586,9 @@
             {% endif %}
           </div>
         {% endif %}
+      </div>
+    </div>
+
     <!-- 🏛️ SIGNED DECISION & FACULTY DISPATCH PANEL (Phase 4) -->
     <div class="uc-card shadow-sm mb-4 border-2 border-primary border-opacity-50">
       <div class="uc-card-header bg-navy text-white d-flex justify-content-between align-items-center">
@@ -621,37 +672,42 @@
 
         <!-- نموذج رفع أو تحديث القرار الموقّع للمخوّلين -->
         {% if user_can_upload_signed %}
-          <div class="p-3 bg-white rounded-3 border mt-3">
-            <h6 class="fw-bold text-navy mb-2">
-              {% if topic.signed_decision %}تحديث مستند القرار الموقّع أو تعديل الكليات المعنية{% else %}رفع مستند القرار الموقّع رسميًا وتحديد الكليات المستلمة{% endif %}
+          <div class="p-3 bg-white rounded-3 border mt-3 shadow-2xs">
+            <h6 class="fw-bold text-navy mb-2.5 d-flex align-items-center gap-1.5" style="font-size: 0.9rem;">
+              <i class="bi bi-file-earmark-arrow-up-fill text-primary"></i>
+              <span>{% if topic.signed_decision %}تحديث مستند القرار الموقّع أو تعديل الكليات المعنية{% else %}رفع مستند القرار الموقّع رسميًا وتحديد الكليات المستلمة{% endif %}</span>
             </h6>
             <form method="post" action="{% url 'council:upload_signed_decision' topic_pk=topic.pk %}" enctype="multipart/form-data">
               {% csrf_token %}
-              <div class="row g-2 mb-2">
-                <div class="col-md-6">
-                  <label class="form-label small text-muted">ملف القرار الموقّع (PDF أو صورة عالية الجودة):</label>
-                  <input type="file" name="signed_file" class="form-control form-control-sm" {% if not topic.signed_decision %}required{% endif %}>
+              <div class="mb-2.5">
+                <label class="form-label small text-muted mb-1 fw-semibold">ملف القرار الموقّع رسميًا (PDF أو صورة عالية الجودة):</label>
+                <input type="file" name="signed_file" class="form-control form-control-sm bg-white" {% if not topic.signed_decision %}required{% endif %}>
+              </div>
+
+              <div class="row g-2 mb-2.5">
+                <div class="col-12 col-sm-6">
+                  <label class="form-label small text-muted mb-1 fw-semibold">رقم القرار الإداري:</label>
+                  <input type="text" name="decision_number" class="form-control form-control-sm bg-white" value="{{ topic.signed_decision.decision_number|default:'' }}" placeholder="مثال: ق/2026/14">
                 </div>
-                <div class="col-md-3">
-                  <label class="form-label small text-muted">رقم القرار الإداري:</label>
-                  <input type="text" name="decision_number" class="form-control form-control-sm" value="{{ topic.signed_decision.decision_number|default:'' }}" placeholder="مثال: ق/2026/14">
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label small text-muted">تاريخ التوقيع:</label>
-                  <input type="date" name="decision_date" class="form-control form-control-sm" value="{{ topic.signed_decision.decision_date|date:'Y-m-d'|default:'' }}">
+                <div class="col-12 col-sm-6">
+                  <label class="form-label small text-muted mb-1 fw-semibold">تاريخ التوقيع والاعتماد:</label>
+                  <input type="date" name="decision_date" class="form-control form-control-sm bg-white" value="{{ topic.signed_decision.decision_date|date:'Y-m-d'|default:'' }}">
                 </div>
               </div>
 
               <!-- اختيار الكليات والجهات المعنية -->
-              <div class="mb-2">
-                <label class="form-label small text-muted">الكليات والجهات المعنية بالقرار (ستصل المراسلة لها وحدها):</label>
-                <div class="p-2 border rounded bg-light" style="max-height: 140px; overflow-y: auto;">
-                  <div class="row g-1">
+              <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label small text-muted mb-0 fw-semibold">الكليات والجهات المعنية بالقرار (ستصل المراسلة لها وحدها):</label>
+                  <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" style="font-size: 0.75rem;" onclick="toggleAllSeats(this)">تحديد الكل / إلغاء</button>
+                </div>
+                <div class="p-2.5 border rounded-3 bg-light" style="max-height: 160px; overflow-y: auto;">
+                  <div class="row g-2">
                     {% for s in all_seats %}
-                      <div class="col-md-4 col-sm-6">
-                        <div class="form-check small">
-                          <input class="form-check-input" type="checkbox" name="target_seats" value="{{ s.pk }}" id="seat_check_{{ s.pk }}" {% if s in topic.target_seats.all %}checked{% endif %}>
-                          <label class="form-check-label" for="seat_check_{{ s.pk }}">
+                      <div class="col-12 col-sm-6">
+                        <div class="form-check small p-1 ps-4 rounded bg-white border border-light">
+                          <input class="form-check-input target-seat-check" type="checkbox" name="target_seats" value="{{ s.pk }}" id="seat_check_{{ s.pk }}" {% if s in topic.target_seats.all %}checked{% endif %}>
+                          <label class="form-check-label text-dark fw-medium" for="seat_check_{{ s.pk }}" style="font-size: 0.78rem;">
                             {{ s.name }}
                           </label>
                         </div>
@@ -662,8 +718,9 @@
               </div>
 
               <div class="d-flex justify-content-end">
-                <button type="submit" class="btn btn-navy btn-sm px-4 fw-bold">
-                  {% if topic.signed_decision %}حفظ التعديلات{% else %}رفع القرار واعتماد الكليات المعنية{% endif %}
+                <button type="submit" class="btn btn-navy btn-sm px-4 fw-bold shadow-sm d-inline-flex align-items-center gap-1">
+                  <i class="bi bi-check-circle"></i>
+                  <span>{% if topic.signed_decision %}حفظ وتحديث المستند والكليات{% else %}اعتماد ورفع القرار الرسمي{% endif %}</span>
                 </button>
               </div>
             </form>
@@ -673,6 +730,13 @@
     </div>
 
     <script>
+    function toggleAllSeats(btn) {
+      const checkboxes = document.querySelectorAll('.target-seat-check');
+      const allChecked = Array.from(checkboxes).every(c => c.checked);
+      checkboxes.forEach(c => c.checked = !allChecked);
+      if (btn) btn.innerText = allChecked ? 'تحديد الكل' : 'إلغاء التحديد';
+    }
+
     function dispatchDecision(topicPk) {
       if (!confirm('هل أنت متأكد من رغبتك في إرسال وتعميم القرار الموقّع رسميًا على كافة الكليات والجهات المعنية؟')) return;
       fetch('/council/topics/' + topicPk + '/signed-decision/dispatch/', {

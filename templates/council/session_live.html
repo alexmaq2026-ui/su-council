@@ -2195,10 +2195,12 @@ function toggleDecisionEditor(topicId) {
 }
 
 function copyProposalToDecision(topicId) {
-  const prop = document.getElementById(`proposal-text-${topicId}`);
+  const prop = document.getElementById(`topic-priorities-${topicId}`) || document.getElementById(`proposal-text-${topicId}`);
   const input = document.getElementById(`decision-input-${topicId}`);
   if (prop && input) {
-    input.value = prop.innerText.trim();
+    let val = prop.innerText.trim();
+    val = val.replace(/^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]*/, '').trim();
+    input.value = val;
     input.focus();
   }
 }
@@ -2208,7 +2210,8 @@ function saveTopicDecision(topicId) {
   const feedback = document.getElementById(`decision-feedback-${topicId}`);
   if (!input) return;
 
-  const text = input.value.trim();
+  let text = input.value.trim();
+  text = text.replace(/^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]*/, '').trim();
   if (!text) {
     if (feedback) {
       feedback.style.display = 'block';
@@ -2229,8 +2232,8 @@ function saveTopicDecision(topicId) {
   .then(res => res.json())
   .then(data => {
     if (data.ok) {
-      const box = document.getElementById(`decision-box-${topicId}`);
-      const view = document.getElementById(`decision-text-view-${topicId}`);
+      const box = document.getElementById(`decision-display-box-${topicId}`) || document.getElementById(`decision-box-${topicId}`);
+      const view = document.getElementById(`decision-display-text-${topicId}`) || document.getElementById(`decision-text-view-${topicId}`);
       if (box) box.style.display = 'block';
       if (view) view.innerText = data.decision_text;
 
@@ -2767,8 +2770,8 @@ function pollQueue() {
           }
 
           // مزامنة القرار المعتمد
-          const decBox = document.getElementById(`decision-box-${tid}`);
-          const decView = document.getElementById(`decision-text-view-${tid}`);
+          const decBox = document.getElementById(`decision-display-box-${tid}`) || document.getElementById(`decision-box-${tid}`);
+          const decView = document.getElementById(`decision-display-text-${tid}`) || document.getElementById(`decision-text-view-${tid}`);
           if (tState.has_decision && tState.decision_text) {
             if (decBox) decBox.style.display = 'block';
             if (decView) decView.innerText = tState.decision_text;

@@ -145,7 +145,8 @@ def parse_word_file(file_obj) -> list:
                 title = ''
                 if i + 1 < len(paragraphs):
                     next_p = paragraphs[i + 1]
-                    if not _TOPIC_HEADER_RE.match(next_p) and not next_p.startswith('القــــــــرار:') and not next_p.startswith('القرار:'):
+                    norm_next = re.sub(r'[\u0640]', '', next_p.strip())
+                    if not _TOPIC_HEADER_RE.match(next_p) and not re.match(r'^[\s\-\*]*(?:ال+ق+رار|التوصيات)', norm_next):
                         title = next_p
                 
                 if current_topic:
@@ -187,10 +188,12 @@ def parse_word_file(file_obj) -> list:
                     continue  # Already captured as title
                 
                 # Check for decision / recommendation markers
-                if text.startswith('القــــــــرار:') or text.startswith('القرار:') or text.startswith('التوصيات:'):
-                    clean_dec = re.sub(r'^(?:القــــــــرار|القرار|التوصيات)[\s\:\-]+', '', text).strip()
-                    current_topic['decision'] = clean_dec or text
-                    current_topic['priorities'] = clean_dec or text
+                norm_marker = re.sub(r'[\u0640]', '', text.strip())
+                if re.match(r'^[\s\-\*]*(?:ال+ق+رار|التوصيات)', norm_marker):
+                    clean_dec = re.sub(r'^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]*', '', text).strip()
+                    if clean_dec:
+                        current_topic['decision'] = clean_dec
+                        current_topic['priorities'] = clean_dec
                 else:
                     current_topic['background'].append(text)
 
@@ -227,10 +230,12 @@ def parse_word_file(file_obj) -> list:
                 continue
 
             if current_topic:
-                if text.startswith('القــــــــرار:') or text.startswith('القرار:') or text.startswith('التوصيات:'):
-                    clean_dec = re.sub(r'^(?:القــــــــرار|القرار|التوصيات)[\s\:\-]+', '', text).strip()
-                    current_topic['decision'] = clean_dec or text
-                    current_topic['priorities'] = clean_dec or text
+                norm_marker = re.sub(r'[\u0640]', '', text.strip())
+                if re.match(r'^[\s\-\*]*(?:ال+ق+رار|التوصيات)', norm_marker):
+                    clean_dec = re.sub(r'^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]*', '', text).strip()
+                    if clean_dec:
+                        current_topic['decision'] = clean_dec
+                        current_topic['priorities'] = clean_dec
                 else:
                     current_topic['background'].append(text)
 

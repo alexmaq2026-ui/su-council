@@ -756,12 +756,33 @@ class Topic(models.Model):
         if updates:
             cls.objects.bulk_update(updates, ['sub_order'])
 
+    @property
+    def clean_priorities(self):
+        """Return priorities without redundant 'القرار:' marker or if it's just a blank marker."""
+        if not self.priorities:
+            return ''
+        import re
+        norm = re.sub(r'[\u0640]', '', self.priorities.strip())
+        if re.match(r'^[\s\-\*]*(?:ال+ق+رار|التوصيات)[\s\:\-\–]*$', norm):
+            return ''
+        clean = re.sub(r'^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]+', '', self.priorities.strip())
+        return clean or self.priorities
+
     def save(self, *args, **kwargs):
+        if self.priorities:
+            import re
+            norm = re.sub(r'[\u0640]', '', self.priorities.strip())
+            if re.match(r'^[\s\-\*]*(?:ال+ق+رار|التوصيات)[\s\:\-\–]*$', norm):
+                self.priorities = ''
+            else:
+                clean_prio = re.sub(r'^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]+', '', self.priorities.strip())
+                if clean_prio:
+                    self.priorities = clean_prio
+        update_fields = kwargs.get('update_fields')
         old_category = None
-        if self.pk:
+        if self.pk and (update_fields is None or 'category' in update_fields):
             old_category = Topic.objects.filter(pk=self.pk).values_list('category', flat=True).first()
         super().save(*args, **kwargs)
-        update_fields = kwargs.get('update_fields')
         if update_fields is None or 'category' in update_fields or 'order_number' in update_fields or 'sub_order' in update_fields:
             self.resequence_category(self.session_id, self.category)
             if old_category and old_category != self.category:
@@ -1013,6 +1034,22 @@ class Decision(models.Model):
 
     def __str__(self):
         return f'قرار: {self.topic.title[:60]}'
+
+    @property
+    def clean_text(self):
+        """Returns the decision text stripped of redundant prefixes like 'القرار:'."""
+        text = self.decision_text or ''
+        import re
+        clean = re.sub(r'^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]*', '', text).strip()
+        return clean or text
+
+    def save(self, *args, **kwargs):
+        if self.decision_text:
+            import re
+            cleaned = re.sub(r'^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]*', '', self.decision_text.strip())
+            if cleaned:
+                self.decision_text = cleaned
+        super().save(*args, **kwargs)
 
 
 # ── Topic Table (Dynamic, Flexible & Math-enabled) ────────────────────────────

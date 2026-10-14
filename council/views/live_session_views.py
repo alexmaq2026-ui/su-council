@@ -136,7 +136,8 @@ def session_live_view(request, session_pk):
     for t in topics:
         t.user_vote = t.get_user_vote(user)
         t.has_decision_flag = t.has_decision()
-        t.decision_text_val = t.decision.decision_text if t.has_decision_flag else ''
+        t.decision_text_val = t.decision.clean_text if t.has_decision_flag else ''
+        t.priorities = t.clean_priorities
 
     # ── Intelligent Active Topic Resolution (Preserves President's exact position) ──
     topics_map = {t.pk: t for t in topics}
@@ -568,7 +569,10 @@ def api_topic_control(request, topic_pk):
 
         elif action == 'save_decision':
             from council.models import Decision
-            decision_text = (data.get('decision_text') or '').strip()
+            raw_dec = (data.get('decision_text') or '').strip()
+            import re
+            clean_dec = re.sub(r'^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]*', '', raw_dec).strip()
+            decision_text = clean_dec or raw_dec
             if not decision_text:
                 return JsonResponse({'ok': False, 'error': 'يرجى كتابة نص القرار قبل الاعتماد.'}, status=400)
             Decision.objects.update_or_create(
@@ -595,7 +599,7 @@ def api_topic_control(request, topic_pk):
     summary = topic.get_vote_summary()
     percentages = state.get_vote_percentages()
     has_dec = topic.has_decision()
-    dec_text = topic.decision.decision_text if has_dec else ''
+    dec_text = topic.decision.clean_text if has_dec else ''
 
     return JsonResponse({
         'ok': True,
@@ -1015,7 +1019,7 @@ def api_speak_queue(request, session_pk):
         if not st:
             st, _ = TopicDisplayState.objects.get_or_create(topic=t)
         has_dec = t.has_decision()
-        dec_text = t.decision.decision_text if has_dec else ''
+        dec_text = t.decision.clean_text if has_dec else ''
         if t.status in ('voted', 'closed') or st.display_status == 'closed' or has_dec:
             completed_topics_count += 1
         if st.display_status in ('voting', 'shown') and active_topic_id is None:
@@ -1031,7 +1035,7 @@ def api_speak_queue(request, session_pk):
             'ordinal_label': t.ordinal_label,
             'title': t.title,
             'background': t.background or '',
-            'priorities': t.priorities or '',
+            'priorities': t.clean_priorities,
             'presenting_entity': t.presenting_entity or '',
             'memo_number': t.memo_number or '',
             'memo_date': str(t.memo_date) if t.memo_date else '',
