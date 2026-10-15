@@ -334,14 +334,60 @@
     padding: 6px 8px !important;
     font-size: 0.86rem;
   }
+
+  /* ════════════════════════════════════════════════════════════════════════
+     تحسينات التجاوب الشاملة للأجهزة الذكية والآيفون (iPhone Responsive Design)
+     ════════════════════════════════════════════════════════════════════════ */
+  @media (max-width: 768px) {
+    .page-header {
+      padding: 0.85rem 1rem !important;
+    }
+    .page-title {
+      font-size: 1.12rem !important;
+    }
+    .category-card-header {
+      padding: 0.65rem 0.85rem !important;
+      gap: 0.5rem !important;
+    }
+    .category-title {
+      font-size: 0.95rem !important;
+    }
+    .topic-item-row {
+      padding: 0.75rem 0.85rem !important;
+      gap: 0.65rem !important;
+    }
+    .topic-item-title {
+      font-size: 0.88rem !important;
+    }
+    .inline-add-panel {
+      padding: 1rem 0.85rem !important;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .category-card-header {
+      flex-direction: column;
+      align-items: stretch !important;
+    }
+    .category-card-header > div:first-child {
+      justify-content: space-between;
+      width: 100%;
+    }
+    .category-header-actions {
+      width: 100%;
+      justify-content: flex-end;
+      padding-top: 0.35rem;
+      border-top: 1px dashed #f1f5f9;
+    }
+  }
 </style>
 {% endblock %}
 
 {% block page_header %}
-<div class="page-header">
+<div class="page-header py-2.5 px-3 px-md-4">
   <div class="page-header-inner">
     <div>
-      <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+      <div class="d-flex align-items-center gap-1.5 mb-1 flex-wrap">
         <span class="badge" style="background:var(--agy-gold); color:var(--agy-navy); font-weight:700;">
           <i class="bi bi-shield-check me-1"></i>الشاشة المعتمدة لإعداد جدول الأعمال
         </span>
@@ -350,10 +396,10 @@
           <span class="badge bg-warning text-dark">مسودة – تحضير</span>
         {% endif %}
       </div>
-      <h1 class="page-title mb-0" style="font-size: 1.32rem;">
-        <i class="bi bi-journal-plus text-gold me-2"></i>{{ page_title }}
+      <h1 class="page-title mb-0" style="font-size: 1.25rem;">
+        <i class="bi bi-journal-plus text-gold me-1.5"></i>{{ page_title }}
       </h1>
-      <div class="page-subtitle mt-1" style="font-size: 0.82rem;">
+      <div class="page-subtitle mt-1 d-none d-sm-block" style="font-size: 0.82rem;">
         {% if phase == 'A' %}
           المرحلة الأولى: إدخال بيانات وتوقيت ومكان الجلسة ثم حفظها لبدء بناء جدول الأعمال.
         {% else %}
@@ -363,15 +409,17 @@
     </div>
 
     <!-- أزرار التنقل والرجوع -->
-    <div class="d-flex gap-2 align-items-center flex-wrap">
+    <div class="d-flex gap-1.5 align-items-center flex-wrap">
       {% if session %}
         <a href="{% url 'council:session_detail' pk=session.pk %}"
-           class="btn btn-outline-light btn-sm fw-semibold d-inline-flex align-items-center gap-1 shadow-sm">
+           class="btn btn-outline-light btn-sm fw-semibold d-inline-flex align-items-center gap-1 shadow-sm px-2.5 py-1"
+           style="font-size: 0.78rem;">
           <i class="bi bi-eye"></i><span>معاينة الجلسة</span>
         </a>
       {% endif %}
       <a href="{% url 'council:session_list' %}"
-         class="btn btn-outline-light btn-sm fw-semibold d-inline-flex align-items-center gap-1 shadow-sm">
+         class="btn btn-outline-light btn-sm fw-semibold d-inline-flex align-items-center gap-1 shadow-sm px-2.5 py-1"
+         style="font-size: 0.78rem;">
         <i class="bi bi-arrow-right"></i><span>قائمة الجلسات</span>
       </a>
     </div>
@@ -381,8 +429,8 @@
 
 {% block content %}
 
-{# ── شريط مؤشر التقدم الذكي ── #}
-<div class="stepper-container shadow-sm">
+{# ── شريط مؤشر التقدم الذكي (نسخة سطح المكتب) ── #}
+<div class="stepper-container shadow-sm d-none d-md-block">
   <div class="d-flex align-items-center justify-content-between">
     <div class="stepper-item {% if phase == 'B' %}done{% else %}active{% endif %}">
       <div class="stepper-circle">
@@ -400,6 +448,24 @@
       <div class="stepper-circle">3</div>
       <span class="text-muted ps-1">نشر للاطلاع المسبق</span>
     </div>
+  </div>
+</div>
+
+{# ── شريط التقدم الرشيق على الجوال والآيفون (Mobile Progress Ribbon) ── #}
+<div class="d-md-none bg-white p-2.5 px-3 rounded-3 shadow-sm border mb-3">
+  <div class="d-flex gap-1.5 mb-2" style="height: 5px;">
+    <div class="flex-grow-1 rounded-pill {% if phase == 'B' %}bg-success{% else %}bg-primary{% endif %}" style="height: 5px;"></div>
+    <div class="flex-grow-1 rounded-pill {% if phase == 'B' %}bg-primary{% else %}bg-secondary bg-opacity-25{% endif %}" style="height: 5px;"></div>
+    <div class="flex-grow-1 rounded-pill bg-secondary bg-opacity-25" style="height: 5px;"></div>
+  </div>
+  <div class="d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center gap-1.5 fw-bold text-navy" style="font-size: 0.8rem;">
+      <span class="badge" style="background: var(--agy-navy); color: var(--agy-gold); font-size: 0.72rem;">المرحلة {% if phase == 'B' %}2{% else %}1{% endif %} من 3</span>
+      <span>{% if phase == 'B' %}جدول الأعمال والموضوعات{% else %}بيانات الجلسة{% endif %}</span>
+    </div>
+    <span class="text-muted" style="font-size: 0.72rem;">
+      {% if phase == 'B' %}التالي: النشر للاطلاع{% else %}التالي: جدول الأعمال{% endif %}
+    </span>
   </div>
 </div>
 
@@ -532,20 +598,20 @@
             type="button" onclick="excludeAllEmptyCategories()"
             style="font-size:0.75rem;"
             title="استبعاد كافة العناوين التي لا تحتوي على مواضيع في هذه الجلسة لتنقية المحضر">
-      <i class="bi bi-eye-slash text-danger me-1"></i>إخفاء المحاور الخالية
+      <i class="bi bi-eye-slash text-danger me-1"></i><span class="d-none d-sm-inline">إخفاء المحاور الخالية</span><span class="d-sm-none">إخفاء الخالية</span>
     </button>
     {% endif %}
   </div>
 
   {# اليسار: أدوات العرض والتصفح الخاصة بكروت المحاور #}
   <div class="d-flex align-items-center gap-2">
-    <span class="text-muted small d-none d-sm-inline" style="font-size:0.78rem;">عرض المحاور:</span>
+    <span class="text-muted small d-none d-md-inline" style="font-size:0.78rem;">عرض المحاور:</span>
     <div class="btn-group btn-group-sm shadow-0" role="group">
       <button type="button" class="btn btn-outline-navy btn-sm py-1 px-2.5 fw-bold" onclick="setAllCategories(true)" title="فتح واستعراض كافة المحاور وموضوعاتها">
-        <i class="bi bi-arrows-expand text-primary me-1"></i>فتح كافة المحاور
+        <i class="bi bi-arrows-expand text-primary me-1"></i><span class="d-none d-sm-inline">فتح كافة المحاور</span><span class="d-sm-none">فتح الكل</span>
       </button>
       <button type="button" class="btn btn-outline-navy btn-sm py-1 px-2.5 fw-semibold" onclick="setAllCategories(false)" title="طي كافة المحاور لتلخيص الصفحة">
-        <i class="bi bi-arrows-collapse text-secondary me-1"></i>طي كافة المحاور
+        <i class="bi bi-arrows-collapse text-secondary me-1"></i><span class="d-none d-sm-inline">طي كافة المحاور</span><span class="d-sm-none">طي الكل</span>
       </button>
     </div>
   </div>
@@ -559,7 +625,7 @@
 
     {# هيدر العنوان الرئيسي المتميز بهوية المجال #}
     <div class="category-card-header" onclick="toggleCategorySection('{{ cat_key }}')">
-      <div class="d-flex align-items-center gap-2.5 flex-wrap">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
         <i class="bi bi-chevron-down fs-6 cat-toggle-icon" id="catIcon-{{ cat_key }}" style="color: {{ cat_data.theme.color }};"></i>
 
         <div class="category-title" style="color: {{ cat_data.theme.color }};">
@@ -573,13 +639,13 @@
         </span>
 
         {% if cat_data.topics|length > 0 %}
-        <span class="badge py-1 px-2.5 small fw-semibold cat-toggle-hint"
+        <span class="badge py-1 px-2.5 small fw-semibold cat-toggle-hint d-none d-sm-inline-block"
               id="catHint-{{ cat_key }}" data-has-topics="1"
               style="font-size:0.75rem; background-color: {{ cat_data.theme.bg_soft }}; color: {{ cat_data.theme.color }}; border: 1px solid {{ cat_data.theme.border_color }};">
           اضغط للطي ▲
         </span>
         {% else %}
-        <span class="badge bg-light text-muted border py-1 px-2.5 small fw-normal cat-toggle-hint"
+        <span class="badge bg-light text-muted border py-1 px-2.5 small fw-normal cat-toggle-hint d-none d-sm-inline-block"
               id="catHint-{{ cat_key }}" data-has-topics="0" style="font-size:0.75rem;">
           لا توجد موضوعات
         </span>
@@ -587,24 +653,24 @@
       </div>
 
       {# الأزرار على يسار هيدر العنوان الرئيسي #}
-      <div class="d-flex align-items-center gap-2" onclick="event.stopPropagation();">
+      <div class="d-flex align-items-center gap-2 category-header-actions" onclick="event.stopPropagation();">
         {# خيار استبعاد هذا العنوان من الجلسة إن لم تكن به مواضيع #}
         {% if cat_data.topics|length == 0 %}
-        <button class="btn btn-sm btn-outline-secondary py-1 px-2.5 rounded-pill border"
+        <button class="btn btn-sm btn-outline-secondary py-1 px-2 rounded-pill border"
                 style="font-size:0.75rem;"
                 title="استبعاد هذا العنوان من جدول أعمال هذه الجلسة لعدم وجود مواضيع لنقاشها فيه"
                 onclick="promptExcludeCategory('{{ cat_key }}', '{{ cat_data.label|escapejs }}')">
-          <i class="bi bi-eye-slash me-1 text-muted"></i>استبعاد العنوان من الجلسة
+          <i class="bi bi-eye-slash me-1 text-muted"></i><span class="d-none d-sm-inline">استبعاد العنوان من الجلسة</span><span class="d-sm-none">استبعاد</span>
         </button>
         {% endif %}
 
         {# الزر الحصري: إضافة موضوع جديد تحت هذا العنوان بلون المحور المتناسق #}
         {% if user_can_add_topic %}
-        <button class="btn btn-sm fw-bold px-3 py-1 shadow-sm d-inline-flex align-items-center gap-1.5 rounded-2 text-white"
-                style="background-color: {{ cat_data.theme.color }}; border-color: {{ cat_data.theme.color }};"
+        <button class="btn btn-sm fw-bold px-2.5 py-1 shadow-sm d-inline-flex align-items-center gap-1 rounded-2 text-white"
+                style="background-color: {{ cat_data.theme.color }}; border-color: {{ cat_data.theme.color }}; font-size: 0.78rem;"
                 onclick="openInlineTopicForm('{{ cat_key }}', '{{ cat_data.label|escapejs }}')">
           <i class="bi bi-plus-lg"></i>
-          <span>إضافة موضوع جديد</span>
+          <span><span class="d-none d-sm-inline">إضافة موضوع جديد</span><span class="d-sm-none">إضافة موضوع</span></span>
         </button>
         {% endif %}
       </div>

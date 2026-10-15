@@ -706,6 +706,142 @@
     .btn-action-secondary:hover {
       background: #CBD5E1;
     }
+
+    /* ════════════════════════════════════════════════════════════════════════
+       تصميم فائق التجاوب للأجهزة الذكية والآيفون (iPhone Responsive Fixes)
+       ════════════════════════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      body.login-page {
+        padding: 0.5rem 0.4rem 2rem;
+      }
+      .portal-card {
+        border-radius: 16px;
+      }
+      .portal-header {
+        padding: 1.25rem 1rem 1rem;
+      }
+      .portal-main-title {
+        font-size: 1.25rem;
+        line-height: 1.3;
+      }
+      .portal-main-subtitle {
+        font-size: 0.82rem;
+      }
+      .portal-command-bar {
+        padding: 0.5rem;
+        gap: 0.5rem;
+      }
+      .portal-search-box {
+        max-width: 100%;
+        padding: 0.35rem 0.6rem;
+      }
+      .btn-header-action {
+        width: 100%;
+        text-align: center;
+        padding: 0.5rem 0.8rem;
+        font-size: 0.82rem;
+      }
+      
+      /* شريط الخطوات الإرشادية - شريط أفقي انسيابي بدون انكسار عمودي */
+      .guided-steps-bar {
+        padding: 0.45rem 0.75rem;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        gap: 0.75rem;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      .guided-steps-bar::-webkit-scrollbar {
+        display: none;
+      }
+      .guided-step-item {
+        flex-shrink: 0;
+        font-size: 0.78rem;
+        white-space: nowrap;
+      }
+      .guided-step-divider {
+        display: none;
+      }
+
+      /* بوابات الكيانات الأكاديمية - إنهاء تداخل النصوص والأزرار بالكامل */
+      .gateway-header {
+        padding: 0.85rem 0.95rem;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.65rem;
+      }
+      .gateway-title-side {
+        width: 100%;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.65rem;
+      }
+      .gateway-title {
+        font-size: 0.98rem;
+        line-height: 1.35;
+        margin-bottom: 0.2rem;
+        word-break: break-word;
+      }
+      .gateway-subtitle {
+        font-size: 0.78rem;
+        line-height: 1.35;
+        word-break: break-word;
+      }
+      .gateway-action-side {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 0.55rem;
+        border-top: 1px solid #E2E8F0;
+        margin-top: 0.15rem;
+      }
+      .gateway-panel.active .gateway-action-side {
+        border-top-color: rgba(255, 255, 255, 0.15);
+      }
+      .gateway-action-button {
+        font-size: 0.82rem;
+        padding: 0.4rem 1.05rem;
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .gateway-count-pill {
+        font-size: 0.76rem;
+        padding: 0.22rem 0.65rem;
+      }
+
+      /* بطاقات المقاعد داخل البوابة */
+      .seats-grid {
+        grid-template-columns: 1fr;
+        gap: 0.65rem;
+      }
+      .seat-card {
+        padding: 0.75rem 0.85rem;
+      }
+      .seat-entity-title {
+        font-size: 0.92rem;
+      }
+      .member-name-text {
+        font-size: 0.82rem;
+      }
+      .card-enter-bar {
+        font-size: 0.78rem;
+        padding: 0.38rem 0.75rem;
+      }
+      .quick-remember-banner {
+        padding: 0.85rem 1rem;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+      }
+      .quick-remember-banner > div:last-child {
+        justify-content: flex-end;
+      }
+    }
   </style>
 </head>
 <body class="login-page">
@@ -746,6 +882,18 @@
       </div>
     </div>
 
+    <!-- Alert Messages -->
+    {% if messages %}
+      <div class="px-3 px-md-4 pt-3 pb-0">
+        {% for message in messages %}
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show rounded-3 mb-2 fw-bold" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
     <!-- Guided 3-Step Strip (Strictly Text Only, Dignified Language) -->
     <div class="guided-steps-bar">
       <div class="guided-step-item">
@@ -763,18 +911,6 @@
         <span>أدخل كلمة المرور الشخصية المعتمدة</span>
       </div>
     </div>
-
-    <!-- Alert Messages -->
-    {% if messages %}
-      <div class="px-4 pt-3 pb-0">
-        {% for message in messages %}
-          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show rounded-3 mb-2 fw-bold" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
 
     <!-- Main Portal Body -->
     <div class="p-3 p-md-4">
@@ -809,7 +945,7 @@
             <div class="gateway-header" onclick="toggleGateway('{{ cat.key }}')">
               <div class="gateway-title-side">
                 <span class="gateway-state-indicator" id="indicator-{{ cat.key }}">[ مغلقة ]</span>
-                <div>
+                <div class="gateway-title-stack" style="min-width: 0; flex: 1;">
                   <div class="gateway-title">{{ cat.title }}</div>
                   <div class="gateway-subtitle">{{ cat.subtitle }}</div>
                 </div>
