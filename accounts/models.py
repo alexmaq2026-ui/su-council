@@ -290,14 +290,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     def can_grant_permissions(self):
         return self._has_perm('can_grant_permissions')
 
-    # Granular Operation & Screen Properties (57 total)
+    # Granular Operation & Screen Properties (58 total)
     # 1. Sessions & Screens
     @property
     def can_view_sessions(self):       return self._has_perm('can_view_sessions')
     @property
     def can_view_draft_sessions(self): return self._has_perm('can_view_draft_sessions')
     @property
+    def can_view_past_sessions(self):  return self._has_perm('can_view_past_sessions')
+    @property
     def can_add_session(self):         return self._has_perm('can_add_session')
+    @property
+    def can_prepare_agenda(self):      return self._has_perm('can_prepare_agenda')
     @property
     def can_edit_session(self):        return self._has_perm('can_edit_session')
     @property
@@ -458,13 +462,13 @@ class User(AbstractBaseUser, PermissionsMixin):
 class CouncilPermission(models.Model):
     """
     Granular Smart Permission Matrix.
-    Contains 57 discrete screen and button/operation permissions.
+    Contains 58 discrete screen and button/operation permissions.
     Zero default permissions - all controlled explicitly by Admin.
     """
     ALL_PERMISSION_FIELDS = [
         # 1. Sessions
-        'can_view_sessions', 'can_view_draft_sessions',
-        'can_add_session', 'can_edit_session', 'can_delete_session',
+        'can_view_sessions', 'can_view_draft_sessions', 'can_view_past_sessions',
+        'can_add_session', 'can_prepare_agenda', 'can_edit_session', 'can_delete_session',
         'can_view_attendance', 'can_manage_attendance',
         'can_export_minutes', 'can_verify_integrity',
         # 2. Topics
@@ -525,7 +529,10 @@ class CouncilPermission(models.Model):
     # 1. Sessions Screens & Operations
     can_view_sessions       = models.BooleanField('عرض شاشة قائمة الجلسات وتفاصيل الجلسة', default=False)
     can_view_draft_sessions = models.BooleanField('عرض الجلسات في مرحلة التحضير (المسودة)', default=False)
+    can_view_past_sessions  = models.BooleanField('الاطلاع على الجلسات السابقة', default=False,
+                                                  help_text='استعراض أرشيف ومحاضر وتفاصيل ومواضيع الجلسات السابقة للمجلس التي تسبق الجلسة الأخيرة')
     can_add_session         = models.BooleanField('إنشاء جلسة جديدة', default=False)
+    can_prepare_agenda      = models.BooleanField('إعداد جدول الأعمال (الشاشة المخصصة)', default=False)
     can_edit_session        = models.BooleanField('تعديل بيانات الجلسة', default=False)
     can_delete_session      = models.BooleanField('حذف الجلسة', default=False)
     can_view_attendance     = models.BooleanField('عرض كشف الحضور والغياب في الجلسة', default=False)
@@ -627,7 +634,7 @@ class CouncilPermission(models.Model):
                 u._cached_council_perm = self
 
     def count_granted(self):
-        """Return total number of granted permissions (out of 57)."""
+        """Return total number of granted permissions (out of 58)."""
         return sum(1 for f in self.ALL_PERMISSION_FIELDS if getattr(self, f, False))
 
     def get_permissions_list(self):

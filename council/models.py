@@ -73,6 +73,19 @@ def user_can_view_drafts(user):
     )
 
 
+def user_can_view_past_sessions(user):
+    """
+    Check if user has permission to view previous council sessions (sessions prior to the latest session).
+    Superusers and users with can_view_past_sessions permission can view previous sessions.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if getattr(user, 'is_super', False):
+        return True
+    perm = user.get_permission() if hasattr(user, 'get_permission') else None
+    return bool(perm and getattr(perm, 'can_view_past_sessions', False))
+
+
 # ── Council Session ────────────────────────────────────────────────────────────
 class CouncilSession(models.Model):
     """Represents one council meeting/session with full 5-stage lifecycle."""
@@ -98,6 +111,61 @@ class CouncilSession(models.Model):
                                                 help_text='مثال: 1448هـ - 2026/2027م')
     status                    = models.CharField('الحالة والمرحلة', max_length=20, choices=SESSION_STATUS, default='draft')
     agenda_notes              = models.TextField('ملاحظات جدول الأعمال', blank=True)
+    custom_categories_json    = models.TextField('تصنيفات جدول الأعمال المخصصة', blank=True, default='')
+
+    def get_agenda_categories(self):
+        """
+        Returns list of dicts:
+        [{'key': 'general', 'label': 'المواضيع العامة', 'is_custom': False}, ...]
+        """
+        import json
+        if self.custom_categories_json:
+            try:
+                data = json.loads(self.custom_categories_json)
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+            except Exception:
+                pass
+        return [
+            {'key': k, 'label': l, 'is_custom': False}
+            for k, l in TOPIC_CATEGORIES
+        ]
+
+    def set_agenda_categories(self, categories_list):
+        """Saves category configuration as JSON."""
+        import json
+        self.custom_categories_json = json.dumps(categories_list, ensure_ascii=False)
+        self.save(update_fields=['custom_categories_json'])
+
+    def add_custom_category(self, label):
+        """Adds a new custom category to this session."""
+        import time
+        cats = self.get_agenda_categories()
+        clean_lbl = label.strip()
+        key = f"c_{int(time.time()) % 1000000}"
+        cats.append({'key': key, 'label': clean_lbl, 'is_custom': True})
+        self.set_agenda_categories(cats)
+        return key, clean_lbl
+
+    def remove_agenda_category(self, key):
+        """Removes/excludes a category from this session if it has no topics."""
+        if self.topics.filter(category=key).exists():
+            return False, "لا يمكن استبعاد عنوان رئيسي يحتوي على موضوعات مدرجة."
+        cats = [c for c in self.get_agenda_categories() if c['key'] != key]
+        self.set_agenda_categories(cats)
+        return True, "تم استبعاد العنوان الرئيسي من جدول أعمال هذه الجلسة بنجاح."
+
+    def restore_standard_category(self, key):
+        """Restores a previously excluded standard category to this session's agenda."""
+        cats = self.get_agenda_categories()
+        if any(c['key'] == key for c in cats):
+            return False, "هذا العنوان مدرج بالفعل في جدول أعمال الجلسة."
+        standard_map = dict(TOPIC_CATEGORIES)
+        if key not in standard_map:
+            return False, "رمز العنوان غير صالح."
+        cats.append({'key': key, 'label': standard_map[key], 'is_custom': False})
+        self.set_agenda_categories(cats)
+        return True, standard_map[key]
 
     # Lifecycle tracking fields
     frozen_at                 = models.DateTimeField('تاريخ التجميد', null=True, blank=True)
@@ -230,11 +298,31 @@ class CouncilSession(models.Model):
     def is_frozen(self):
         return self.status in ('frozen', 'closed')
 
+    def is_past_session(self, user=None):
+        """
+        Check if this session is a previous session (strictly prior to the latest accessible session).
+        Ordering is -date, -session_number.
+        """
+        qs = CouncilSession.objects.all()
+        if user and not user_can_view_drafts(user):
+            qs = qs.exclude(status='draft')
+        latest = qs.order_by('-date', '-session_number').first()
+        if not latest:
+            return False
+        return self.pk != latest.pk
+
     def can_be_seen_by(self, user):
-        """Check if user can see this session (draft visibility restriction)."""
-        if self.status != 'draft':
+        """Check if user can see this session (draft visibility and past session restriction)."""
+        if not user or not user.is_authenticated:
+            return False
+        if getattr(user, 'is_super', False):
             return True
-        return user_can_view_drafts(user)
+        if self.status == 'draft' and not user_can_view_drafts(user):
+            return False
+        if not getattr(user, 'can_view_past_sessions', False):
+            if self.is_past_session(user):
+                return False
+        return True
 
     def get_status_color(self):
         colors = {
@@ -738,6 +826,26 @@ class Topic(models.Model):
         verbose_name = 'موضوع'
         verbose_name_plural = 'المواضيع'
         ordering = ['category', 'sub_order', 'order_number']
+
+    def clean_fields(self, exclude=None):
+        if exclude is None:
+            exclude = []
+        else:
+            exclude = list(exclude)
+        if 'category' not in exclude:
+            exclude.append('category')
+        super().clean_fields(exclude=exclude)
+
+    def get_category_display(self):
+        """Return human-readable label for standard or custom categories."""
+        for k, v in TOPIC_CATEGORIES:
+            if k == self.category:
+                return v
+        if hasattr(self, 'session') and self.session and hasattr(self.session, 'get_agenda_categories'):
+            for cat in self.session.get_agenda_categories():
+                if cat['key'] == self.category:
+                    return cat['label']
+        return self.category
 
     def __str__(self):
         return f'{self.get_category_display()} – {self.title[:60]}'

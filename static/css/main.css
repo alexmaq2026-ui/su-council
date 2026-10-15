@@ -99,12 +99,15 @@ a:hover { color: var(--gold); }
 }
 
 .uc-navbar .nav-link {
-  color: rgba(255,255,255,0.8) !important;
+  color: rgba(255,255,255,0.85) !important;
   font-weight: 500;
-  font-size: 0.9rem;
-  padding: 0.45rem 0.8rem;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.65rem;
   border-radius: var(--radius-sm);
   transition: var(--transition);
+  white-space: nowrap !important;
+  display: inline-flex;
+  align-items: center;
 }
 
 .uc-navbar .nav-link:hover,

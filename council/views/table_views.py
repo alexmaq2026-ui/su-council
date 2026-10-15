@@ -33,7 +33,7 @@ PRESET_SUM_COLS_MAP = {
 @login_required(login_url='/login/')
 def table_create_view(request, topic_pk):
     """Create a new dynamic table for a topic."""
-    if not (request.user.can_add_table or request.user.is_super):
+    if not (request.user.can_add_table or request.user.is_super or getattr(request.user, 'can_prepare_agenda', False)):
         messages.error(request, 'ليس لديك صلاحية لإضافة جداول.')
         return redirect('/dashboard/')
 
@@ -121,6 +121,8 @@ def table_create_view(request, topic_pk):
             notes=notes
         )
         messages.success(request, f'تمت إضافة الجدول «{table.title}» بنجاح.')
+        if request.GET.get('next') == 'prepare' or session.status == 'draft':
+            return redirect('council:session_prepare_edit', pk=session.pk)
         return redirect('council:topic_detail', pk=topic.pk)
 
     context = {
@@ -144,7 +146,7 @@ def table_create_view(request, topic_pk):
 @login_required(login_url='/login/')
 def table_edit_view(request, pk):
     """Edit an existing dynamic table (headers, rows, sum settings)."""
-    if not (request.user.can_edit_table or request.user.is_super):
+    if not (request.user.can_edit_table or request.user.is_super or getattr(request.user, 'can_prepare_agenda', False)):
         messages.error(request, 'ليس لديك صلاحية لتعديل الجداول.')
         return redirect('/dashboard/')
 
@@ -224,6 +226,8 @@ def table_edit_view(request, pk):
         table.sum_columns = sum_columns
         table.save()
         messages.success(request, f'تم تحديث الجدول «{table.title}» بنجاح.')
+        if request.GET.get('next') == 'prepare' or session.status == 'draft':
+            return redirect('council:session_prepare_edit', pk=session.pk)
         return redirect('council:topic_detail', pk=topic.pk)
 
     # Format current rows as text for textarea fallback
@@ -254,14 +258,17 @@ def table_edit_view(request, pk):
 @login_required(login_url='/login/')
 def table_delete_view(request, pk):
     """Delete a table from a topic."""
-    if not (request.user.can_delete_table or request.user.is_super):
+    if not (request.user.can_delete_table or request.user.is_super or getattr(request.user, 'can_prepare_agenda', False)):
         messages.error(request, 'ليس لديك صلاحية لحذف الجداول.')
         return redirect('/dashboard/')
 
-    table = get_object_or_404(TopicTable.objects.select_related('topic'), pk=pk)
+    table = get_object_or_404(TopicTable.objects.select_related('topic', 'topic__session'), pk=pk)
     topic_pk = table.topic.pk
+    session = table.topic.session
 
     title = table.title
     table.delete()
     messages.success(request, f'تم حذف الجدول «{title}» بنجاح.')
+    if request.GET.get('next') == 'prepare' or session.status == 'draft':
+        return redirect('council:session_prepare_edit', pk=session.pk)
     return redirect('council:topic_detail', pk=topic_pk)

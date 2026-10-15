@@ -70,7 +70,7 @@
         <div class="p-3 bg-white rounded-3 border border-2 border-gold shadow-sm mb-3">
           <div class="form-check form-switch fs-5 d-flex align-items-center justify-content-between m-0">
             <label class="form-check-label fw-bold text-navy cursor-pointer" for="master-select-all" style="cursor: pointer;">
-              منح كافة صلاحيات النظام دفعة واحدة (شامل - 57 صلاحية)
+              منح كافة صلاحيات النظام دفعة واحدة (شامل - 58 صلاحية)
             </label>
             <input class="form-check-input" type="checkbox" id="master-select-all" style="cursor: pointer; width: 2.8em; height: 1.4em;">
           </div>
@@ -178,10 +178,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusBadge = document.getElementById('granted-status-badge');
   const totalCount = allCheckboxes.length;
 
-  // Direct boolean injection for guaranteed state accuracy across all 57 permissions
+  // Direct boolean injection for guaranteed state accuracy across all 58 permissions
   const activeFields = [
     {% if permission_obj.can_view_sessions %}'can_view_sessions',{% endif %}
     {% if permission_obj.can_view_draft_sessions %}'can_view_draft_sessions',{% endif %}
+    {% if permission_obj.can_view_past_sessions %}'can_view_past_sessions',{% endif %}
     {% if permission_obj.can_add_session %}'can_add_session',{% endif %}
     {% if permission_obj.can_edit_session %}'can_edit_session',{% endif %}
     {% if permission_obj.can_delete_session %}'can_delete_session',{% endif %}
@@ -336,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'can_view_notifications', 'can_use_smart_reader', 'can_change_password'
     ],
     secretary: [
-      'can_view_sessions', 'can_view_draft_sessions', 'can_view_topics',
+      'can_view_sessions', 'can_view_draft_sessions', 'can_view_past_sessions', 'can_view_topics',
       'can_view_attendance', 'can_manage_attendance', 'can_export_minutes',
       'can_verify_integrity', 'can_view_attachments', 'can_listen_audio',
       'can_vote', 'can_view_vote_details', 'can_draft_decision', 'can_delete_decision',
@@ -350,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'can_change_password'
     ],
     director: [
-      'can_view_sessions', 'can_view_draft_sessions', 'can_add_session', 'can_edit_session',
+      'can_view_sessions', 'can_view_draft_sessions', 'can_view_past_sessions', 'can_add_session', 'can_edit_session',
       'can_view_attendance', 'can_manage_attendance', 'can_export_minutes', 'can_verify_integrity',
       'can_view_topics', 'can_add_topic', 'can_edit_topic', 'can_change_topic_status', 'can_import_topics',
       'can_add_table', 'can_edit_table', 'can_delete_table',

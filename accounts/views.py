@@ -424,9 +424,20 @@ def dashboard_view(request):
             if not user_can_view_drafts(user):
                 sessions_qs = sessions_qs.exclude(status='draft')
                 topics_qs = topics_qs.exclude(session__status='draft')
+
+            has_past_perm = bool(user.is_super or getattr(user, 'can_view_past_sessions', False))
+            if not has_past_perm:
+                latest_session = sessions_qs.order_by('-date', '-session_number').first()
+                if latest_session:
+                    sessions_qs = sessions_qs.filter(pk=latest_session.pk)
+                    topics_qs = topics_qs.filter(session_id=latest_session.pk)
+                else:
+                    sessions_qs = sessions_qs.none()
+                    topics_qs = topics_qs.none()
+
             stats['total_sessions'] = sessions_qs.count()
             stats['active_sessions'] = sessions_qs.filter(status='active').count()
-            recent_sessions = list(sessions_qs.order_by('-date')[:5])
+            recent_sessions = list(sessions_qs.order_by('-date', '-session_number')[:5])
             if user.is_super or user.can_view_topics:
                 stats['total_topics'] = topics_qs.count()
                 stats['voted_topics'] = topics_qs.filter(status='voted').count()

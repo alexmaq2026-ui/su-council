@@ -314,6 +314,8 @@ def _search_topics_unified(
     vote_result: str = '',
     topic_status: str = '',
     include_drafts: bool = False,
+    include_past_sessions: bool = True,
+    allowed_session_id: int = None,
 ) -> dict:
     """Execute unified smart search across Topics, Decisions, Smart Tables (TopicTable),
     Signed Decisions, Votes, Attachments, and Recordings.
@@ -326,6 +328,16 @@ def _search_topics_unified(
 
     if not include_drafts:
         qs = qs.exclude(session__status='draft')
+
+    if not include_past_sessions:
+        if allowed_session_id:
+            qs = qs.filter(session_id=allowed_session_id)
+        else:
+            latest_id = qs.order_by('-session__date', '-session__session_number').values_list('session_id', flat=True).first()
+            if latest_id:
+                qs = qs.filter(session_id=latest_id)
+            else:
+                qs = qs.none()
 
     if scope == 'session' and session_id:
         qs = qs.filter(session_id=session_id)
@@ -728,6 +740,19 @@ def _render_unified_search(request, default_mode: str = 'all'):
         'parsed_query': extract_query_tokens(query),
     }
 
+    has_past_perm = bool(user.is_super or getattr(user, 'can_view_past_sessions', False))
+
+    sessions_qs = CouncilSession.objects.order_by('-date', '-session_number')
+    if not include_drafts:
+        sessions_qs = sessions_qs.exclude(status='draft')
+
+    latest_accessible_session = sessions_qs.first() if not has_past_perm else None
+    if not has_past_perm:
+        if latest_accessible_session:
+            sessions_qs = sessions_qs.filter(pk=latest_accessible_session.pk)
+        else:
+            sessions_qs = sessions_qs.none()
+
     if searched:
         search_data = _search_topics_unified(
             query=query,
@@ -739,11 +764,9 @@ def _render_unified_search(request, default_mode: str = 'all'):
             vote_result=vote_result,
             topic_status=topic_status,
             include_drafts=include_drafts,
+            include_past_sessions=has_past_perm,
+            allowed_session_id=latest_accessible_session.pk if latest_accessible_session else None,
         )
-
-    sessions_qs = CouncilSession.objects.order_by('-date', '-session_number')
-    if not include_drafts:
-        sessions_qs = sessions_qs.exclude(status='draft')
 
     all_sessions = list(sessions_qs.values(
         'id', 'session_number', 'title', 'date', 'academic_year', 'status'

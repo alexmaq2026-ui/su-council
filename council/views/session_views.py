@@ -8,6 +8,7 @@ requests (previous session not yet frozen), audit log and manual backup.
 All views require login. Permission checks use user.can_* properties.
 Server-side lifecycle enforcement also lives in council.middleware.
 """
+import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -87,6 +88,14 @@ def session_list_view(request):
     if not user_can_view_drafts(request.user):
         qs = qs.exclude(status='draft')
 
+    has_past_perm = bool(request.user.is_super or getattr(request.user, 'can_view_past_sessions', False))
+    if not has_past_perm:
+        latest_session = qs.first()
+        if latest_session:
+            qs = qs.filter(pk=latest_session.pk)
+        else:
+            qs = qs.none()
+
     # Optional status filter
     status_filter = request.GET.get('status', '')
     if status_filter in STAGE_LABELS:
@@ -102,13 +111,16 @@ def session_list_view(request):
     page_obj = paginator.get_page(page_number)
 
     # Distinct academic years for filter dropdown
-    all_years = (
-        CouncilSession.objects
-        .exclude(academic_year='')
-        .values_list('academic_year', flat=True)
-        .distinct()
-        .order_by('-academic_year')
-    )
+    if not has_past_perm:
+        all_years = qs.exclude(academic_year='').values_list('academic_year', flat=True).distinct()
+    else:
+        all_years = (
+            CouncilSession.objects
+            .exclude(academic_year='')
+            .values_list('academic_year', flat=True)
+            .distinct()
+            .order_by('-academic_year')
+        )
 
     can_approve = _can_approve_new_session(request.user)
     pending_requests = (
@@ -153,7 +165,10 @@ def session_detail_view(request, pk):
         pk=pk
     )
     if not session.can_be_seen_by(request.user):
-        messages.error(request, 'هذه الجلسة في مرحلة التحضير ولا يمكن الاطلاع عليها حالياً.')
+        if session.status == 'draft':
+            messages.error(request, 'هذه الجلسة في مرحلة التحضير ولا يمكن الاطلاع عليها حالياً.')
+        else:
+            messages.error(request, 'ليس لديك صلاحية للاطلاع على الجلسات السابقة للمجلس.')
         return redirect('council:session_list')
 
     # Fetch all topics with related data in as few queries as possible
@@ -164,10 +179,12 @@ def session_detail_view(request, pk):
         .order_by('category', 'sub_order', 'order_number')
     )
 
-    # Group topics by category preserving TOPIC_CATEGORIES order
+    # Group topics by category preserving session categories order
     topics_by_category = {}
     if request.user.is_super or request.user.can_view_topics:
-        for cat_key, cat_label in TOPIC_CATEGORIES:
+        for cat in session.get_agenda_categories():
+            cat_key = cat['key']
+            cat_label = cat['label']
             cat_topics = [t for t in topics if t.category == cat_key]
             if cat_topics:
                 topics_by_category[cat_label] = cat_topics
@@ -313,6 +330,184 @@ def session_create_view(request):
         'action':     'create',
     }
     return render(request, 'council/session_form.html', context)
+
+
+# ── Session Prepare (Agenda Builder – Dedicated Screen) ───────────────────────
+
+CATEGORY_THEMES = {
+    'general': {
+        'color': '#1e3a8a',          # Royal Navy
+        'bg_soft': '#eff6ff',
+        'border_color': '#93c5fd',
+        'icon': 'bi-building',
+        'badge_bg': '#dbeafe',
+        'badge_text': '#1e40af',
+    },
+    'appointments': {
+        'color': '#059669',          # Emerald Green
+        'bg_soft': '#ecfdf5',
+        'border_color': '#6ee7b7',
+        'icon': 'bi-person-plus-fill',
+        'badge_bg': '#d1fae5',
+        'badge_text': '#065f46',
+    },
+    'academic': {
+        'color': '#4338ca',          # Deep Indigo
+        'bg_soft': '#eef2ff',
+        'border_color': '#a5b4fc',
+        'icon': 'bi-mortarboard-fill',
+        'badge_bg': '#e0e7ff',
+        'badge_text': '#3730a3',
+    },
+    'postgrad': {
+        'color': '#7c3aed',          # Royal Purple
+        'bg_soft': '#f5f3ff',
+        'border_color': '#c4b5fd',
+        'icon': 'bi-award-fill',
+        'badge_bg': '#ede9fe',
+        'badge_text': '#5b21b6',
+    },
+    'students': {
+        'color': '#d97706',          # Warm Amber
+        'bg_soft': '#fffbeb',
+        'border_color': '#fcd34d',
+        'icon': 'bi-people-fill',
+        'badge_bg': '#fef3c7',
+        'badge_text': '#92400e',
+    },
+    'centers': {
+        'color': '#0284c7',          # Sky Blue
+        'bg_soft': '#f0f9ff',
+        'border_color': '#7dd3fc',
+        'icon': 'bi-cpu-fill',
+        'badge_bg': '#e0f2fe',
+        'badge_text': '#075985',
+    },
+    'new_business': {
+        'color': '#e11d48',          # Crimson / Rose
+        'bg_soft': '#fff1f2',
+        'border_color': '#fda4af',
+        'icon': 'bi-lightning-charge-fill',
+        'badge_bg': '#ffe4e6',
+        'badge_text': '#9f1239',
+    },
+}
+
+DEFAULT_CUSTOM_THEME = {
+    'color': '#b45309',              # Dark Gold / Bronze
+    'bg_soft': '#fffdf5',
+    'border_color': '#fde68a',
+    'icon': 'bi-folder-check',
+    'badge_bg': '#fef3c7',
+    'badge_text': '#78350f',
+}
+
+
+@login_required(login_url='/login/')
+def session_prepare_view(request, pk=None):
+    """
+    الشاشة الموحدة الحصرية لإعداد جدول الأعمال.
+    المرحلة A: إنشاء بيانات الجلسة أو تعديلها.
+    المرحلة B (بعد الحفظ): عرض العناوين الرئيسية تفاعلياً مع أزرار إضافة المواضيع.
+    تتطلب صلاحية can_prepare_agenda. تعمل فقط على جلسات في مرحلة draft.
+    """
+    user = request.user
+    if not (user.is_super or user.can_prepare_agenda):
+        messages.error(request, 'ليس لديك صلاحية للوصول إلى شاشة إعداد جدول الأعمال.')
+        return redirect('council:session_list')
+
+    session = None
+    form_errors = None
+
+    # ── Load existing session if pk provided ──
+    if pk:
+        session = get_object_or_404(CouncilSession, pk=pk)
+        if session.status != 'draft':
+            messages.error(request, 'لا يمكن تعديل جدول أعمال جلسة بعد مرحلة التحضير.')
+            return redirect('council:session_detail', pk=pk)
+
+    # ── POST: save session data (Phase A) ──
+    if request.method == 'POST' and 'save_session' in request.POST:
+        if session:
+            form = SessionForm(request.POST, instance=session)
+        else:
+            # م2 gate check
+            blocked, last_session, approved_request = _new_session_gate(user)
+            if blocked and approved_request is None:
+                messages.error(request, 'الجلسة السابقة لم تُغلق بعد. يرجى طلب موافقة مسبقة.')
+                return redirect('council:session_list')
+            form = SessionForm(request.POST)
+
+        if form.is_valid():
+            obj = form.save(commit=False)
+            if not session:
+                obj.created_by = user
+                obj.status = 'draft'
+                obj.stage_changed_at = timezone.now()
+                obj.stage_changed_by = user
+                if 'approved_request' in dir() and approved_request:
+                    approved_request.used = True
+                    approved_request.save(update_fields=['used'])
+            obj.save()
+            log_action(user, 'create' if not session else 'update', obj=obj, request=request,
+                       notes='إعداد جدول الأعمال – حفظ بيانات الجلسة')
+            messages.success(request, f'تم حفظ بيانات الجلسة رقم {obj.session_number} بنجاح.')
+            return redirect('council:session_prepare_edit', pk=obj.pk)
+        else:
+            form_errors = form
+            session = session  # keep existing
+
+    # ── Build context ──
+    if session:
+        form = SessionForm(instance=session)
+        categories = session.get_agenda_categories()
+        all_topics = list(
+            session.topics
+            .prefetch_related('attachments', 'tables')
+            .order_by('category', 'sub_order', 'order_number')
+        )
+        topics_by_category = {}
+        for cat in categories:
+            cat_key = cat['key']
+            theme = CATEGORY_THEMES.get(cat_key, DEFAULT_CUSTOM_THEME)
+            topics_by_category[cat_key] = {
+                'label': cat['label'],
+                'is_custom': cat.get('is_custom', False),
+                'theme': theme,
+                'topics': [t for t in all_topics if t.category == cat_key],
+            }
+        existing_keys = {cat['key'] for cat in categories}
+        excluded_standard_categories = [
+            {'key': k, 'label': l}
+            for k, l in TOPIC_CATEGORIES
+            if k not in existing_keys
+        ]
+    else:
+        form = form_errors or SessionForm()
+        topics_by_category = None
+        excluded_standard_categories = []
+
+    from council.models import TABLE_PRESET_CHOICES
+    from council.views.table_views import PRESET_HEADERS_MAP, PRESET_SUM_COLS_MAP
+
+    context = {
+        'form':               form,
+        'session':            session,
+        'topics_by_category': topics_by_category,
+        'topic_categories':   TOPIC_CATEGORIES,
+        'excluded_standard_categories': excluded_standard_categories,
+        'page_title':         'إعداد جدول الأعمال' if not session else f'إعداد جدول أعمال الجلسة رقم {session.session_number}',
+        'phase':              'B' if session else 'A',
+        'user_can_add_topic':    user.is_super or user.can_add_topic or getattr(user, 'can_prepare_agenda', False),
+        'user_can_edit_topic':   user.is_super or user.can_edit_topic or getattr(user, 'can_prepare_agenda', False),
+        'user_can_delete_topic': user.is_super or user.can_delete_topic or getattr(user, 'can_prepare_agenda', False),
+        'user_can_upload':       user.is_super or user.can_upload_attachments or getattr(user, 'can_prepare_agenda', False),
+        'user_can_add_table':    user.is_super or user.can_add_table or getattr(user, 'can_prepare_agenda', False),
+        'preset_choices':        TABLE_PRESET_CHOICES,
+        'presets_json':          json.dumps(PRESET_HEADERS_MAP, ensure_ascii=False),
+        'preset_sum_cols_json':  json.dumps(PRESET_SUM_COLS_MAP, ensure_ascii=False),
+    }
+    return render(request, 'council/session_prepare.html', context)
 
 
 # ── Session Edit ───────────────────────────────────────────────────────────────

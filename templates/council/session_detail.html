@@ -55,6 +55,14 @@
           <i class="bi bi-broadcast"></i><span>الانتقال للقاعة الحية 🔴</span>
         </a>
       {% endif %}
+
+      {% if session.status == 'draft' and user_can_add_topic %}
+        <a href="{% url 'council:session_prepare_edit' pk=session.pk %}"
+           class="btn btn-navy btn-sm session-header-btn fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
+          <i class="bi bi-journal-plus"></i><span>إعداد جدول الأعمال</span>
+        </a>
+      {% endif %}
+
       
       {% if user_can_view_analytics %}
         <a href="{% url 'council:session_analytics' session_pk=session.pk %}" class="btn btn-outline-light btn-sm session-header-btn d-inline-flex align-items-center gap-1">
@@ -74,6 +82,14 @@
           <i class="bi bi-gear-fill"></i><span>إدارة الجلسة</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1" aria-labelledby="sessionActionsDropdown" style="font-size: 0.82rem; min-width: 195px; border-radius: 8px; z-index: 1050;">
+          {% if session.status == 'draft' and user_can_add_topic %}
+          <li>
+            <a class="dropdown-item py-1 fw-bold text-navy" href="{% url 'council:session_prepare_edit' pk=session.pk %}">
+              <i class="bi bi-journal-plus text-navy me-2"></i>إعداد جدول الأعمال
+            </a>
+          </li>
+          <li><hr class="dropdown-divider my-1"></li>
+          {% endif %}
           {% if user_can_add_topic %}
           <li>
             <a class="dropdown-item py-1.5" href="{% url 'council:topic_create' session_pk=session.pk %}">
@@ -363,9 +379,17 @@
           </button>
         {% endif %}
         {% if user_can_add_topic %}
-          <a href="{% url 'council:topic_create' session_pk=session.pk %}" class="btn btn-sm btn-navy">
-            موضوع جديد
-          </a>
+          {% if session.status == 'draft' %}
+            <a href="{% url 'council:session_prepare_edit' pk=session.pk %}"
+               class="btn btn-sm btn-navy fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
+              <i class="bi bi-journal-plus text-gold"></i>
+              <span>إعداد وتجهيز جدول الأعمال</span>
+            </a>
+          {% else %}
+            <a href="{% url 'council:topic_create' session_pk=session.pk %}" class="btn btn-sm btn-outline-navy">
+              <i class="bi bi-plus-lg me-1"></i>موضوع جديد
+            </a>
+          {% endif %}
         {% endif %}
       </div>
     </div>
@@ -509,16 +533,24 @@
         <i class="bi bi-folder-x display-4 text-muted mb-3"></i>
         <h5 class="fw-bold">لا توجد موضوعات مدرجة في جدول الأعمال حتى الآن</h5>
         <p class="text-muted">قم بإضافة أول موضوع أو استيراد الموضوعات مباشرة من ملف Word.</p>
-        {% if user_can_add_topic or user_can_import_topics %}
-          <div class="d-flex justify-content-center gap-2 mt-3">
+        {% if session.status == 'draft' %}
+          <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
             {% if user_can_add_topic %}
-              <a href="{% url 'council:topic_create' session_pk=session.pk %}" class="btn btn-navy">
-                إضافة موضوع يدوي
+              <a href="{% url 'council:session_prepare_edit' pk=session.pk %}" class="btn btn-navy px-4 fw-bold shadow-sm">
+                <i class="bi bi-journal-plus text-gold me-2"></i>فتح شاشة إعداد وتجهيز جدول الأعمال المخصصة
+              </a>
+            {% endif %}
+          </div>
+        {% elif user_can_add_topic or user_can_import_topics %}
+          <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
+            {% if user_can_add_topic %}
+              <a href="{% url 'council:topic_create' session_pk=session.pk %}" class="btn btn-outline-navy">
+                <i class="bi bi-plus-lg me-1"></i>إضافة موضوع يدوي
               </a>
             {% endif %}
             {% if user_can_import_topics %}
               <a href="{% url 'council:topic_import' session_pk=session.pk %}" class="btn btn-outline-primary">
-                استيراد من Word
+                <i class="bi bi-file-earmark-word me-1"></i>استيراد من Word
               </a>
             {% endif %}
           </div>

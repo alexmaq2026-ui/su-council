@@ -12,25 +12,27 @@ from council.models import (
 
 class TopicForm(forms.ModelForm):
     """Form for creating/editing a topic."""
+    category = forms.CharField(max_length=30, required=True, widget=forms.Select)
 
     class Meta:
         model = Topic
         fields = [
             'category', 'order_number', 'title',
+            'memo_number', 'memo_date', 'presenting_entity',
             'background', 'priorities', 'mentioned_persons',
         ]
         labels = {
-            'category':         'تصنيف الموضوع',
-            'order_number':     'رقم الترتيب',
-            'title':            'عنوان الموضوع',
-            'background':       'الحيثيات والخلفية',
-            'priorities':       'الأولويات والمقترحات',
+            'category':          'تصنيف الموضوع',
+            'order_number':      'رقم الترتيب',
+            'title':             'عنوان الموضوع',
+            'memo_number':       'رقم المذكرة الواردة',
+            'memo_date':         'تاريخ المذكرة الواردة',
+            'presenting_entity': 'الجهة العارضة',
+            'background':        'الحيثيات والخلفية',
+            'priorities':        'الأولويات والمقترحات',
             'mentioned_persons': 'الأشخاص المذكورون',
         }
         widgets = {
-            'category': forms.Select(attrs={
-                'class': 'form-select',
-            }),
             'order_number': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'min': '1',
@@ -39,9 +41,21 @@ class TopicForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': 'أدخل عنوان الموضوع',
             }),
+            'memo_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'مثال: ق/24/115',
+            }),
+            'memo_date': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'مثال: 1448/02/14هـ',
+            }),
+            'presenting_entity': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'مثال: كلية الطب',
+            }),
             'background': forms.Textarea(attrs={
                 'class': 'form-control',
-                'rows': 6,
+                'rows': 5,
                 'placeholder': 'اكتب الحيثيات والخلفية هنا...',
             }),
             'priorities': forms.Textarea(attrs={
@@ -58,10 +72,30 @@ class TopicForm(forms.ModelForm):
             'mentioned_persons': 'أدخل الأسماء مفصولة بفاصلة – تُستخدم في البحث',
         }
 
+    def __init__(self, *args, **kwargs):
+        session = kwargs.pop('session', None)
+        super().__init__(*args, **kwargs)
+        self.fields['order_number'].required = False
+
+        target_session = session
+        if not target_session and self.instance and getattr(self.instance, 'session_id', None):
+            try:
+                target_session = self.instance.session
+            except Exception:
+                target_session = None
+
+        if target_session and hasattr(target_session, 'get_agenda_categories'):
+            cats = target_session.get_agenda_categories()
+            choices = [(c['key'], c['label']) for c in cats]
+        else:
+            choices = list(TOPIC_CATEGORIES)
+
+        self.fields['category'].widget = forms.Select(choices=choices, attrs={'class': 'form-select'})
+
     def clean_order_number(self):
         n = self.cleaned_data.get('order_number')
-        if n is not None and n <= 0:
-            raise forms.ValidationError('رقم الترتيب يجب أن يكون عدداً موجباً.')
+        if not n or n <= 0:
+            return 1
         return n
 
 

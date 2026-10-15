@@ -50,7 +50,10 @@ def topic_detail_view(request, pk):
         pk=pk
     )
     if not topic.session.can_be_seen_by(request.user):
-        messages.error(request, 'هذه الجلسة في مرحلة التحضير ولا يمكن الاطلاع على مواضيعها حالياً.')
+        if topic.session.status == 'draft':
+            messages.error(request, 'هذه الجلسة في مرحلة التحضير ولا يمكن الاطلاع على مواضيعها حالياً.')
+        else:
+            messages.error(request, 'ليس لديك صلاحية للاطلاع على مواضيع ومرفقات الجلسات السابقة.')
         return redirect('/dashboard/')
 
     user = request.user
@@ -111,6 +114,11 @@ def topic_create_view(request, session_pk):
         return redirect('/dashboard/')
 
     session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    # حصر وتوجيه إعداد وإضافة الموضوعات في مرحلة التحضير للشاشة المخصصة حصرياً
+    if session.status == 'draft':
+        messages.info(request, 'يتم تجهيز وإعداد وإضافة موضوعات الجلسة حصرياً عبر شاشة إعداد جدول الأعمال المخصصة.')
+        return redirect('council:session_prepare_edit', pk=session_pk)
 
     if request.method == 'POST':
         form = TopicForm(request.POST)
@@ -531,3 +539,457 @@ def import_word_view(request, session_pk):
         'existing_topics_count': session.topics.count(),
     }
     return render(request, 'council/import_word.html', context)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Agenda Prepare – AJAX API Endpoints (الشاشة الموحدة لإعداد جدول الأعمال)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@login_required(login_url='/login/')
+@require_POST
+def api_agenda_topic_add(request, session_pk):
+    """
+    AJAX: إضافة موضوع جديد من شاشة إعداد جدول الأعمال.
+    تتطلب صلاحية can_add_topic أو can_prepare_agenda. الجلسة يجب أن تكون في مرحلة draft.
+    """
+    if not (request.user.is_super or request.user.can_add_topic or getattr(request.user, 'can_prepare_agenda', False)):
+        return JsonResponse({'success': False, 'error': 'ليس لديك صلاحية لإضافة مواضيع.'}, status=403)
+
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+    if session.status != 'draft':
+        return JsonResponse({'success': False, 'error': 'لا يمكن إضافة مواضيع إلا في مرحلة التحضير.'}, status=400)
+
+    form = TopicForm(request.POST, session=session)
+    if form.is_valid():
+        topic = form.save(commit=False)
+        topic.session    = session
+        topic.created_by = request.user
+
+        # حساب الترتيب الفرعي بدقة داخل التبويب
+        last_in_cat = Topic.objects.filter(session=session, category=topic.category).order_by('-sub_order').first()
+        topic.sub_order = (last_in_cat.sub_order + 1) if last_in_cat else 1
+
+        # ضبط الترتيب العام
+        if not topic.order_number or topic.order_number >= 999:
+            last_topic = Topic.objects.filter(session=session).order_by('-order_number').first()
+            topic.order_number = (last_topic.order_number + 1) if last_topic else 1
+
+        topic.save()
+
+        # رفع أوليات الموضوع إن وُجدت مع طلب الحفظ
+        uploaded_files = request.FILES.getlist('attachments')
+        for f in uploaded_files:
+            TopicAttachment.objects.create(
+                topic=topic,
+                file=f,
+                file_name=f.name,
+                file_size=f.size,
+                file_type=os.path.splitext(f.name)[1].lstrip('.').lower(),
+                uploaded_by=request.user
+            )
+
+        # إنشاء جدول بيانات فوري إن طُلب مع كامل هيكله وقوالبه وصفوفه
+        table_type = request.POST.get('table_type', 'custom')
+        table_title = request.POST.get('table_title', '').strip()
+        table_headers_raw = request.POST.get('table_headers_json', '').strip()
+        table_rows_raw = request.POST.get('table_rows_json', '').strip()
+        table_sum_cols_raw = request.POST.get('table_sum_cols_json', '').strip()
+        table_notes = request.POST.get('table_notes', '').strip()
+        create_table = (request.POST.get('create_table') == '1') or bool(table_title) or bool(table_rows_raw and table_rows_raw != '[]')
+
+        if create_table:
+            from council.models import TopicTable, TABLE_PRESET_CHOICES
+            from council.views.table_views import PRESET_HEADERS_MAP, PRESET_SUM_COLS_MAP
+
+            headers = []
+            if table_headers_raw:
+                try:
+                    parsed_h = json.loads(table_headers_raw)
+                    if isinstance(parsed_h, list):
+                        headers = [str(h).strip() for h in parsed_h if str(h).strip()]
+                except Exception:
+                    pass
+            if not headers:
+                headers = PRESET_HEADERS_MAP.get(table_type, ['م', 'البيان', 'ملاحظات'])
+
+            rows_data = []
+            if table_rows_raw:
+                try:
+                    parsed_r = json.loads(table_rows_raw)
+                    if isinstance(parsed_r, list):
+                        for r in parsed_r:
+                            if isinstance(r, list):
+                                rows_data.append([str(c) if c is not None else '' for c in r])
+                except Exception:
+                    pass
+
+            sum_columns = []
+            if table_sum_cols_raw:
+                try:
+                    parsed_s = json.loads(table_sum_cols_raw)
+                    if isinstance(parsed_s, list):
+                        for c in parsed_s:
+                            if str(c).isdigit():
+                                sum_columns.append(int(c))
+                except Exception:
+                    pass
+            elif table_type in PRESET_SUM_COLS_MAP:
+                sum_columns = PRESET_SUM_COLS_MAP[table_type]
+
+            default_title = dict(TABLE_PRESET_CHOICES).get(table_type, 'جدول الموضوع')
+            TopicTable.objects.create(
+                topic=topic,
+                table_type=table_type,
+                title=table_title or default_title,
+                headers=headers,
+                rows_data=rows_data,
+                sum_columns=sum_columns,
+                order=1,
+                notes=table_notes
+            )
+
+        first_tbl = topic.tables.first()
+        tbl_url = f'/tables/{first_tbl.pk}/edit/?next=prepare' if first_tbl else f'/topics/{topic.pk}/tables/new/?next=prepare'
+
+        return JsonResponse({
+            'success':     True,
+            'topic_id':    topic.pk,
+            'title':       topic.title,
+            'category':    topic.category,
+            'sub_order':   topic.sub_order,
+            'order_number': topic.order_number,
+            'has_priorities': bool(topic.priorities),
+            'attachments_count': topic.attachments.count(),
+            'tables_count': topic.tables.count(),
+            'edit_url':    f'/topics/{topic.pk}/edit/',
+            'delete_url':  f'/api/agenda/topics/{topic.pk}/delete/',
+            'attach_url':  f'/api/agenda/topics/{topic.pk}/attachments/',
+            'table_url':   tbl_url,
+        })
+    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+
+@login_required(login_url='/login/')
+@require_POST
+def api_agenda_category_add(request, session_pk):
+    """
+    AJAX: إضافة عنوان رئيسي جديد أو استرجاع عنوان رسمي تم استبعاده.
+    """
+    if not (request.user.is_super or request.user.can_add_topic or getattr(request.user, 'can_prepare_agenda', False)):
+        return JsonResponse({'success': False, 'error': 'ليس لديك صلاحية لإدارة العناوين الرئيسية.'}, status=403)
+
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+    if session.status != 'draft':
+        return JsonResponse({'success': False, 'error': 'لا يمكن التعديل إلا في مرحلة التحضير.'}, status=400)
+
+    restore_key = request.POST.get('restore_key', '').strip()
+    if restore_key:
+        ok, res = session.restore_standard_category(restore_key)
+        if not ok:
+            return JsonResponse({'success': False, 'error': res}, status=400)
+        return JsonResponse({'success': True, 'key': restore_key, 'label': res, 'is_restored': True})
+
+    label = request.POST.get('label', '').strip()
+    if not label:
+        return JsonResponse({'success': False, 'error': 'يرجى كتابة اسم العنوان الرئيسي أو اختيار عنوان لاسترجاعه.'}, status=400)
+
+    key, clean_label = session.add_custom_category(label)
+    return JsonResponse({'success': True, 'key': key, 'label': clean_label, 'is_restored': False})
+
+
+@login_required(login_url='/login/')
+@require_POST
+def api_agenda_category_delete(request, session_pk):
+    """
+    AJAX: استبعاد عنوان رئيسي من جدول أعمال الجلسة إذا لم تكن به مواضيع.
+    """
+    if not (request.user.is_super or request.user.can_delete_topic or getattr(request.user, 'can_prepare_agenda', False)):
+        return JsonResponse({'success': False, 'error': 'ليس لديك صلاحية لاستبعاد عناوين رئيسية.'}, status=403)
+
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+    if session.status != 'draft':
+        return JsonResponse({'success': False, 'error': 'لا يمكن التعديل إلا في مرحلة التحضير.'}, status=400)
+
+    key = request.POST.get('category_key', '').strip()
+    if not key:
+        return JsonResponse({'success': False, 'error': 'رمز العنوان غير محدد.'}, status=400)
+
+    ok, msg = session.remove_agenda_category(key)
+    if not ok:
+        return JsonResponse({'success': False, 'error': msg}, status=400)
+    return JsonResponse({'success': True, 'message': msg, 'key': key})
+
+
+@login_required(login_url='/login/')
+def api_agenda_topic_get(request, pk):
+    """
+    AJAX: جلب بيانات الموضوع بصيغة JSON نقية لتعبئة نافذة التعديل السريع فورياً.
+    """
+    if not (request.user.is_super or request.user.can_edit_topic or getattr(request.user, 'can_prepare_agenda', False)):
+        return JsonResponse({'success': False, 'error': 'غير مصرح.'}, status=403)
+
+    topic = get_object_or_404(Topic.objects.select_related('session'), pk=pk)
+    return JsonResponse({
+        'success': True,
+        'topic': {
+            'id': topic.pk,
+            'title': topic.title,
+            'category': topic.category,
+            'memo_number': topic.memo_number or '',
+            'memo_date': topic.memo_date or '',
+            'presenting_entity': topic.presenting_entity or '',
+            'mentioned_persons': topic.mentioned_persons or '',
+            'background': topic.background or '',
+            'priorities': topic.priorities or '',
+            'order_number': topic.order_number,
+            'sub_order': topic.sub_order,
+        }
+    })
+
+
+@login_required(login_url='/login/')
+@require_POST
+def api_agenda_topic_update(request, pk):
+    """
+    AJAX: تعديل موضوع من شاشة إعداد جدول الأعمال مع إرجاع كامل الحقول المحدثة.
+    """
+    if not (request.user.is_super or request.user.can_edit_topic or getattr(request.user, 'can_prepare_agenda', False)):
+        return JsonResponse({'success': False, 'error': 'ليس لديك صلاحية لتعديل المواضيع.'}, status=403)
+
+    topic = get_object_or_404(Topic.objects.select_related('session'), pk=pk)
+    if topic.session.status != 'draft':
+        return JsonResponse({'success': False, 'error': 'لا يمكن التعديل إلا في مرحلة التحضير.'}, status=400)
+
+    form = TopicForm(request.POST, instance=topic, session=topic.session)
+    if form.is_valid():
+        topic = form.save()
+        return JsonResponse({
+            'success':           True,
+            'topic_id':          topic.pk,
+            'title':             topic.title,
+            'category':          topic.category,
+            'memo_number':       topic.memo_number or '',
+            'memo_date':         topic.memo_date or '',
+            'presenting_entity': topic.presenting_entity or '',
+            'sub_order':         topic.sub_order,
+            'has_priorities':    bool(topic.priorities),
+        })
+    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+
+@login_required(login_url='/login/')
+def api_agenda_topic_table_get(request, pk):
+    """
+    AJAX: جلب جدول بيانات الموضوع لعرضه وتحريره في شاشة فلاشية داخلية دون مغادرة الصفحة.
+    """
+    if not (request.user.is_super or request.user.can_add_table or getattr(request.user, 'can_prepare_agenda', False)):
+        return JsonResponse({'success': False, 'error': 'غير مصرح.'}, status=403)
+
+    topic = get_object_or_404(Topic.objects.select_related('session').prefetch_related('tables'), pk=pk)
+    table = topic.tables.first()
+    if not table:
+        return JsonResponse({
+            'success': True,
+            'has_table': False,
+            'topic_title': topic.title,
+        })
+
+    return JsonResponse({
+        'success': True,
+        'has_table': True,
+        'table_id': table.pk,
+        'table_type': table.table_type,
+        'title': table.title,
+        'headers': table.headers,
+        'rows_data': table.rows_data,
+        'sum_columns': table.sum_columns,
+        'notes': table.notes or '',
+        'topic_title': topic.title,
+    })
+
+
+@login_required(login_url='/login/')
+@require_POST
+def api_agenda_topic_table_save(request, pk):
+    """
+    AJAX: حفظ أو تعديل جدول بيانات الموضوع مباشرة داخل نفس الشاشة الفلاشية.
+    """
+    if not (request.user.is_super or request.user.can_add_table or getattr(request.user, 'can_prepare_agenda', False)):
+        return JsonResponse({'success': False, 'error': 'ليس لديك صلاحية لإدارة الجداول.'}, status=403)
+
+    topic = get_object_or_404(Topic.objects.select_related('session').prefetch_related('tables'), pk=pk)
+    if topic.session.status != 'draft':
+        return JsonResponse({'success': False, 'error': 'لا يمكن التعديل إلا في مرحلة التحضير.'}, status=400)
+
+    from council.models import TopicTable, TABLE_PRESET_CHOICES
+    from council.views.table_views import PRESET_HEADERS_MAP, PRESET_SUM_COLS_MAP
+
+    table_type = request.POST.get('table_type', 'custom')
+    table_title = request.POST.get('table_title', '').strip()
+    table_headers_raw = request.POST.get('table_headers_json', '').strip()
+    table_rows_raw = request.POST.get('table_rows_json', '').strip()
+    table_sum_cols_raw = request.POST.get('table_sum_cols_json', '').strip()
+    table_notes = request.POST.get('table_notes', '').strip()
+
+    headers = []
+    if table_headers_raw:
+        try:
+            parsed_h = json.loads(table_headers_raw)
+            if isinstance(parsed_h, list):
+                headers = [str(h).strip() for h in parsed_h if str(h).strip()]
+        except Exception:
+            pass
+    if not headers:
+        headers = PRESET_HEADERS_MAP.get(table_type, ['م', 'البيان', 'ملاحظات'])
+
+    rows_data = []
+    if table_rows_raw:
+        try:
+            parsed_r = json.loads(table_rows_raw)
+            if isinstance(parsed_r, list):
+                for r in parsed_r:
+                    if isinstance(r, list):
+                        rows_data.append([str(c) if c is not None else '' for c in r])
+        except Exception:
+            pass
+
+    sum_columns = []
+    if table_sum_cols_raw:
+        try:
+            parsed_s = json.loads(table_sum_cols_raw)
+            if isinstance(parsed_s, list):
+                for c in parsed_s:
+                    if str(c).isdigit():
+                        sum_columns.append(int(c))
+        except Exception:
+            pass
+    elif table_type in PRESET_SUM_COLS_MAP:
+        sum_columns = PRESET_SUM_COLS_MAP[table_type]
+
+    default_title = dict(TABLE_PRESET_CHOICES).get(table_type, 'جدول الموضوع')
+    final_title = table_title or default_title
+
+    table = topic.tables.first()
+    if table:
+        table.table_type = table_type
+        table.title = final_title
+        table.headers = headers
+        table.rows_data = rows_data
+        table.sum_columns = sum_columns
+        table.notes = table_notes
+        table.save()
+    else:
+        table = TopicTable.objects.create(
+            topic=topic,
+            table_type=table_type,
+            title=final_title,
+            headers=headers,
+            rows_data=rows_data,
+            sum_columns=sum_columns,
+            order=1,
+            notes=table_notes
+        )
+
+    return JsonResponse({
+        'success':      True,
+        'table_id':     table.pk,
+        'title':        table.title,
+        'rows_count':   len(table.rows_data),
+        'cols_count':   len(table.headers),
+        'tables_count': topic.tables.count(),
+    })
+
+
+@login_required(login_url='/login/')
+@require_POST
+def api_agenda_topic_delete(request, pk):
+    """
+    AJAX: حذف موضوع من شاشة إعداد جدول الأعمال.
+    تتطلب صلاحية can_delete_topic أو can_prepare_agenda. الجلسة يجب أن تكون draft.
+    """
+    if not (request.user.is_super or request.user.can_delete_topic or getattr(request.user, 'can_prepare_agenda', False)):
+        return JsonResponse({'success': False, 'error': 'ليس لديك صلاحية لحذف المواضيع.'}, status=403)
+
+    topic = get_object_or_404(Topic.objects.select_related('session'), pk=pk)
+    if topic.session.status != 'draft':
+        return JsonResponse({'success': False, 'error': 'لا يمكن الحذف إلا في مرحلة التحضير.'}, status=400)
+
+    title    = topic.title
+    category = topic.category
+    topic.delete()
+    return JsonResponse({'success': True, 'title': title, 'category': category})
+
+
+@login_required(login_url='/login/')
+def api_agenda_topic_attachments(request, pk):
+    """
+    AJAX GET: قائمة مرفقات الموضوع.
+    AJAX POST (multipart): رفع مرفق جديد (أوليات الموضوع).
+    تتطلب صلاحية can_upload_attachments أو can_prepare_agenda. الجلسة يجب أن تكون draft.
+    """
+    topic = get_object_or_404(Topic.objects.select_related('session').prefetch_related('attachments'), pk=pk)
+
+    if request.method == 'GET':
+        if not (request.user.is_super or request.user.can_view_attachments or request.user.can_upload_attachments or getattr(request.user, 'can_prepare_agenda', False)):
+            return JsonResponse({'success': False, 'error': 'غير مصرح.'}, status=403)
+        attachments = [
+            {
+                'id':        a.pk,
+                'name':      a.file_name,
+                'url':       a.file.url if a.file else '',
+                'uploaded_at': a.uploaded_at.strftime('%Y-%m-%d %H:%M') if hasattr(a, 'uploaded_at') else '',
+                'delete_url': f'/api/agenda/attachments/{a.pk}/delete/',
+            }
+            for a in topic.attachments.all()
+        ]
+        return JsonResponse({'success': True, 'attachments': attachments})
+
+    # POST – upload
+    if not (request.user.is_super or request.user.can_upload_attachments or getattr(request.user, 'can_prepare_agenda', False)):
+        return JsonResponse({'success': False, 'error': 'ليس لديك صلاحية لرفع المرفقات.'}, status=403)
+    if topic.session.status != 'draft':
+        return JsonResponse({'success': False, 'error': 'لا يمكن رفع الأوليات إلا في مرحلة التحضير.'}, status=400)
+
+    form = AttachmentForm(request.POST, request.FILES)
+    if form.is_valid():
+        attachment = form.save(commit=False)
+        attachment.topic       = topic
+        attachment.uploaded_by = request.user
+        attachment.save()
+        return JsonResponse({
+            'success': True,
+            'id':      attachment.pk,
+            'name':    attachment.file_name,
+            'url':     attachment.file.url if attachment.file else '',
+            'delete_url': f'/api/agenda/attachments/{attachment.pk}/delete/',
+        })
+    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+
+@login_required(login_url='/login/')
+@require_POST
+def api_agenda_attachment_delete(request, pk):
+    """
+    AJAX: حذف مرفق من شاشة إعداد جدول الأعمال.
+    تتطلب صلاحية can_delete_attachments أو can_prepare_agenda. الجلسة يجب أن تكون draft.
+    """
+    if not (request.user.is_super or request.user.can_delete_attachments or getattr(request.user, 'can_prepare_agenda', False)):
+        return JsonResponse({'success': False, 'error': 'ليس لديك صلاحية لحذف المرفقات.'}, status=403)
+
+    attachment = get_object_or_404(
+        TopicAttachment.objects.select_related('topic__session'), pk=pk
+    )
+    if attachment.topic.session.status != 'draft':
+        return JsonResponse({'success': False, 'error': 'لا يمكن الحذف إلا في مرحلة التحضير.'}, status=400)
+
+    name = attachment.file_name
+    # Remove physical file if exists
+    if attachment.file:
+        try:
+            if os.path.isfile(attachment.file.path):
+                os.remove(attachment.file.path)
+        except Exception:
+            pass
+    attachment.delete()
+    return JsonResponse({'success': True, 'name': name})
+
