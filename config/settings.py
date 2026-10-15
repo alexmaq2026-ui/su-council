@@ -121,8 +121,8 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # ── Cloud Storage (Supabase Media Storage) ──────────────────────────────────
-SUPABASE_URL = os.getenv('SUPABASE_URL', '').rstrip('/')
-SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
+SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://hhqrohrclfekmjqhlaet.supabase.co').rstrip('/')
+SUPABASE_KEY = os.getenv('SUPABASE_KEY', 'sb_publishable_4cBv9I9tNFWSaTYbLxs3fA_bGBHifXz')
 SUPABASE_STORAGE_BUCKET = os.getenv('SUPABASE_STORAGE_BUCKET', 'council-media')
 
 if SUPABASE_URL and SUPABASE_KEY:
