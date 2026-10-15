@@ -1027,7 +1027,8 @@ class TopicAttachment(models.Model):
 
     def save(self, *args, **kwargs):
         if self.file:
-            self.file_name = self.file.name.split('/')[-1]
+            if not self.file_name:
+                self.file_name = self.file.name.split('/')[-1]
             ext = self.file_name.rsplit('.', 1)[-1].lower() if '.' in self.file_name else ''
             self.file_type = ext
             try:

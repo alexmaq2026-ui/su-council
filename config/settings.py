@@ -120,6 +120,25 @@ if not DEBUG:
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# ── Cloud Storage (Supabase Media Storage) ──────────────────────────────────
+SUPABASE_URL = os.getenv('SUPABASE_URL', '').rstrip('/')
+SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
+SUPABASE_STORAGE_BUCKET = os.getenv('SUPABASE_STORAGE_BUCKET', 'council-media')
+
+if SUPABASE_URL and SUPABASE_KEY:
+    DEFAULT_STORAGE_BACKEND = 'config.storage.SupabaseMediaStorage'
+else:
+    DEFAULT_STORAGE_BACKEND = 'django.core.files.storage.FileSystemStorage'
+
+STORAGES = {
+    'default': {
+        'BACKEND': DEFAULT_STORAGE_BACKEND,
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage' if not DEBUG else 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+}
+
 # ── Crispy Forms ──────────────────────────────────────────────────────────────
 CRISPY_ALLOWED_TEMPLATE_PACKS = 'bootstrap5'
 CRISPY_TEMPLATE_PACK = 'bootstrap5'

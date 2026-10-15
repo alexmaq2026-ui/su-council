@@ -14,3 +14,4 @@ psycopg2-binary>=2.9.9
 dj-database-url>=2.1.0
 openpyxl>=3.1.0
 edge-tts>=6.1.0
+requests>=2.31.0

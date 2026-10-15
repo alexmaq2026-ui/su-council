@@ -253,6 +253,8 @@ def attachment_upload_view(request, topic_pk):
             attachment = form.save(commit=False)
             attachment.topic       = topic
             attachment.uploaded_by = request.user
+            if request.FILES.get('file'):
+                attachment.file_name = request.FILES['file'].name
             attachment.save()
             messages.success(request, f'تم رفع الملف "{attachment.file_name}" بنجاح.')
             return redirect('council:topic_detail', pk=topic.pk)
@@ -955,6 +957,8 @@ def api_agenda_topic_attachments(request, pk):
         attachment = form.save(commit=False)
         attachment.topic       = topic
         attachment.uploaded_by = request.user
+        if request.FILES.get('file'):
+            attachment.file_name = request.FILES['file'].name
         attachment.save()
         return JsonResponse({
             'success': True,
