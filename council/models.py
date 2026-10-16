@@ -18,6 +18,76 @@ TOPIC_CATEGORIES = [
     ('new_business', 'ما استجد من أعمال'),
 ]
 
+# ── Visual Identity / Themes for Council Topics & Categories ───────────────────
+CATEGORY_THEMES = {
+    'general': {
+        'color': '#1e3a8a',          # Royal Navy
+        'bg_soft': '#eff6ff',
+        'border_color': '#93c5fd',
+        'icon': 'bi-building',
+        'badge_bg': '#dbeafe',
+        'badge_text': '#1e40af',
+    },
+    'appointments': {
+        'color': '#059669',          # Emerald Green
+        'bg_soft': '#ecfdf5',
+        'border_color': '#6ee7b7',
+        'icon': 'bi-person-plus-fill',
+        'badge_bg': '#d1fae5',
+        'badge_text': '#065f46',
+    },
+    'academic': {
+        'color': '#4338ca',          # Deep Indigo
+        'bg_soft': '#eef2ff',
+        'border_color': '#a5b4fc',
+        'icon': 'bi-mortarboard-fill',
+        'badge_bg': '#e0e7ff',
+        'badge_text': '#3730a3',
+    },
+    'postgrad': {
+        'color': '#7c3aed',          # Royal Purple
+        'bg_soft': '#f5f3ff',
+        'border_color': '#c4b5fd',
+        'icon': 'bi-award-fill',
+        'badge_bg': '#ede9fe',
+        'badge_text': '#5b21b6',
+    },
+    'students': {
+        'color': '#d97706',          # Warm Amber
+        'bg_soft': '#fffbeb',
+        'border_color': '#fcd34d',
+        'icon': 'bi-people-fill',
+        'badge_bg': '#fef3c7',
+        'badge_text': '#92400e',
+    },
+    'centers': {
+        'color': '#0284c7',          # Sky Blue
+        'bg_soft': '#f0f9ff',
+        'border_color': '#7dd3fc',
+        'icon': 'bi-cpu-fill',
+        'badge_bg': '#e0f2fe',
+        'badge_text': '#075985',
+    },
+    'new_business': {
+        'color': '#e11d48',          # Crimson / Rose
+        'bg_soft': '#fff1f2',
+        'border_color': '#fda4af',
+        'icon': 'bi-lightning-charge-fill',
+        'badge_bg': '#ffe4e6',
+        'badge_text': '#9f1239',
+    },
+}
+
+DEFAULT_CUSTOM_THEME = {
+    'color': '#b45309',              # Dark Gold / Bronze
+    'bg_soft': '#fffdf5',
+    'border_color': '#fde68a',
+    'icon': 'bi-folder-check',
+    'badge_bg': '#fef3c7',
+    'badge_text': '#78350f',
+}
+
+
 SESSION_STATUS = [
     ('draft',         'مسودة – تحضير'),
     ('publishing',    'منشورة – للاطلاع المسبق'),
@@ -846,6 +916,35 @@ class Topic(models.Model):
                 if cat['key'] == self.category:
                     return cat['label']
         return self.category
+
+    @property
+    def category_theme(self):
+        """Return the approved visual theme dict for this topic's category."""
+        return CATEGORY_THEMES.get(self.category, DEFAULT_CUSTOM_THEME)
+
+    @property
+    def category_color(self):
+        return self.category_theme['color']
+
+    @property
+    def category_icon(self):
+        return self.category_theme['icon']
+
+    @property
+    def category_bg_soft(self):
+        return self.category_theme['bg_soft']
+
+    @property
+    def category_border_color(self):
+        return self.category_theme['border_color']
+
+    @property
+    def category_badge_bg(self):
+        return self.category_theme['badge_bg']
+
+    @property
+    def category_badge_text(self):
+        return self.category_theme['badge_text']
 
     def __str__(self):
         return f'{self.get_category_display()} – {self.title[:60]}'

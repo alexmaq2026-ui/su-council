@@ -33,7 +33,8 @@ from django.views.decorators.http import require_POST, require_GET
 from council.models import (
     CouncilSession, Topic, Vote, EntitySeat, Attendance,
     TopicDisplayState, SpeakRequest, SessionRecording, ExitPermit,
-    LiveSessionPresence, TOPIC_CATEGORIES, user_can_view_drafts
+    LiveSessionPresence, TOPIC_CATEGORIES, user_can_view_drafts,
+    CATEGORY_THEMES, DEFAULT_CUSTOM_THEME,
 )
 
 
@@ -180,13 +181,18 @@ def session_live_view(request, session_pk):
     progress_pct = round((completed_topics_count / total_topics_count) * 100) if total_topics_count else 0
 
     topics_by_category = []
-    for cat_key, cat_label in TOPIC_CATEGORIES:
+    categories = session.get_agenda_categories()
+    for cat in categories:
+        cat_key = cat['key']
+        cat_label = cat['label']
         cat_topics = [t for t in topics if t.category == cat_key]
         if cat_topics:
             has_active = any((active_topic and t.pk == active_topic.pk) or t.display_state.display_status in ('shown', 'voting') for t in cat_topics)
+            theme = CATEGORY_THEMES.get(cat_key, DEFAULT_CUSTOM_THEME)
             topics_by_category.append({
                 'key': cat_key,
                 'label': cat_label,
+                'theme': theme,
                 'topics': cat_topics,
                 'has_active': has_active,
             })
@@ -1031,6 +1037,11 @@ def api_speak_queue(request, session_pk):
             'id': t.pk,
             'category': t.category,
             'category_label': t.get_category_display(),
+            'category_color': t.category_color,
+            'category_icon': t.category_icon,
+            'category_bg_soft': t.category_bg_soft,
+            'category_badge_bg': t.category_badge_bg,
+            'category_badge_text': t.category_badge_text,
             'sub_order': t.sub_order,
             'ordinal_label': t.ordinal_label,
             'title': t.title,

@@ -414,7 +414,8 @@ def dashboard_view(request):
         'voted_topics': 0,
         'total_users': 0,
     }
-    recent_sessions = []
+    active_session = None
+    latest_session = None
 
     if user.is_super or user.can_view_sessions:
         try:
@@ -437,7 +438,8 @@ def dashboard_view(request):
 
             stats['total_sessions'] = sessions_qs.count()
             stats['active_sessions'] = sessions_qs.filter(status='active').count()
-            recent_sessions = list(sessions_qs.order_by('-date', '-session_number')[:5])
+            active_session = sessions_qs.filter(status='active').first()
+            latest_session = sessions_qs.order_by('-date', '-session_number').first()
             if user.is_super or user.can_view_topics:
                 stats['total_topics'] = topics_qs.count()
                 stats['voted_topics'] = topics_qs.filter(status='voted').count()
@@ -448,14 +450,16 @@ def dashboard_view(request):
         stats['total_users'] = User.objects.filter(is_active=True).count()
 
     context = {
-        'title': 'لوحة التحكم',
+        'title': 'الرئيسية',
         'stats': stats,
         'total_sessions': stats.get('total_sessions', 0),
         'active_sessions': stats.get('active_sessions', 0),
         'total_topics': stats.get('total_topics', 0),
         'voted_topics': stats.get('voted_topics', 0),
         'total_users': stats.get('total_users', 0),
-        'recent_sessions': recent_sessions,
+        'active_session': active_session,
+        'latest_session': latest_session,
+        'featured_session': active_session or latest_session,
         'user': user,
         'has_any_permission': user.has_any_permission,
     }

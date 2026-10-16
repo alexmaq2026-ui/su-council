@@ -90,6 +90,14 @@
           </a>
         </li>
         {% endif %}
+        {% if user.has_any_permission %}
+        <li class="nav-item">
+          <a class="nav-link {% if request.path == '/dashboard/' or request.path == '/' %}active{% endif %}"
+             href="/dashboard/">
+            <i class="bi bi-house-door me-1"></i>الرئيسية
+          </a>
+        </li>
+        {% endif %}
         {% if user.is_super or user.can_view_sessions %}
         <li class="nav-item">
           <a class="nav-link {% if '/sessions' in request.path and not is_on_live_page %}active{% endif %}"
@@ -304,7 +312,7 @@
       {% endif %}
       {% if user.has_any_permission %}
       <a href="/dashboard/" class="sidebar-link {% if request.path == '/dashboard/' %}active{% endif %}">
-        <i class="bi bi-speedometer2"></i><span>لوحة التحكم</span>
+        <i class="bi bi-house-door"></i><span>الرئيسية</span>
       </a>
       {% endif %}
       {% if user.is_super or user.can_view_sessions %}

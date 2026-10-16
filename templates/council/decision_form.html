@@ -10,7 +10,7 @@
       <h1 class="page-title">
         <i class="bi bi-file-earmark-check"></i>{{ page_title }}
       </h1>
-      <div class="page-subtitle">{{ topic.title }} (الجلسة رقم {{ session.session_number }})</div>
+      <div class="page-subtitle"><span class="badge rounded-pill px-2.5 py-1 me-2" style="background-color: {{ topic.category_color }}; color: #ffffff;"><i class="bi {{ topic.category_icon }} me-1"></i>{{ topic.get_category_display }}</span> {{ topic.title }} (الجلسة رقم {{ session.session_number }})</div>
     </div>
     <div>
       <a href="{% url 'council:topic_detail' pk=topic.pk %}" class="btn btn-outline-light btn-sm">
@@ -26,9 +26,12 @@
   <div class="col-12 col-md-10 col-lg-8">
     
     <!-- Topic Rationale Summary for the Drafter -->
-    <div class="uc-card shadow-sm mb-4">
-      <div class="uc-card-header bg-navy text-white">
-        <h5><i class="bi bi-info-circle text-gold"></i>ملخص الحيثيات والتصويت للاسترشاد</h5>
+    <div class="uc-card shadow-sm mb-4" style="border-right: 5px solid {{ topic.category_color }} !important;">
+      <div class="uc-card-header bg-navy text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0"><i class="bi bi-info-circle text-gold me-1"></i>ملخص الحيثيات والتصويت للاسترشاد</h5>
+        <span class="badge rounded-pill px-3 py-1.5 fw-bold" style="background-color: {{ topic.category_color }}; color: #ffffff;">
+          <i class="bi {{ topic.category_icon }} me-1"></i>{{ topic.get_category_display }} · {{ topic.ordinal_label }}
+        </span>
       </div>
       <div class="uc-card-body p-3 bg-light">
         <div class="small mb-2"><strong>الحيثيات:</strong> {{ topic.background|truncatewords:40 }}</div>

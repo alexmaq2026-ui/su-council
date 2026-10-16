@@ -448,11 +448,11 @@
     {% if results %}
       <div class="d-flex flex-column gap-3" id="search-results">
         {% for r in results %}
-          <div class="uc-search-card">
+          <div class="uc-search-card" style="border-right: 4px solid {{ r.topic.category_color }} !important;">
             <!-- Header Metadata & Action -->
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom">
               <div class="d-flex flex-wrap align-items-center gap-2">
-                <span class="cat-badge cat-{{ r.topic.category }}">{{ r.category_display }}</span>
+                <span class="cat-badge cat-{{ r.topic.category }}"><i class="bi {{ r.topic.category_icon }}"></i> {{ r.category_display }}</span>
                 <a href="{% url 'council:session_detail' pk=r.session.pk %}" class="badge bg-light text-navy border text-decoration-none">
                   الجلسة رقم {{ r.session.session_number }}
                 </a>

@@ -414,12 +414,14 @@ a:hover { color: var(--gold); }
   border-right-color: var(--gold);
 }
 
-.topic-card.category-general     { border-right-color: #3b82f6; }
-.topic-card.category-appointments{ border-right-color: #8b5cf6; }
-.topic-card.category-academic    { border-right-color: #10b981; }
-.topic-card.category-postgrad    { border-right-color: #f59e0b; }
-.topic-card.category-students    { border-right-color: #ef4444; }
-.topic-card.category-centers     { border-right-color: #14b8a6; }
+.topic-card.category-general     { border-right-color: #1e3a8a !important; }
+.topic-card.category-appointments{ border-right-color: #059669 !important; }
+.topic-card.category-academic    { border-right-color: #4338ca !important; }
+.topic-card.category-postgrad    { border-right-color: #7c3aed !important; }
+.topic-card.category-students    { border-right-color: #d97706 !important; }
+.topic-card.category-centers     { border-right-color: #0284c7 !important; }
+.topic-card.category-new_business{ border-right-color: #e11d48 !important; }
+
 
 /* ════════════════════════════════════════════════════════════════════════════
    VOTE BUTTONS — Priority Design (Mobile Friendly)
@@ -751,21 +753,29 @@ a:hover { color: var(--gold); }
   border: 1px dashed #cbd5e1 !important;
 }
 
-/* Category badges */
+/* Category badges - Visual Identity */
 .cat-badge {
   border-radius: 50px;
-  padding: 0.2rem 0.7rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+  padding: 0.22rem 0.75rem;
+  font-size: 0.76rem;
+  font-weight: 700;
   font-family: var(--font);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
-.cat-general      { background: #dbeafe; color: #1d4ed8; }
-.cat-appointments { background: #ede9fe; color: #7c3aed; }
-.cat-academic     { background: #d1fae5; color: #065f46; }
-.cat-postgrad     { background: #fef3c7; color: #92400e; }
-.cat-students     { background: #fee2e2; color: #991b1b; }
-.cat-centers      { background: #ccfbf1; color: #0f766e; }
+.cat-general, .cat-badge.cat-general           { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+.cat-appointments, .cat-badge.cat-appointments { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.cat-academic, .cat-badge.cat-academic         { background: #e0e7ff; color: #3730a3; border: 1px solid #a5b4fc; }
+.cat-postgrad, .cat-badge.cat-postgrad         { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
+.cat-students, .cat-badge.cat-students         { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.cat-centers, .cat-badge.cat-centers           { background: #e0f2fe; color: #075985; border: 1px solid #7dd3fc; }
+.cat-new_business, .cat-badge.cat-new_business { background: #ffe4e6; color: #9f1239; border: 1px solid #fda4af; }
+.cat-custom, .cat-badge.cat-custom             { background: #fef3c7; color: #78350f; border: 1px solid #fde68a; }
+
 
 /* ════════════════════════════════════════════════════════════════════════════
    FORMS

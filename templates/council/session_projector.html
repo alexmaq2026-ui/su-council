@@ -103,11 +103,13 @@
     </div>
 
     <!-- بطاقة الموضوع المعروض حالياً -->
-    <div class="card main-card shadow-lg p-4 mb-4">
+    <div class="card main-card shadow-lg p-4 mb-4" id="proj-main-card" style="border-right: 6px solid {{ active_topic.category_color|default:'#e0a96d' }} !important;">
       <div class="d-flex justify-content-between align-items-start mb-3 border-bottom pb-3">
         <div>
           <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="badge badge-gold px-3 py-1 fs-6" id="proj-topic-category">{{ active_topic.get_category_display|default:"جدول الأعمال" }}</span>
+            <span class="badge px-3 py-1 fs-6 fw-bold" id="proj-topic-category" style="background-color: {{ active_topic.category_color|default:'#e0a96d' }}; color: #ffffff;">
+              <i class="bi {{ active_topic.category_icon|default:'bi-folder' }} me-1" id="proj-topic-category-icon"></i><span id="proj-topic-category-text">{{ active_topic.get_category_display|default:"جدول الأعمال" }}</span>
+            </span>
             <span class="badge bg-secondary px-3 py-1 fs-6" id="proj-topic-ordinal">{{ active_topic.ordinal_label|default:"" }}</span>
             <span id="proj-topic-status-badge" class="badge {% if active_topic.display_state.display_status == 'voting' %}bg-success{% elif active_topic.display_state.display_status == 'shown' %}bg-info text-dark{% else %}bg-secondary{% endif %} fs-6 px-3 py-1">
               {{ active_topic.display_state.get_display_status_display|default:"معروض للنقاش" }}
@@ -244,7 +246,19 @@
             currentProjTopicId = tid;
             const t = data.topics_state[String(tid)];
 
-            document.getElementById('proj-topic-category').innerText = t.category_label || '';
+            const catBadge = document.getElementById('proj-topic-category');
+            if (catBadge) {
+              catBadge.innerHTML = `<i class="bi ${t.category_icon || 'bi-folder'} me-1"></i>${t.category_label || ''}`;
+              if (t.category_color) {
+                catBadge.style.backgroundColor = t.category_color;
+                catBadge.style.color = '#ffffff';
+              }
+            }
+            const mainCard = document.getElementById('proj-main-card');
+            if (mainCard && t.category_color) {
+              mainCard.style.borderRight = `6px solid ${t.category_color}`;
+            }
+
             document.getElementById('proj-topic-ordinal').innerText = t.ordinal_label || '';
             document.getElementById('proj-topic-title').innerText = t.title || '';
 

@@ -123,8 +123,8 @@
             <div class="d-flex flex-column gap-3">
               {% for field_name, field_title, field_help in group.fields %}
                 <div class="p-2 px-3 rounded-3 bg-light border hover-shadow transition-all">
-                  <div class="form-check form-switch fs-5 d-flex align-items-center justify-content-between m-0">
-                    <div>
+                  <div class="form-check form-switch fs-5 d-flex align-items-center justify-content-between m-0 gap-3">
+                    <div class="flex-grow-1">
                       <label class="form-check-label fw-bold text-navy fs-6" for="id_{{ field_name }}" style="cursor: pointer;">
                         {{ field_title }}
                       </label>
@@ -132,7 +132,7 @@
                         {{ field_help }}
                       </div>
                     </div>
-                    <input class="form-check-input perm-checkbox group-{{ group.id }}" type="checkbox" name="{{ field_name }}" id="id_{{ field_name }}" style="cursor: pointer; width: 2.4em; height: 1.25em;">
+                    <input class="form-check-input perm-checkbox group-{{ group.id }} ms-0" type="checkbox" name="{{ field_name }}" id="id_{{ field_name }}" style="cursor: pointer; width: 2.4em; height: 1.25em; flex-shrink: 0;">
                   </div>
                 </div>
               {% endfor %}
@@ -184,6 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
     {% if permission_obj.can_view_draft_sessions %}'can_view_draft_sessions',{% endif %}
     {% if permission_obj.can_view_past_sessions %}'can_view_past_sessions',{% endif %}
     {% if permission_obj.can_add_session %}'can_add_session',{% endif %}
+    {% if permission_obj.can_prepare_agenda %}'can_prepare_agenda',{% endif %}
     {% if permission_obj.can_edit_session %}'can_edit_session',{% endif %}
     {% if permission_obj.can_delete_session %}'can_delete_session',{% endif %}
     {% if permission_obj.can_view_attendance %}'can_view_attendance',{% endif %}
@@ -351,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'can_change_password'
     ],
     director: [
-      'can_view_sessions', 'can_view_draft_sessions', 'can_view_past_sessions', 'can_add_session', 'can_edit_session',
+      'can_view_sessions', 'can_view_draft_sessions', 'can_view_past_sessions', 'can_add_session', 'can_prepare_agenda', 'can_edit_session',
       'can_view_attendance', 'can_manage_attendance', 'can_export_minutes', 'can_verify_integrity',
       'can_view_topics', 'can_add_topic', 'can_edit_topic', 'can_change_topic_status', 'can_import_topics',
       'can_add_table', 'can_edit_table', 'can_delete_table',

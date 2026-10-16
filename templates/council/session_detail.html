@@ -395,27 +395,28 @@
     </div>
 
     {% if topics_by_category %}
-      {% for cat_label, topics in topics_by_category.items %}
+      {% for cat in topics_by_category %}
         <div class="mb-3">
-          <div class="p-2 px-3 rounded-3 bg-navy text-white d-flex align-items-center justify-content-between shadow-sm"
-               style="cursor: pointer; user-select: none;"
+          <div class="category-detail-header p-2.5 px-3 rounded-3 d-flex align-items-center justify-content-between shadow-sm"
+               style="background-color: #ffffff; border: 1px solid {{ cat.theme.border_color }}; border-right: 5px solid {{ cat.theme.color }} !important; cursor: pointer; user-select: none;"
                onclick="toggleCategorySection({{ forloop.counter }})">
             <div class="d-flex align-items-center gap-2">
-              <i id="cat-icon-{{ forloop.counter }}" class="bi {% if forloop.first %}bi-chevron-down{% else %}bi-chevron-left{% endif %}" style="font-size: 0.95rem;"></i>
-              <span class="fw-bold">{{ cat_label }}</span>
+              <i id="cat-icon-{{ forloop.counter }}" class="bi {% if forloop.first %}bi-chevron-down{% else %}bi-chevron-left{% endif %}" style="font-size: 0.95rem; color: {{ cat.theme.color }};"></i>
+              <i class="bi {{ cat.theme.icon }} fs-5" style="color: {{ cat.theme.color }};"></i>
+              <span class="fw-bold" style="color: {{ cat.theme.color }}; font-size: 1rem;">{{ cat.label }}</span>
             </div>
             <div class="d-flex align-items-center gap-2">
-              <span id="cat-hint-{{ forloop.counter }}" class="small text-white-50 d-none d-sm-inline" style="font-size: 0.78rem;">{% if forloop.first %}اضغط للطي ▲{% else %}اضغط لعرض المواضيع ▼{% endif %}</span>
-              <span class="badge rounded-pill px-3 py-1 fw-bold" style="background-color: #f3c65f; color: #11223A;">{{ topics|length }} موضوع</span>
+              <span id="cat-hint-{{ forloop.counter }}" class="small text-muted d-none d-sm-inline" style="font-size: 0.78rem;">{% if forloop.first %}اضغط للطي ▲{% else %}اضغط لعرض المواضيع ▼{% endif %}</span>
+              <span class="badge rounded-pill px-3 py-1.5 fw-bold" style="background-color: {{ cat.theme.color }}; color: #ffffff;">{{ cat.topics|length }} موضوع</span>
             </div>
           </div>
 
           <div id="cat-body-{{ forloop.counter }}" class="cat-topics-body flex-column gap-2 mt-2" style="{% if forloop.first %}display: flex;{% else %}display: none;{% endif %}">
-            {% for t in topics %}
-              <div class="topic-card category-{{ t.category }} p-3">
+            {% for t in cat.topics %}
+              <div class="topic-card category-{{ t.category }} p-3" style="border-right: 4px solid {{ cat.theme.color }} !important;">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                   <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-navy">{{ t.ordinal_label }}</span>
+                    <span class="badge" style="background-color: {{ cat.theme.color }}; color: #ffffff; font-weight: 700;">{{ t.ordinal_label }}</span>
                     <span class="uc-badge badge-{{ t.status }}">{{ t.get_clear_status_display }}</span>
                     {% if t.memo_number %}
                       <span class="badge bg-light text-dark border">مذكرة {{ t.memo_number }}</span>
@@ -442,7 +443,7 @@
                       </button>
                     {% endif %}
                     {% if user_can_view_topics %}
-                      <a href="{% url 'council:topic_detail' pk=t.pk %}" class="btn btn-sm btn-outline-navy">
+                      <a href="{% url 'council:topic_detail' pk=t.pk %}" class="btn btn-sm" style="border: 1px solid {{ cat.theme.color }}; color: {{ cat.theme.color }};">
                         عرض الموضوع
                       </a>
                     {% endif %}

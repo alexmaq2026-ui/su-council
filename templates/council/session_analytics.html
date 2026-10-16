@@ -119,7 +119,7 @@
             <tr>
               <td class="fw-bold text-muted">{{ forloop.counter }}</td>
               <td>
-                <span class="badge bg-light text-dark border mb-1">{{ item.topic.get_category_display }}</span>
+                <span class="cat-badge cat-{{ item.topic.category }} mb-1"><i class="bi {{ item.topic.category_icon }}"></i> {{ item.topic.get_category_display }}</span>
                 <div class="fw-bold text-dark">{{ item.topic.title }}</div>
               </td>
               <td>{{ item.topic.presenting_entity|default:"—" }}</td>

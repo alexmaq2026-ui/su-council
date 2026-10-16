@@ -375,8 +375,8 @@
           🌐 جميع المحاور ({{ total_topics_count }})
         </button>
         {% for cat in topics_by_category %}
-          <button type="button" class="btn btn-sm btn-outline-secondary px-3 fw-bold filter-ribbon-btn" data-cat="{{ cat.key }}" onclick="filterRibbonCategory('{{ cat.key }}')">
-            {{ cat.label }} ({{ cat.topics|length }})
+          <button type="button" class="btn btn-sm px-3 fw-bold filter-ribbon-btn" data-cat="{{ cat.key }}" onclick="filterRibbonCategory('{{ cat.key }}')" style="border: 1px solid {{ cat.theme.border_color }}; color: {{ cat.theme.color }}; background-color: {{ cat.theme.bg_soft }};">
+            <i class="bi {{ cat.theme.icon }} me-1"></i>{{ cat.label }} ({{ cat.topics|length }})
             {% if cat.has_active %}<span class="badge bg-danger ms-1 animate-pulse" style="font-size: 0.65rem;">● قيد النقاش</span>{% endif %}
           </button>
         {% endfor %}
@@ -387,17 +387,17 @@
         {% for cat in topics_by_category %}
           <div class="ribbon-cat-group mb-4" id="ribbon-group-{{ cat.key }}" data-cat="{{ cat.key }}">
             <!-- ترويسة المحور الرئيسي البارزة -->
-            <div class="d-flex flex-wrap align-items-center justify-content-between p-2 px-3 mb-2 rounded-2 text-white shadow-sm"
-                 style="background: linear-gradient(90deg, #1B365D 0%, #2A5298 100%); border-right: 4px solid #f3c65f;">
+            <div class="d-flex flex-wrap align-items-center justify-content-between p-2 px-3 mb-2 rounded-2 shadow-sm"
+                 style="background-color: #ffffff; border: 1px solid {{ cat.theme.border_color }}; border-right: 5px solid {{ cat.theme.color }} !important;">
               <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-folder2-open text-warning fs-5"></i>
-                <h6 class="mb-0 fw-bold">{{ cat.label }}</h6>
+                <i class="bi {{ cat.theme.icon }} fs-5" style="color: {{ cat.theme.color }};"></i>
+                <h6 class="mb-0 fw-bold" style="color: {{ cat.theme.color }};">{{ cat.label }}</h6>
               </div>
               <div class="d-flex align-items-center gap-2">
                 {% if cat.has_active %}
                   <span class="badge bg-danger animate-pulse px-2 py-1">● المحور المطروح حالياً</span>
                 {% endif %}
-                <span class="badge rounded-pill bg-light text-navy fw-bold px-2 py-1" style="color: #1B365D;">{{ cat.topics|length }} موضوع</span>
+                <span class="badge rounded-pill fw-bold px-2.5 py-1" style="background-color: {{ cat.theme.color }}; color: #ffffff;">{{ cat.topics|length }} موضوع</span>
               </div>
             </div>
 
@@ -406,10 +406,10 @@
               {% for t in cat.topics %}
                 <div class="col-md-6 col-lg-4">
                   <div class="p-2 bg-white rounded border d-flex flex-column justify-content-between h-100 shadow-sm transition-hover"
-                       style="cursor: pointer; {% if t.pk == active_topic.pk %}border: 2px solid #0d6efd !important; background: #f0f7ff !important; box-shadow: 0 4px 12px rgba(13,110,253,0.18) !important;{% endif %}"
+                       style="cursor: pointer; border-right: 4px solid {{ cat.theme.color }} !important; {% if t.pk == active_topic.pk %}border: 2px solid #0d6efd !important; background: #f0f7ff !important; box-shadow: 0 4px 12px rgba(13,110,253,0.18) !important;{% endif %}"
                        onclick="jumpToTopicFromRibbon({{ t.pk }})">
                     <div class="d-flex align-items-center justify-content-between mb-1">
-                      <span class="badge bg-navy text-white text-truncate" style="font-size: 0.72rem; background-color: #1B365D; max-width: 175px;">{{ t.ordinal_label }}</span>
+                      <span class="badge text-white text-truncate" style="font-size: 0.72rem; background-color: {{ cat.theme.color }}; max-width: 175px;">{{ t.ordinal_label }}</span>
                       {% if t.has_decision_flag or t.status == 'voted' or t.status == 'closed' %}
                         <span class="badge bg-success" style="font-size: 0.7rem;">✓ منجز</span>
                       {% elif t.pk == active_topic.pk or t.display_state.display_status == 'shown' or t.display_state.display_status == 'voting' %}
@@ -547,18 +547,19 @@
           {% for cat in topics_by_category %}
             <div class="mb-2 border rounded-3 overflow-hidden live-cat-wrapper {% if not can_start_session_live and not is_frozen_manager %}border-0 mb-0{% endif %}" id="cat-wrapper-{{ forloop.counter }}">
               {% if can_start_session_live or is_frozen_manager %}
-              <div class="p-2 px-3 d-flex align-items-center justify-content-between text-white live-cat-bar"
-                   style="background-color: #1B365D; cursor: pointer; user-select: none;"
+              <div class="p-2.5 px-3 d-flex align-items-center justify-content-between live-cat-bar"
+                   style="background-color: #ffffff; border: 1px solid {{ cat.theme.border_color }}; border-right: 5px solid {{ cat.theme.color }} !important; cursor: pointer; user-select: none;"
                    onclick="toggleLiveCategory({{ forloop.counter }})">
                 <div class="d-flex align-items-center gap-2">
-                  <i id="live-cat-icon-{{ forloop.counter }}" class="bi {% if cat.has_active %}bi-chevron-down{% else %}bi-chevron-left{% endif %}"></i>
-                  <span class="fw-bold">{{ cat.label }}</span>
+                  <i id="live-cat-icon-{{ forloop.counter }}" class="bi {% if cat.has_active %}bi-chevron-down{% else %}bi-chevron-left{% endif %}" style="color: {{ cat.theme.color }};"></i>
+                  <i class="bi {{ cat.theme.icon }} fs-5" style="color: {{ cat.theme.color }};"></i>
+                  <span class="fw-bold" style="color: {{ cat.theme.color }}; font-size: 1rem;">{{ cat.label }}</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                  <span id="live-cat-hint-{{ forloop.counter }}" class="small text-white-50 d-none d-sm-inline" style="font-size: 0.76rem;">
+                  <span id="live-cat-hint-{{ forloop.counter }}" class="small text-muted d-none d-sm-inline" style="font-size: 0.76rem;">
                     {% if cat.has_active %}اضغط للطي ▲{% else %}اضغط للعرض ▼{% endif %}
                   </span>
-                  <span class="badge rounded-pill px-3 py-1 fw-bold" style="background-color: #f3c65f; color: #11223A;">{{ cat.topics|length }} موضوع</span>
+                  <span class="badge rounded-pill px-3 py-1 fw-bold" style="background-color: {{ cat.theme.color }}; color: #ffffff;">{{ cat.topics|length }} موضوع</span>
                 </div>
               </div>
               {% endif %}
@@ -568,11 +569,11 @@
                   <div class="list-group-item p-3 topic-item {% if t.pk == active_topic.pk %}border-start border-primary border-4 bg-light{% endif %}"
                        id="topic-row-{{ t.pk }}"
                        data-cat-idx="{{ forloop.parentloop.counter }}"
-                       style="{% if not can_start_session_live and not is_frozen_manager and t.pk != active_topic.pk %}display: none;{% endif %}">
+                       style="border-right: 4px solid {{ cat.theme.color }} !important; {% if not can_start_session_live and not is_frozen_manager and t.pk != active_topic.pk %}display: none;{% endif %}">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                       <div class="flex-grow-1" style="cursor: pointer;" onclick="toggleTopicDetails({{ t.pk }})">
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
-                          <span class="badge bg-navy text-white" style="background-color: #1B365D;">{{ t.ordinal_label }}</span>
+                          <span class="badge text-white" style="background-color: {{ cat.theme.color }}; font-weight: 700;">{{ t.ordinal_label }}</span>
                           <span class="badge topic-state-badge-{{ t.pk }} {% if t.status == 'postponed' %}bg-danger{% elif t.status == 'suspended' or t.display_state.display_status == 'suspended' %}bg-warning text-dark{% elif t.display_state.display_status == 'voting' %}bg-success{% elif t.display_state.display_status == 'shown' %}bg-info text-dark{% elif t.display_state.display_status == 'closed' %}bg-dark{% else %}bg-secondary{% endif %}">
                             {% if t.status == 'postponed' %}⏳ مؤجل{% elif t.status == 'suspended' or t.display_state.display_status == 'suspended' %}⏸️ معلق مؤقتاً{% else %}{{ t.display_state.get_display_status_display }}{% endif %}
                           </span>
@@ -2979,7 +2980,14 @@ function openTopicInspector(topicId) {
       const stEl = document.getElementById('topicInspectorStatus');
       if (ordEl) ordEl.innerText = data.ordinal_label || `الموضوع رقم ${data.id}`;
       if (titleEl) titleEl.innerText = data.title;
-      if (catEl) catEl.innerText = data.category_label;
+      if (catEl) {
+        catEl.innerText = data.category_label;
+        if (data.category_color) {
+          catEl.style.backgroundColor = data.category_color;
+          catEl.style.color = '#ffffff';
+          catEl.className = 'badge px-3 py-1 fw-bold';
+        }
+      }
       if (stEl) {
         stEl.innerText = data.status_display;
         stEl.className = 'badge px-3 py-1 ' + (data.display_status === 'voting' ? 'bg-success' : (data.display_status === 'shown' ? 'bg-info text-dark' : 'bg-primary'));
