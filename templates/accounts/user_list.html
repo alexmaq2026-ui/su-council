@@ -288,8 +288,7 @@
           <tr>
             <th>الاسم وبيانات الحساب</th>
             <th class="d-none d-md-table-cell">الموقع والصفة في المجلس</th>
-            <th>الصلاحيات</th>
-            <th class="d-none d-sm-table-cell">الحالة</th>
+            <th class="d-none d-sm-table-cell text-center" style="width: 90px;">الحالة</th>
             <th class="text-center">إجراءات</th>
           </tr>
         </thead>
@@ -307,7 +306,7 @@
               <div>
                 <div class="fw-bold text-navy" style="font-size: 0.96rem;">{{ u.full_name }}</div>
                 <div class="d-flex align-items-center gap-2 mt-0.5">
-                  <code class="text-muted small" style="font-size: 0.78rem;">@{{ u.username }}</code>
+                  <code class="text-muted small" style="font-size: 0.78rem;"><bdi dir="ltr">@{{ u.username }}</bdi></code>
                   {% if not u.is_active %}
                     <span class="badge status-badge-inactive d-sm-none" style="font-size: 0.7rem;">غير نشط</span>
                   {% endif %}
@@ -330,37 +329,8 @@
               {% endif %}
             </td>
 
-            <!-- Permissions badges (Compact & Pure Text) -->
-            <td>
-              <div class="d-flex flex-wrap gap-1 align-items-center">
-                {% if u.is_super %}
-                  <span class="badge perm-badge perm-super" title="مدير النظام الأعلى (60 / 60)">مدير النظام الأعلى</span>
-                {% elif u.is_voting_member_core %}
-                  <span class="badge" style="background-color: #0f3460; color: #ffffff; font-size: 0.78rem; font-weight: 600;" title="الصلاحيات الأساسية للأعضاء من لهم حق التصويت (11 / 60)">
-                    <i class="bi bi-star-fill text-warning me-1"></i>مصوّت أساسي (11)
-                  </span>
-                {% elif u.has_any_permission %}
-                  <span class="badge perm-badge perm-export" title="إجمالي الصلاحيات الممنوحة">{{ u.granted_permissions_count }} صلاحية</span>
-                  {% if u.can_vote %}
-                    <span class="badge perm-badge perm-vote" title="حق التصويت في المجلس">تصويت</span>
-                  {% endif %}
-                  {% if u.can_draft_decision %}
-                    <span class="badge perm-badge perm-draft" title="صياغة واعتماد القرارات">صياغة</span>
-                  {% endif %}
-                  {% if u.can_manage_attendance %}
-                    <span class="badge perm-badge perm-attendance" title="إدارة ورصد كشف الحضور">حضور</span>
-                  {% endif %}
-                  {% if u.can_grant_permissions %}
-                    <span class="badge perm-badge perm-grant" title="تخويل وإدارة الصلاحيات">تخويل</span>
-                  {% endif %}
-                {% else %}
-                  <span class="badge perm-badge perm-none" title="لا توجد صلاحيات ممنوحة (0)">لا صلاحيات</span>
-                {% endif %}
-              </div>
-            </td>
-
             <!-- Status -->
-            <td class="d-none d-sm-table-cell">
+            <td class="d-none d-sm-table-cell text-center">
               {% if u.is_active %}
                 <span class="badge status-badge-active" title="الحساب نشط">نشط</span>
               {% else %}
