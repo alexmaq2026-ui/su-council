@@ -24,8 +24,8 @@
         <h6 class="mb-0 fw-bold">تأكيد حذف الحساب</h6>
       </div>
       <div class="uc-card-body p-4 text-center">
-        <div class="user-avatar-lg mb-2 text-danger border border-danger mx-auto">
-          {{ target_user.avatar_initials|default:"!" }}
+        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 text-danger border border-danger mb-3 p-3 mx-auto" style="width: 56px; height: 56px;">
+          <i class="bi bi-person-x-fill fs-2"></i>
         </div>
         <h5 class="fw-bold mb-1 text-navy">{{ target_user.full_name }}</h5>
         <div class="text-muted small mb-3">

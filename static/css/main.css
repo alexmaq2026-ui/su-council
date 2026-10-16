@@ -132,38 +132,12 @@ a:hover { color: var(--gold); }
   border-color: rgba(201,168,76,0.4) !important;
 }
 
-/* Avatar */
-.user-avatar-sm {
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--gold), var(--gold-light));
-  color: var(--navy-dark);
-  font-weight: 800;
-  font-size: 0.7rem;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-
-.user-avatar-lg {
-  width: 52px; height: 52px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--gold), var(--gold-light));
-  color: var(--navy-dark);
-  font-weight: 800;
-  font-size: 1.1rem;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-
-.user-avatar-xl {
-  width: 80px; height: 80px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--gold), var(--gold-light));
-  color: var(--navy-dark);
-  font-weight: 900;
-  font-size: 1.6rem;
-  display: flex; align-items: center; justify-content: center;
-  margin: 0 auto;
+/* Avatar - Disabled globally per academic visual dignity guidelines */
+.user-avatar-sm,
+.user-avatar-lg,
+.user-avatar-xl,
+.avatar-circle-sm {
+  display: none !important;
 }
 
 /* Dropdown */

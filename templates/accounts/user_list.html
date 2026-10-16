@@ -286,9 +286,8 @@
       <table class="table uc-table table-mobile-cards mb-0" id="users-table">
         <thead>
           <tr>
-            <th>الاسم</th>
+            <th>الاسم وبيانات الحساب</th>
             <th class="d-none d-md-table-cell">الموقع والصفة في المجلس</th>
-            <th class="d-none d-lg-table-cell">اسم المستخدم</th>
             <th>الصلاحيات</th>
             <th class="d-none d-sm-table-cell">الحالة</th>
             <th class="text-center">إجراءات</th>
@@ -303,16 +302,19 @@
               data-category="{{ u.get_effective_login_category }}"
               data-status="{% if u.is_active %}active{% else %}inactive{% endif %}">
 
-            <!-- Name & avatar -->
+            <!-- Name & Username -->
             <td>
-              <div class="d-flex align-items-center gap-2">
-                <div class="user-avatar-sm flex-shrink-0">{{ u.avatar_initials|default:"?" }}</div>
-                <div>
-                  <div class="fw-semibold">{{ u.full_name }}</div>
-                  <div class="small text-muted d-md-none">
-                    {{ u.official_title|default:u.get_title_display }}
-                    <span class="badge perm-badge perm-scanner ms-1">{{ u.get_effective_login_category_display }}</span>
-                  </div>
+              <div>
+                <div class="fw-bold text-navy" style="font-size: 0.96rem;">{{ u.full_name }}</div>
+                <div class="d-flex align-items-center gap-2 mt-0.5">
+                  <code class="text-muted small" style="font-size: 0.78rem;">@{{ u.username }}</code>
+                  {% if not u.is_active %}
+                    <span class="badge status-badge-inactive d-sm-none" style="font-size: 0.7rem;">غير نشط</span>
+                  {% endif %}
+                </div>
+                <div class="small text-muted d-md-none mt-1">
+                  {{ u.official_title|default:u.get_title_display }}
+                  <span class="badge perm-badge perm-scanner ms-1">{{ u.get_effective_login_category_display }}</span>
                 </div>
               </div>
             </td>
@@ -326,11 +328,6 @@
               {% if u.department and u.department not in u.official_title %}
                 <small class="text-muted d-block" style="font-size: 0.78rem;">{{ u.department }}</small>
               {% endif %}
-            </td>
-
-            <!-- Username -->
-            <td class="d-none d-lg-table-cell">
-              <code class="text-secondary">{{ u.username }}</code>
             </td>
 
             <!-- Permissions badges (Compact & Pure Text) -->

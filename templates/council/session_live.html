@@ -169,9 +169,7 @@
                   {% for m in online_managers %}
                     <div class="list-group-item d-flex justify-content-between align-items-center p-2 rounded mb-1 {% if m.is_delegated %}bg-success bg-opacity-10 border border-success{% else %}bg-light{% endif %}" id="manager-item-{{ m.id }}">
                       <div class="d-flex align-items-center gap-2">
-                        <div class="avatar-circle-sm bg-navy text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; font-size: 0.75rem; background-color: #1B365D;">
-                          {{ m.avatar_initials }}
-                        </div>
+                        <i class="bi bi-person-circle fs-4 text-navy"></i>
                         <div>
                           <div class="fw-bold text-dark small" style="line-height: 1.2;">{{ m.name }}</div>
                           <div class="text-muted" style="font-size: 0.70rem;">{{ m.title }}</div>
@@ -1714,9 +1712,7 @@ function updateOnlineManagersUI(managers, activeControllerId, activeControllerNa
       html += `
         <div class="list-group-item d-flex justify-content-between align-items-center p-2 rounded mb-1 ${isDel ? 'bg-success bg-opacity-10 border border-success' : 'bg-light'}" id="manager-item-${m.id}">
           <div class="d-flex align-items-center gap-2">
-            <div class="avatar-circle-sm bg-navy text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; font-size: 0.75rem; background-color: #1B365D;">
-              ${m.avatar_initials}
-            </div>
+            <i class="bi bi-person-circle fs-4 text-navy"></i>
             <div>
               <div class="fw-bold text-dark small" style="line-height: 1.2;">${m.name}</div>
               <div class="text-muted" style="font-size: 0.70rem;">${m.title}</div>

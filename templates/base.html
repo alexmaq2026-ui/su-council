@@ -192,7 +192,7 @@
       <div class="dropdown">
         <button class="btn btn-sm user-menu-btn dropdown-toggle d-flex align-items-center gap-2"
                 type="button" data-bs-toggle="dropdown">
-          <div class="user-avatar-sm">{{ user.avatar_initials|default:"?" }}</div>
+          <i class="bi bi-person-circle fs-5" style="color: var(--gold-bright);"></i>
           <span class="d-none d-md-inline">{{ user.full_name|truncatechars:20 }}</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end uc-dropdown shadow">
@@ -279,7 +279,7 @@
     <div class="p-3">
       <div class="user-info-card mb-3 p-3 rounded-3">
         <div class="d-flex align-items-center gap-3">
-          <div class="user-avatar-lg">{{ user.avatar_initials|default:"?" }}</div>
+          <i class="bi bi-person-circle fs-1" style="color: var(--gold-bright);"></i>
           <div>
             <div class="fw-bold">{{ user.full_name }}</div>
             <small class="text-muted">{{ user.get_title_display }}</small>
