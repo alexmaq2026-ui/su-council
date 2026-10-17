@@ -271,6 +271,12 @@ class CouncilSession(models.Model):
     )
     live_controller_delegated_at = models.DateTimeField('وقت تفويض الإدارة', null=True, blank=True)
 
+    # بث عرض المحضر السابق على شاشات الأعضاء الحية
+    broadcast_prev_minutes_session = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='broadcasted_in_sessions', verbose_name='المحضر السابق المعروض على الشاشات'
+    )
+
     created_by                = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
         related_name='created_sessions', verbose_name='أنشأها'
@@ -474,6 +480,70 @@ class CouncilSession(models.Model):
             'missing_count': missing_count,
             'quorum_percentage': round((present_count / total_seats) * 100, 1) if total_seats else 0,
         }
+
+    def get_present_members(self):
+        """
+        Returns list of members currently attending in this session.
+        If formal attendance is recorded, strictly returns members marked present (excluding approved departures).
+        If attendance has not yet been taken, falls back to active online session members or active council members.
+        """
+        departed_user_ids = set(
+            self.exit_permits.filter(status='approved').values_list('member_id', flat=True)
+        )
+        present_atts = list(self.attendances.filter(
+            status__in=['present_primary', 'present_deputy', 'present']
+        ).select_related('member', 'proxy_user', 'seat'))
+
+        members = []
+        seen_user_ids = set()
+
+        if present_atts:
+            for att in present_atts:
+                target_user = att.proxy_user if (att.is_proxy and att.proxy_user) else att.member
+                if not target_user or target_user.pk in departed_user_ids or target_user.pk in seen_user_ids:
+                    continue
+                seen_user_ids.add(target_user.pk)
+                seat_title = att.seat.name if att.seat else (target_user.department or '')
+                members.append({
+                    'id': target_user.pk,
+                    'name': target_user.full_name,
+                    'title': target_user.official_title or target_user.get_title_display(),
+                    'seat_name': seat_title,
+                    'avatar_initials': getattr(target_user, 'avatar_initials', '') or target_user.full_name[:2],
+                    'is_proxy': att.is_proxy,
+                    'proxy_name': att.proxy_name,
+                })
+        else:
+            from accounts.models import User as CouncilUser
+            cutoff = timezone.now() - timezone.timedelta(minutes=30)
+            live_users = list(
+                CouncilUser.objects.filter(
+                    live_session_presences__session=self,
+                    live_session_presences__last_seen__gte=cutoff,
+                    live_session_presences__is_active=True
+                ).exclude(pk__in=departed_user_ids).distinct()
+            )
+            if not live_users:
+                live_users = list(
+                    CouncilUser.objects.filter(is_active=True)
+                    .exclude(title='مدير_النظام')
+                    .exclude(pk__in=departed_user_ids)
+                    .order_by('order', 'id')[:35]
+                )
+            for u in live_users:
+                if u.pk in seen_user_ids:
+                    continue
+                seen_user_ids.add(u.pk)
+                members.append({
+                    'id': u.pk,
+                    'name': u.full_name,
+                    'title': u.official_title or u.get_title_display(),
+                    'seat_name': u.department or '',
+                    'avatar_initials': getattr(u, 'avatar_initials', '') or u.full_name[:2],
+                    'is_proxy': False,
+                    'proxy_name': '',
+                })
+        return members
 
     def get_live_active_topic(self):
         """Return the topic currently being discussed or voted on in live session."""
@@ -1614,6 +1684,53 @@ class LiveSessionPresence(models.Model):
 
     def __str__(self):
         return f'{self.user.full_name} في {self.session}'
+
+
+# ── Live Session Directive (Interactive Flash & Alert System) ─────────────────
+class LiveSessionDirective(models.Model):
+    """
+    التوجيهات والتنبيهات التفاعلية المباشرة من رئاسة الجلسة إلى الأعضاء الحاضرين.
+    يشمل:
+    - نقطة نظام (Point of Order) مع وميض بصري فلاشي وصوت تنبيه متزامن.
+    - يرجى الهدوء والتركيز (Calm & Focus Alert).
+    - رسالة نصية مخصصة وموجهة باسم العضو.
+    """
+    DIRECTIVE_TYPES = [
+        ('point_of_order', 'نقطة نظام'),
+        ('calm_focus',     'يرجى الهدوء والتركيز'),
+        ('custom_message', 'رسالة مخصصة'),
+    ]
+
+    session         = models.ForeignKey(
+        CouncilSession, on_delete=models.CASCADE,
+        related_name='live_directives', verbose_name='الجلسة'
+    )
+    sender          = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='sent_live_directives', verbose_name='المرسِل'
+    )
+    recipient       = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='received_live_directives', verbose_name='العضو المستهدف'
+    )
+    recipient_name  = models.CharField('اسم العضو المستهدف', max_length=200, blank=True)
+    recipient_title = models.CharField('الصفة بالمجلس', max_length=255, blank=True)
+    directive_type  = models.CharField('نوع التوجيه', max_length=30, choices=DIRECTIVE_TYPES)
+    message         = models.TextField('نص التوجيه / الرسالة')
+    is_read         = models.BooleanField('تم الاطلاع / الاستلام', default=False)
+    read_at         = models.DateTimeField('وقت الاطلاع', null=True, blank=True)
+    created_at      = models.DateTimeField('وقت الإرسال', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'توجيه تفاعلي بالجلسة'
+        verbose_name_plural = 'التوجيهات التفاعلية بالجلسة الحية'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['session', 'recipient', 'is_read', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.get_directive_type_display()} إلى {self.recipient.full_name} ({self.created_at:%H:%M:%S})'
 
 
 # ==============================================================================

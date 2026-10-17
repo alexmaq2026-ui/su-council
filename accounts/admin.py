@@ -79,6 +79,7 @@ class CouncilPermissionAdmin(admin.ModelAdmin):
     )
     list_filter  = (
         'can_vote', 'can_draft_decision', 'can_add_topic',
+        'can_start_session_live', 'can_reopen_topic_live', 'can_moderate_live_session',
         'can_manage_attendance', 'can_grant_permissions',
     )
     search_fields = ('user__full_name', 'user__username', 'granted_by__full_name')

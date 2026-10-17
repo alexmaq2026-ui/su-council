@@ -33,7 +33,7 @@ from django.views.decorators.http import require_POST, require_GET
 from council.models import (
     CouncilSession, Topic, Vote, EntitySeat, Attendance,
     TopicDisplayState, SpeakRequest, SessionRecording, ExitPermit,
-    LiveSessionPresence, TOPIC_CATEGORIES, user_can_view_drafts,
+    LiveSessionPresence, LiveSessionDirective, TOPIC_CATEGORIES, user_can_view_drafts,
     CATEGORY_THEMES, DEFAULT_CUSTOM_THEME,
 )
 
@@ -279,6 +279,7 @@ def session_live_view(request, session_pk):
         'can_set_topic_timer': is_controller,
         'can_suspend_session': is_controller,
         'can_postpone_topic': is_controller,
+        'can_reopen_topic_live': is_controller and (user.is_super or session.is_user_president(user) or getattr(user, 'can_reopen_topic_live', False)),
         'is_suspended': getattr(session, 'is_suspended', False),
         'suspension_reason': getattr(session, 'suspension_reason', ''),
         'can_draft_decision': (is_controller or user.can_draft_decision) and not session.is_frozen(),
@@ -290,6 +291,10 @@ def session_live_view(request, session_pk):
         'can_vote': user.is_super or user.can_vote,
         'can_view_projector': user.is_super or user.can_view_projector,
         'can_view_analytics': user.is_super or user.can_view_analytics,
+        'can_open_previous_minutes': user.is_super or user.can_open_previous_minutes,
+        'can_broadcast_previous_minutes': user.is_super or user.can_broadcast_previous_minutes,
+        'can_moderate_live_session': is_president or user.is_super or getattr(user, 'can_moderate_live_session', False) or is_controller,
+        'present_members': session.get_present_members() if (is_president or user.is_super or getattr(user, 'can_moderate_live_session', False) or is_controller) else [],
         'quorum_info': quorum_info,
         'user_seat': user_seat,
         'active_speaker': active_speaker,
@@ -478,6 +483,9 @@ def api_topic_control(request, topic_pk):
     elif action == 'save_decision':
         if not (user.is_super or user.can_draft_decision or session.user_can_manage_live_controls(user)):
             return JsonResponse({'ok': False, 'error': 'ليس لديك صلاحية لصياغة أو اعتماد القرار.'}, status=403)
+    elif action in ('reopen_discussion', 'reopen_voting'):
+        if not (session.user_can_manage_live_controls(user) and (user.is_super or session.is_user_president(user) or getattr(user, 'can_reopen_topic_live', False))):
+            return JsonResponse({'ok': False, 'error': 'ليس لديك صلاحية لإعادة فتح الموضوع للنقاش أو التصويت.'}, status=403)
     else:
         if not session.user_can_manage_live_controls(user):
             return JsonResponse({'ok': False, 'error': 'غير مصرح لك بالتحكم بالجلسة الحية.'}, status=403)
@@ -593,11 +601,53 @@ def api_topic_control(request, topic_pk):
                 topic.save(update_fields=['status'])
             msg = 'تم اعتماد وحفظ قرار المجلس لهذا الموضوع بنجاح.'
 
+        elif action == 'reopen_discussion':
+            other_shown = TopicDisplayState.objects.filter(
+                topic__session_id=topic.session_id,
+                display_status='shown'
+            ).exclude(topic_id=topic.pk)
+            folded_topic_ids = list(other_shown.values_list('topic_id', flat=True))
+            if folded_topic_ids:
+                other_shown.update(display_status='hidden')
+
+            state.display_status = 'shown'
+            state.save()
+            topic.status = 'discussing'
+            topic.save(update_fields=['status'])
+            msg = f'تمت إعادة الموضوع «{topic.title}» للنقاش والمداولة العامة بتوجيه رئيس المجلس.'
+
+        elif action == 'reopen_voting':
+            reset_votes = bool(data.get('reset_votes', False))
+            other_shown = TopicDisplayState.objects.filter(
+                topic__session_id=topic.session_id,
+                display_status='shown'
+            ).exclude(topic_id=topic.pk)
+            folded_topic_ids = list(other_shown.values_list('topic_id', flat=True))
+            if folded_topic_ids:
+                other_shown.update(display_status='hidden')
+
+            if reset_votes:
+                from council.models import Vote
+                Vote.objects.filter(topic=topic).delete()
+                msg_detail = 'مع تصفير الأصوات السابقة لبدء جولة جديدة'
+            else:
+                msg_detail = 'مع استئناف والاحتفاظ بالأصوات المسجلة'
+
+            state.display_status = 'voting'
+            state.voting_opened_at = timezone.now()
+            state.voting_opened_by = request.user
+            state.voting_closed_at = None
+            state.voting_closed_by = None
+            state.save()
+            topic.status = 'discussing'
+            topic.save(update_fields=['status'])
+            msg = f'تمت إعادة فتح باب التصويت على الموضوع «{topic.title}» ({msg_detail}).'
+
         else:
             return JsonResponse({'ok': False, 'error': 'إجراء غير معروف.'}, status=400)
 
         # Update last_active_topic on session to persist active position
-        if action in ('show', 'open_voting', 'close_voting', 'set_timer', 'save_decision', 'suspend_topic', 'postpone_topic'):
+        if action in ('show', 'open_voting', 'close_voting', 'set_timer', 'save_decision', 'suspend_topic', 'postpone_topic', 'reopen_discussion', 'reopen_voting'):
             if topic.session.last_active_topic_id != topic.pk:
                 topic.session.last_active_topic = topic
                 topic.session.save(update_fields=['last_active_topic'])
@@ -685,7 +735,7 @@ def api_session_lifecycle_control(request, session_pk):
             return JsonResponse({'ok': True, 'action': 'resume', 'is_suspended': False, 'message': msg})
 
         elif action == 'adjourn':
-            from council.models import SessionStageLog, STAGE_LABELS
+            from council.models import SessionStageLog
             old_stage = session.status
             session.status = 'partial_close'
             session.is_suspended = False
@@ -1107,6 +1157,27 @@ def api_speak_queue(request, session_pk):
             'last_seen': p.last_seen.strftime('%H:%M:%S'),
         })
 
+    # Directives: Active unread directive targeted to request.user
+    latest_directive = LiveSessionDirective.objects.filter(
+        session=session, recipient=request.user, is_read=False
+    ).select_related('sender').order_by('-created_at').first()
+
+    user_directive_data = None
+    if latest_directive:
+        user_directive_data = {
+            'id': latest_directive.pk,
+            'directive_type': latest_directive.directive_type,
+            'type_display': latest_directive.get_directive_type_display(),
+            'message': latest_directive.message,
+            'sender_name': latest_directive.sender.full_name if latest_directive.sender else 'رئاسة المجلس',
+            'sender_title': (latest_directive.sender.official_title or latest_directive.sender.get_title_display()) if latest_directive.sender else 'رئيس الجلسة',
+            'recipient_name': request.user.full_name,
+            'recipient_title': request.user.official_title or request.user.get_title_display(),
+            'created_at': latest_directive.created_at.strftime('%H:%M:%S'),
+        }
+
+    can_moderate = bool(session.is_user_president(request.user) or request.user.is_super or getattr(request.user, 'can_moderate_live_session', False) or session.user_can_manage_live_controls(request.user))
+
     return JsonResponse({
         'ok': True,
         'active_speaker': active_data,
@@ -1114,6 +1185,8 @@ def api_speak_queue(request, session_pk):
         'pending_count': len(pending_list),
         'user_has_pending': user_has_pending,
         'user_is_speaking': user_is_speaking,
+        'user_directive': user_directive_data,
+        'can_moderate_live_session': can_moderate,
         'quorum_info': quorum_info,
         'active_topic_id': active_topic_id,
         'completed_topics_count': completed_topics_count,
@@ -1133,6 +1206,8 @@ def api_speak_queue(request, session_pk):
         'is_president': session.is_user_president(request.user),
         'chair_name': session.get_chair_display_name(),
         'online_managers': online_managers,
+        'broadcast_prev_minutes_id': session.broadcast_prev_minutes_session_id,
+        'broadcast_prev_minutes_label': f"الجلسة رقم ({session.broadcast_prev_minutes_session.session_number})" if session.broadcast_prev_minutes_session else None,
     })
 
 
@@ -1484,3 +1559,293 @@ def api_topic_quick_view(request, topic_pk):
         'status': topic.status,
         'status_display': topic.get_clear_status_display(),
     })
+
+
+# ── Previous Session Minutes API ──────────────────────────────────────────────
+@login_required(login_url='/login/')
+@require_GET
+def api_previous_sessions_list(request, session_pk):
+    """
+    Returns a list of all previous (frozen/closed) council sessions
+    available for display as 'previous minutes' during a live session.
+    The current session is excluded.
+    Requires can_view_live_session or can_start_session_live.
+    """
+    user = request.user
+    if not (user.is_super or user.can_view_live_session or user.can_start_session_live):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح لك.'}, status=403)
+
+    current_session = get_object_or_404(CouncilSession, pk=session_pk)
+    if not current_session.can_be_seen_by(user):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح.'}, status=403)
+
+    # Fetch all frozen/closed sessions except the current one, ordered newest first
+    prev_sessions = (
+        CouncilSession.objects
+        .filter(status__in=['frozen', 'partial_close'])
+        .exclude(pk=session_pk)
+        .order_by('-date', '-session_number')
+    )
+
+    sessions_data = []
+    for s in prev_sessions:
+        sessions_data.append({
+            'id': s.pk,
+            'session_number': s.session_number,
+            'session_cumulative_number': s.session_cumulative_number or '',
+            'date': s.date.strftime('%Y-%m-%d') if s.date else '',
+            'hijri_date': s.hijri_date or '',
+            'academic_year': s.academic_year or '',
+            'label': f"الجلسة رقم {s.session_number} – {s.date}",
+            'status': s.status,
+            'topics_count': s.topics.count(),
+        })
+
+    return JsonResponse({'ok': True, 'sessions': sessions_data})
+
+
+@login_required(login_url='/login/')
+@require_GET
+def api_previous_session_minutes(request, session_pk):
+    """
+    Returns the full structured minutes content of a selected previous session
+    for display and smart audio reading during a live session.
+    session_pk here is the ID of the PREVIOUS session to display (not the current one).
+    Requires can_view_live_session or can_start_session_live.
+    """
+    user = request.user
+    if not (user.is_super or user.can_view_live_session or user.can_start_session_live):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح لك.'}, status=403)
+
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    # التحقق من الصلاحية: يُسمح بمشاهدة المحضر إذا كانت الجلسة متاحة للمستخدم،
+    # أو إذا كان المستخدم مشاركاً في الجلسة الحية والجلسة السابقة مغلقة/مجمدة معروضة للمصادقة أو البث
+    is_live_participant = bool(user.is_super or user.can_view_live_session or user.can_start_session_live)
+    is_frozen_or_broadcast = session.status in ('frozen', 'partial_close', 'closed') or CouncilSession.objects.filter(status='active', broadcast_prev_minutes_session=session).exists()
+
+    if not (session.can_be_seen_by(user) or (is_live_participant and is_frozen_or_broadcast)):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح لك بمشاهدة هذه الجلسة.'}, status=403)
+
+    # Build attendance summary
+    from council.models import Attendance as AttModel
+    att_qs = AttModel.objects.filter(session=session).select_related('member', 'seat')
+    present = [a for a in att_qs if a.status in ('present', 'present_primary', 'present_deputy')]
+    excused = [a for a in att_qs if a.status == 'excused']
+    absent  = [a for a in att_qs if a.status in ('unexcused', 'unrecorded')]
+
+    attendance_summary = {
+        'present_count': len(present),
+        'excused_count': len(excused),
+        'absent_count': len(absent),
+        'present_names': [
+            {
+                'name': a.member.full_name,
+                'seat': a.seat.name if a.seat else (getattr(a.member, 'department', '') or ''),
+                'is_proxy': a.is_proxy,
+                'proxy_name': a.proxy_name or '',
+            }
+            for a in present
+        ],
+        'excused_names': [
+            {'name': a.member.full_name, 'seat': a.seat.name if a.seat else ''}
+            for a in excused
+        ],
+    }
+
+    # Build topics with decisions
+    from council.models import TOPIC_CATEGORIES
+    cat_label_map = dict(TOPIC_CATEGORIES)
+    topics_data = []
+    for t in session.topics.select_related('decision').prefetch_related('tables').order_by('sub_order', 'order_number', 'id'):
+        dec = getattr(t, 'decision', None)
+        dec_text = dec.decision_text if dec and dec.decision_text else ''
+
+        tables_data = []
+        for tbl in t.tables.all():
+            tables_data.append({
+                'title': tbl.title or tbl.get_table_type_display(),
+                'headers': tbl.headers or [],
+                'rows': tbl.rows_data or [],
+                'total_row': tbl.get_formatted_total_row() or [],
+            })
+
+        topics_data.append({
+            'id': t.pk,
+            'order_number': t.order_number,
+            'ordinal_label': t.ordinal_label,
+            'category': t.category,
+            'category_label': cat_label_map.get(t.category, t.category),
+            'title': t.title,
+            'presenting_entity': t.presenting_entity or '',
+            'memo_number': t.memo_number or '',
+            'memo_date': str(t.memo_date) if t.memo_date else '',
+            'background': t.background or '',
+            'priorities': t.clean_priorities or '',
+            'status': t.status,
+            'has_decision': bool(dec_text),
+            'decision_text': dec_text,
+            'tables': tables_data,
+        })
+
+    # Build plain text for TTS smart reader
+    from council.services.smart_reader_service import extract_session_smart_text
+    smart_text_data = extract_session_smart_text(session)
+
+    return JsonResponse({
+        'ok': True,
+        'session': {
+            'id': session.pk,
+            'session_number': session.session_number,
+            'session_cumulative_number': session.session_cumulative_number or '',
+            'date': session.date.strftime('%Y-%m-%d') if session.date else '',
+            'hijri_date': session.hijri_date or '',
+            'academic_year': session.academic_year or '',
+            'chair_name': session.chair_name or '',
+            'secretary_name': session.secretary_name or '',
+            'assistant_name': session.assistant_name or '',
+            'location': session.location or '',
+            'opening_honors': session.opening_honors or '',
+            'status': session.status,
+            'label': f"محضر الجلسة رقم ({session.session_number}) – {session.date}",
+        },
+        'attendance': attendance_summary,
+        'topics': topics_data,
+        'smart_reader': smart_text_data,
+    }, json_dumps_params={'ensure_ascii': False})
+
+
+@login_required(login_url='/login/')
+@require_POST
+def api_session_broadcast_minutes(request, session_pk):
+    """
+    Broadcast previous session minutes to all connected members or stop broadcast.
+    Requires session control permission (chair / superuser / controller).
+    """
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+    user = request.user
+    if not (user.is_super or (session.user_can_manage_live_controls(user) and user.can_broadcast_previous_minutes)):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح لك بإدارة بث المحضر السابق للأعضاء.'}, status=403)
+
+    import json
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except Exception:
+        data = {}
+
+    action = data.get('action', 'start')
+    prev_id = data.get('previous_session_id')
+
+    if action == 'start' and prev_id:
+        prev_session = get_object_or_404(CouncilSession, pk=prev_id)
+        session.broadcast_prev_minutes_session = prev_session
+        session.save(update_fields=['broadcast_prev_minutes_session'])
+        return JsonResponse({
+            'ok': True,
+            'broadcast_prev_minutes_id': prev_session.pk,
+            'broadcast_prev_minutes_label': f"الجلسة رقم ({prev_session.session_number})",
+            'message': f"تم بدء بث محضر الجلسة رقم ({prev_session.session_number}) على شاشات جميع الأعضاء."
+        })
+    else:
+        session.broadcast_prev_minutes_session = None
+        session.save(update_fields=['broadcast_prev_minutes_session'])
+        return JsonResponse({
+            'ok': True,
+            'broadcast_prev_minutes_id': None,
+            'message': "تم إيقاف بث المحضر السابق عن شاشات الأعضاء."
+        })
+
+
+# ── Interactive Moderation & Directives APIs ─────────────────────────────────
+@login_required(login_url='/login/')
+@require_GET
+def api_session_present_members(request, session_pk):
+    """
+    Returns list of members currently attending in this live session.
+    Only accessible by users with moderation rights (chair / superadmin / can_moderate_live_session).
+    """
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+    user = request.user
+    if not (session.is_user_president(user) or user.is_super or getattr(user, 'can_moderate_live_session', False) or session.user_can_manage_live_controls(user)):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح لك باستعراض لوحة التوجيه والضبط.'}, status=403)
+
+    members = session.get_present_members()
+    return JsonResponse({
+        'ok': True,
+        'members': members,
+        'count': len(members)
+    })
+
+
+@login_required(login_url='/login/')
+@require_POST
+def api_send_live_directive(request, session_pk):
+    """
+    Sends an instant interactive directive (point of order, calm & focus, or custom message)
+    from the Council President/Controller directly to a specific attending member.
+    """
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+    user = request.user
+    if not (session.is_user_president(user) or user.is_super or getattr(user, 'can_moderate_live_session', False) or session.user_can_manage_live_controls(user)):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح لك بإرسال التنبيهات ونقاط النظام التفاعلية.'}, status=403)
+
+    try:
+        data = json.loads(request.body.decode('utf-8')) if request.body else request.POST
+    except Exception:
+        data = request.POST
+
+    recipient_id = data.get('recipient_id')
+    directive_type = data.get('directive_type')
+    custom_text = (data.get('message') or '').strip()
+
+    if not recipient_id or not directive_type:
+        return JsonResponse({'ok': False, 'error': 'بيانات التوجيه غير مكتملة.'}, status=400)
+
+    from accounts.models import User as CouncilUser
+    recipient = get_object_or_404(CouncilUser, pk=recipient_id)
+
+    if directive_type == 'point_of_order':
+        message = custom_text or 'نقطة نظام: توجيه عاجل من رئيس الجلسة بلزوم الالتزام بنظام الجلسة والتوقف عن المداخلة.'
+    elif directive_type == 'calm_focus':
+        message = custom_text or 'يرجى الهدوء والتركيز مع سير مداولات المجلس وجدول الأعمال.'
+    elif directive_type == 'custom_message':
+        if not custom_text:
+            return JsonResponse({'ok': False, 'error': 'يرجى كتابة نص الرسالة قبل الإرسال.'}, status=400)
+        message = custom_text
+    else:
+        return JsonResponse({'ok': False, 'error': 'نوع التوجيه غير صالح.'}, status=400)
+
+    directive = LiveSessionDirective.objects.create(
+        session=session,
+        sender=user,
+        recipient=recipient,
+        recipient_name=recipient.full_name,
+        recipient_title=recipient.official_title or recipient.get_title_display(),
+        directive_type=directive_type,
+        message=message,
+    )
+
+    return JsonResponse({
+        'ok': True,
+        'message': f'تم إرسال {directive.get_directive_type_display()} إلى {recipient.full_name} بنجاح.',
+        'directive_id': directive.pk,
+        'recipient_name': recipient.full_name,
+        'directive_type': directive_type,
+    })
+
+
+@login_required(login_url='/login/')
+@require_POST
+def api_dismiss_live_directive(request, directive_pk):
+    """
+    Member acknowledges / dismisses a directive card on their screen.
+    """
+    directive = get_object_or_404(LiveSessionDirective, pk=directive_pk)
+    if directive.recipient_id == request.user.pk or request.user.is_super or directive.session.is_user_president(request.user):
+        directive.is_read = True
+        directive.read_at = timezone.now()
+        directive.save(update_fields=['is_read', 'read_at'])
+        return JsonResponse({'ok': True, 'message': 'تم استلام وتأكيد التوجيه بنجاح.'})
+    return JsonResponse({'ok': False, 'error': 'غير مصرح.'}, status=403)
+
+

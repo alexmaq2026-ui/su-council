@@ -401,6 +401,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def can_start_session_live(self):    return self._has_perm('can_start_session_live')
     @property
+    def can_reopen_topic_live(self):     return self._has_perm('can_reopen_topic_live')
+    @property
     def can_suspend_resume_session(self): return self._has_perm('can_suspend_resume_session')
     @property
     def can_set_topic_timer(self):       return self._has_perm('can_set_topic_timer')
@@ -418,6 +420,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     def can_view_projector(self):        return self._has_perm('can_view_projector')
     @property
     def can_view_analytics(self):        return self._has_perm('can_view_analytics')
+    @property
+    def can_open_previous_minutes(self): return self._has_perm('can_open_previous_minutes')
+    @property
+    def can_broadcast_previous_minutes(self): return self._has_perm('can_broadcast_previous_minutes')
+    @property
+    def can_moderate_live_session(self): return self._has_perm('can_moderate_live_session')
 
     # 10. Search, Notifications, Smart Reader & Audit
     @property
@@ -493,11 +501,13 @@ class CouncilPermission(models.Model):
         'can_manage_delegates', 'can_change_password',
         # 9. Lifecycle & Live Session
         'can_advance_session_stage', 'can_reopen_frozen_session', 'can_approve_new_session',
-        'can_view_live_session', 'can_start_session_live', 'can_suspend_resume_session',
+        'can_view_live_session', 'can_start_session_live', 'can_reopen_topic_live', 'can_suspend_resume_session',
         'can_set_topic_timer',
         'can_manage_speak_requests', 'can_request_speak', 'can_control_recording',
         'can_request_exit_permit', 'can_approve_exit_permit',
         'can_view_projector', 'can_view_analytics',
+        'can_open_previous_minutes', 'can_broadcast_previous_minutes',
+        'can_moderate_live_session',
         # 10. Search, Notifications, Smart Reader & Audit
         'can_search_minutes', 'can_search_person',
         'can_view_notifications', 'can_view_notification_log',
@@ -591,6 +601,8 @@ class CouncilPermission(models.Model):
     can_approve_new_session    = models.BooleanField('الموافقة على جلسة جديدة قبل إغلاق السابقة', default=False)
     can_view_live_session      = models.BooleanField('دخول غرفة الجلسة الحية (Live)', default=False)
     can_start_session_live     = models.BooleanField('إدارة الجلسة الحية وفتح التصويت وإنهاؤه', default=False)
+    can_reopen_topic_live      = models.BooleanField('إعادة فتح المواضيع للنقاش والتصويت أثناء الانعقاد', default=False,
+                                                     help_text='صلاحية إعادة طرح أي موضوع مغلق أو محسوب النتائج للنقاش أو إعادة فتح باب التصويت عليه')
     can_suspend_resume_session = models.BooleanField('تعليق واستئناف ورفع الجلسة الحية (وتحرير القاعة)', default=False)
     can_set_topic_timer        = models.BooleanField('ضبط وقت المواضيع وتمديده', default=False)
     can_manage_speak_requests  = models.BooleanField('إدارة طلبات المداخلة (سماح / رفض / إنهاء)', default=False)
@@ -600,6 +612,12 @@ class CouncilPermission(models.Model):
     can_approve_exit_permit    = models.BooleanField('البتّ في طلبات الإذن بالخروج', default=False)
     can_view_projector         = models.BooleanField('عرض شاشة القاعة البروجكتر (Projector)', default=False)
     can_view_analytics         = models.BooleanField('عرض شاشة التقرير التحليلي للجلسة', default=False)
+    can_open_previous_minutes  = models.BooleanField('زر المحضر السابق في جدول الأعمال', default=False,
+                                                    help_text='إظهار زر «المحضر السابق» في جدول مواضيع الجلسة لفتح نافذة مطالعته ومصادقته')
+    can_broadcast_previous_minutes = models.BooleanField('زر بث لشاشات الأعضاء في شاشة المحضر السابق', default=False,
+                                                         help_text='إظهار وإتاحة زر «بث لشاشات الأعضاء» لبث المحضر السابق لشاشات الأعضاء وإيقافه')
+    can_moderate_live_session      = models.BooleanField('اللوحة العائمة للتوجيه والتنبيه التفاعلي ونقاط النظام للأعضاء', default=False,
+                                                         help_text='إظهار اللوحة العائمة المنكمشة لرئيس الجلسة أو المفوّض لإرسال نقاط النظام ورسائل الهدوء والتوجيهات المخصصة للأعضاء الحاضرين')
 
     # 10. Search, Notifications, Smart Reader & Audit
     can_search_minutes        = models.BooleanField('استخدام شاشة البحث في المحاضر', default=False)
@@ -634,7 +652,7 @@ class CouncilPermission(models.Model):
                 u._cached_council_perm = self
 
     def count_granted(self):
-        """Return total number of granted permissions (out of 58)."""
+        """Return total number of granted permissions (out of 60)."""
         return sum(1 for f in self.ALL_PERMISSION_FIELDS if getattr(self, f, False))
 
     def get_permissions_list(self):

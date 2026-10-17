@@ -211,6 +211,8 @@
               <span>مطالعة الجداول</span>
             </button>
 
+
+
             <!-- زر استعراض جدول الأعمال للعضو -->
             {% if not can_start_session_live %}
             <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 fw-bold d-inline-flex align-items-center gap-1 live-tool-btn"
@@ -344,6 +346,28 @@
             <span class="small text-dark">
               تم تفويضك رسمياً بإدارة وتشغيل الجلسة الحية من قِبل رئيس المجلس. جميع أدوات التشغيل نشطة الآن.
             </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- شريط إشعار نشاط بث المحضر السابق للرئيس والمتحكم مع زر إغلاق فوري صريح -->
+      <div id="live-prev-minutes-broadcast-banner" class="mt-2" style="display: none;">
+        <div class="alert alert-danger border border-danger shadow-sm d-flex flex-wrap align-items-center justify-content-between py-2 px-3 mb-0 rounded-3">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-danger text-white px-2.5 py-1 fw-bold fs-6 animate-pulse"><i class="bi bi-broadcast-pin me-1"></i>بث المحضر نشط للأعضاء</span>
+            <span class="small text-dark fw-bold" id="live-prev-minutes-banner-text">
+              محضر الجلسة السابقة معروض حالياً على شاشات جميع أعضاء المجلس.
+            </span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="openPreviousMinutesModal()">
+              <i class="bi bi-eye me-1"></i> فتح المحضر
+            </button>
+            {% if can_broadcast_previous_minutes %}
+            <button type="button" class="btn btn-sm btn-danger fw-bold shadow-sm px-3" onclick="stopPrevMinutesBroadcast()">
+              <i class="bi bi-stop-circle-fill me-1"></i> إغلاق بث المحضر عن الأعضاء الآن
+            </button>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -556,6 +580,15 @@
                   <span class="fw-bold" style="color: {{ cat.theme.color }}; font-size: 1rem;">{{ cat.label }}</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                  {% if cat.key == 'general' and can_open_previous_minutes %}
+                  <button type="button"
+                          onclick="event.stopPropagation(); openPreviousMinutesModal();"
+                          class="btn btn-sm btn-outline-primary py-1 px-2 fw-bold shadow-sm"
+                          style="font-size: 0.76rem; border-radius: 8px;"
+                          title="عرض ومصادقة محضر الجلسة السابقة">
+                    <i class="bi bi-journal-bookmark-fill me-1"></i>المحضر السابق
+                  </button>
+                  {% endif %}
                   <span id="live-cat-hint-{{ forloop.counter }}" class="small text-muted d-none d-sm-inline" style="font-size: 0.76rem;">
                     {% if cat.has_active %}اضغط للطي ▲{% else %}اضغط للعرض ▼{% endif %}
                   </span>
@@ -634,6 +667,35 @@
                           <i class="bi bi-eye-slash me-1"></i>إغلاق
                         </button>
 
+                        <!-- زر إعادة الطرح والنقاش والتصويت (يظهر عند إغلاق الموضوع للمصرح لهم) -->
+                        {% if can_reopen_topic_live %}
+                        <div class="dropdown d-inline-block btn-reopen-group-{{ t.pk }}" style="{% if t.status != 'voted' and t.display_state.display_status != 'closed' and t.status != 'postponed' %}display:none;{% endif %}">
+                          <button class="btn btn-sm btn-outline-warning text-dark dropdown-toggle px-2 py-1 fw-bold shadow-sm live-ctrl-btn"
+                                  type="button" id="reopenMenu-{{ t.pk }}" data-bs-toggle="dropdown" aria-expanded="false"
+                                  title="إعادة فتح وطرح الموضوع للنقاش أو التصويت بتوجيه الرئاسة" style="font-size: 0.76rem;"
+                                  {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                            <i class="bi bi-arrow-repeat text-primary me-1"></i>إعادة الطرح / التصويت
+                          </button>
+                          <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1" aria-labelledby="reopenMenu-{{ t.pk }}" style="font-size: 0.8rem; border-radius: 8px; z-index: 1050;">
+                            <li>
+                              <button type="button" class="dropdown-item py-1.5 px-3 rounded live-ctrl-btn"
+                                      onclick="confirmReopenDiscussion({{ t.pk }}, '{{ t.title|escapejs }}')"
+                                      {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                                <i class="bi bi-chat-right-text text-primary me-2"></i>إعادة الموضوع للنقاش والمداولة
+                              </button>
+                            </li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li>
+                              <button type="button" class="dropdown-item py-1.5 px-3 rounded live-ctrl-btn"
+                                      onclick="openReopenVotingModal({{ t.pk }}, '{{ t.title|escapejs }}')"
+                                      {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                                <i class="bi bi-check2-square text-success me-2"></i>إعادة فتح باب التصويت...
+                              </button>
+                            </li>
+                          </ul>
+                        </div>
+                        {% endif %}
+
                         <!-- زر المعاينة والمطالعة المباشرة -->
                         <button type="button" class="btn btn-sm btn-outline-light text-navy bg-white border shadow-sm px-2 py-1"
                                 onclick="event.stopPropagation(); openTopicInspector({{ t.pk }})"
@@ -674,6 +736,25 @@
                                 <i class="bi bi-stopwatch text-info me-2"></i>ضبط مؤقت زمني
                               </button>
                             </li>
+                            {% if can_reopen_topic_live %}
+                            <li class="reopen-opt-item-{{ t.pk }}" style="{% if t.status != 'voted' and t.display_state.display_status != 'closed' and t.status != 'postponed' %}display:none;{% endif %}">
+                              <hr class="dropdown-divider my-1">
+                            </li>
+                            <li class="reopen-opt-item-{{ t.pk }}" style="{% if t.status != 'voted' and t.display_state.display_status != 'closed' and t.status != 'postponed' %}display:none;{% endif %}">
+                              <button type="button" class="dropdown-item py-1.5 px-3 rounded text-primary fw-bold live-ctrl-btn"
+                                      onclick="confirmReopenDiscussion({{ t.pk }}, '{{ t.title|escapejs }}')"
+                                      {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                                <i class="bi bi-arrow-repeat me-2"></i>إعادة الموضوع للنقاش
+                              </button>
+                            </li>
+                            <li class="reopen-opt-item-{{ t.pk }}" style="{% if t.status != 'voted' and t.display_state.display_status != 'closed' and t.status != 'postponed' %}display:none;{% endif %}">
+                              <button type="button" class="dropdown-item py-1.5 px-3 rounded text-success fw-bold live-ctrl-btn"
+                                      onclick="openReopenVotingModal({{ t.pk }}, '{{ t.title|escapejs }}')"
+                                      {% if is_frozen_manager %}disabled data-frozen="true"{% endif %}>
+                                <i class="bi bi-check2-square me-2"></i>إعادة فتح باب التصويت
+                              </button>
+                            </li>
+                            {% endif %}
                           </ul>
                         </div>
 
@@ -1244,8 +1325,359 @@
       </div>
       <div class="modal-footer bg-white border-top">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">تراجع</button>
-        <button type="button" class="btn btn-danger btn-sm fw-bold px-3" onclick="confirmSessionAdjourn()">
+        <button type="button" id="btnConfirmAdjourn" class="btn btn-danger btn-sm fw-bold px-3" onclick="confirmSessionAdjourn()">
           <i class="bi bi-check-lg me-1"></i>تأكيد رفع الجلسة الآن
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================================
+     Modal إعادة فتح باب التصويت على الموضوع بتوجيه رئيس المجلس
+     ========================================================================= -->
+<div class="modal fade" id="reopenVotingModal" tabindex="-1" aria-labelledby="reopenVotingModalLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+      <div class="modal-header text-white" style="background: linear-gradient(135deg, #1B365D 0%, #0f3460 100%); border-bottom: 3px solid #f59e0b;">
+        <h5 class="modal-title fw-bold" id="reopenVotingModalLabel">
+          <i class="bi bi-arrow-repeat text-warning me-2"></i>إعادة فتح باب التصويت على الموضوع
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <div class="modal-body p-4 bg-light">
+        <input type="hidden" id="reopen_voting_topic_id" value="">
+        <div class="p-3 mb-3 bg-white rounded border border-warning shadow-sm">
+          <span class="badge bg-primary mb-1">الموضوع المستهدف</span>
+          <h6 class="fw-bold text-dark mb-1" id="reopen_voting_topic_title">...</h6>
+          <small class="text-muted">اختر آلية إعادة فتح التصويت المناسبة لقرار رئاسة المجلس:</small>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small fw-bold text-navy mb-2">آلية احتساب الأصوات عند إعادة الفتح:</label>
+          <div class="d-flex flex-column gap-2">
+            <label class="p-3 bg-white rounded border d-flex align-items-start gap-3 cursor-pointer shadow-sm mb-0">
+              <input type="radio" name="reopen_voting_mode" id="reopen_mode_resume" value="resume" checked class="form-check-input mt-1">
+              <div>
+                <strong class="text-success d-block"><i class="bi bi-play-circle-fill me-1"></i>استئناف التصويت (الاحتفاظ بالأصوات الحالية)</strong>
+                <small class="text-muted d-block mt-1">يبقى تصويت من صوت مسبقاً مسجلاً، ويتاح لمن لم يصوت إدلاء صوته، كما يتاح للأعضاء المصوتين تعديل أصواتهم.</small>
+              </div>
+            </label>
+
+            <label class="p-3 bg-white rounded border d-flex align-items-start gap-3 cursor-pointer shadow-sm mb-0">
+              <input type="radio" name="reopen_voting_mode" id="reopen_mode_reset" value="reset" class="form-check-input mt-1">
+              <div>
+                <strong class="text-danger d-block"><i class="bi bi-trash3-fill me-1"></i>تصفير الأصوات والبدء من جديد (جولة تصويت جديدة)</strong>
+                <small class="text-muted d-block mt-1">يتم مسح كافة أصوات هذا الموضوع نهائياً، ويبدأ التصويت من الصفر كجولة تصويت جديدة تماماً.</small>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-white border-top">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">إلغاء</button>
+        <button type="button" class="btn btn-warning btn-sm fw-bold px-3 text-dark shadow-sm" onclick="executeReopenVoting()">
+          <i class="bi bi-check2-square me-1"></i>تأكيد فتح باب التصويت الآن
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================================
+     Modal عرض ومصادقة المحضر السابق (Previous Minutes Ratification Modal)
+     يمكّن مدير الجلسة من اختيار أي جلسة سابقة وعرض محضرها كاملاً وقراءته آلياً
+     ========================================================================= -->
+<div class="modal fade" id="previousMinutesModal" tabindex="-1" aria-labelledby="previousMinutesModalLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered" style="max-width: min(1100px, 97vw);">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+
+      <!-- رأس المودال -->
+      <div class="modal-header text-white py-3 px-4" style="background: linear-gradient(135deg, #1B365D 0%, #0f3460 80%, #1a4a7a 100%); border-bottom: 3px solid #f3c65f;">
+        <div class="d-flex align-items-center gap-3 flex-grow-1 overflow-hidden">
+          <div class="d-flex align-items-center justify-content-center rounded-circle bg-warning bg-opacity-20 border border-warning border-opacity-25" style="width:46px; height:46px; flex-shrink:0;">
+            <i class="bi bi-journal-bookmark-fill text-warning fs-4"></i>
+          </div>
+          <div class="overflow-hidden">
+            <h5 class="modal-title fw-bold mb-0 text-white" id="previousMinutesModalLabel">
+              مصادقة المحضر السابق – عرض وقراءة
+            </h5>
+            <small class="text-white-50 d-block mt-0" id="prevMinutesSessionLabel" style="font-size: 0.78rem;">
+              اختر الجلسة السابقة لعرض محضرها والاستماع إليه
+            </small>
+          </div>
+        </div>
+        <div id="prev-minutes-header-broadcast-badge" class="d-none align-items-center gap-2 me-auto">
+          <span class="badge bg-danger animate-pulse px-2.5 py-1.5 shadow-sm"><i class="bi bi-broadcast-pin me-1"></i> البث نشط للأعضاء</span>
+          {% if can_broadcast_previous_minutes %}
+          <button type="button" class="btn btn-xs btn-danger border border-white text-white fw-bold px-2 py-1 shadow-sm" onclick="stopPrevMinutesBroadcast()" title="إيقاف بث المحضر عن الأعضاء فوراً">
+            <i class="bi bi-stop-circle me-1"></i>إيقاف البث
+          </button>
+          {% endif %}
+        </div>
+        <button type="button" class="btn-close btn-close-white ms-2 flex-shrink-0" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+
+      <!-- شريط إشعار للأعضاء المشاركين (وضع المطالعة الصامت) -->
+      <div id="prev-minutes-member-banner" class="px-4 py-2.5 border-bottom d-none align-items-center justify-content-between" style="background: linear-gradient(135deg, #e0f2fe 0%, #f0fdf4 100%); border-right: 5px solid #0284c7 !important;">
+        <div class="d-flex align-items-center gap-2">
+          <span class="spinner-grow spinner-grow-sm text-primary" role="status" aria-hidden="true"></span>
+          <span class="fw-bold text-dark" style="font-size:0.85rem;" id="prev-minutes-member-banner-text">
+            <i class="bi bi-broadcast me-1 text-primary"></i> يعرض رئيس المجلس حالياً محضر الجلسة السابقة للمطالعة والمصادقة
+          </span>
+        </div>
+        <span class="badge bg-white text-primary border border-primary border-opacity-25 shadow-sm px-2 py-1" style="font-size:0.72rem;">
+          وضع المطالعة (تصفح فقط)
+        </span>
+      </div>
+
+      <!-- شريط اختيار الجلسة وأدوات التحكم بالصوت (خاص برئيس الجلسة والمتحكم المفوض فقط) -->
+      <div id="prev-minutes-controller-controls" class="px-4 py-3 border-bottom {% if not can_start_session_live and not is_frozen_manager %}d-none{% endif %}" style="background: #f8fafc;">
+
+        <!-- الصف الأول: اختيار الجلسة + زر البث للشاشات -->
+        <div class="row g-2 align-items-end mb-3">
+          <div class="col-md-8">
+            <label class="form-label small fw-bold mb-1" style="color:#1B365D;">
+              <i class="bi bi-list-check me-1 text-primary"></i>
+              اختيار الجلسة السابقة للعرض والمصادقة:
+            </label>
+            <select id="prevMinutesSessionSelect" class="form-select form-select-sm shadow-sm"
+                    onchange="loadPreviousMinutesContent(this.value)"
+                    style="border-color: #1B365D; border-radius: 8px;">
+              <option value="">-- اختر الجلسة المراد عرض محضرها --</option>
+            </select>
+          </div>
+          <div class="col-md-4 text-md-end">
+            {% if can_broadcast_previous_minutes %}
+            <button type="button" id="btn-broadcast-prev-minutes"
+                    class="btn btn-sm btn-outline-danger fw-bold shadow-sm px-3 w-100 w-md-auto"
+                    onclick="togglePrevMinutesBroadcast()"
+                    title="بث المحضر لشاشات جميع أعضاء المجلس المتصلين بالقاعة">
+              <i class="bi bi-broadcast me-1"></i> بث لشاشات الأعضاء
+            </button>
+            <button type="button" id="btn-stop-prev-minutes-broadcast"
+                    class="btn btn-sm btn-danger fw-bold shadow-sm px-3 w-100 w-md-auto d-none animate-pulse"
+                    onclick="stopPrevMinutesBroadcast()"
+                    title="إيقاف بث المحضر السابق فوراً وإغلاقه عند جميع الأعضاء">
+              <i class="bi bi-stop-circle-fill me-1"></i> إغلاق بث المحضر عن الأعضاء
+            </button>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- الصف الثاني: لوحة التحكم بالقراءة الآلية -->
+        <div class="p-3 rounded-3 border" style="background:#fff; border-color:#dde3ed !important;">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <small class="fw-bold text-muted me-1" style="font-size:0.75rem; min-width:fit-content;">
+              <i class="bi bi-headphones me-1 text-primary"></i>أدوات القراءة الآلية:
+            </small>
+
+            <!-- أزرار التشغيل / الإيقاف المؤقت / الاستئناف / الإيقاف الكامل -->
+            <button type="button" id="btn-prev-minutes-read" class="btn btn-sm btn-primary fw-bold px-3 d-none"
+                    onclick="startPreviousMinutesReading()"
+                    title="تشغيل القراءة الآلية المتزامنة للمحضر كاملاً من البداية">
+              <i class="bi bi-play-circle-fill me-1"></i> تشغيل القراءة
+            </button>
+            <button type="button" id="btn-prev-minutes-pause" class="btn btn-sm btn-warning fw-bold px-3 d-none text-dark"
+                    onclick="pausePrevMinutesReading()" title="إيقاف مؤقت للقراءة">
+              <i class="bi bi-pause-circle-fill me-1"></i> إيقاف مؤقت
+            </button>
+            <button type="button" id="btn-prev-minutes-resume" class="btn btn-sm btn-success fw-bold px-3 d-none"
+                    onclick="resumePrevMinutesReading()" title="استئناف القراءة من حيث توقفت">
+              <i class="bi bi-play-fill me-1"></i> استئناف
+            </button>
+            <button type="button" id="btn-prev-minutes-stop" class="btn btn-sm btn-danger fw-bold px-3 d-none"
+                    onclick="stopPrevMinutesReading()" title="إيقاف القراءة تماماً والرجوع للبداية">
+              <i class="bi bi-stop-circle-fill me-1"></i> إيقاف كامل
+            </button>
+
+            <!-- مؤشر جاري القراءة -->
+            <div id="prev-minutes-reading-status" class="d-none">
+              <span class="badge bg-primary animate-pulse px-2 py-1" id="prev-minutes-status-badge" style="font-size:0.74rem;">
+                <i class="bi bi-soundwave me-1"></i> جاري القراءة...
+              </span>
+            </div>
+          </div>
+
+          <!-- الصف الفرعي: السرعة + نوع الصوت -->
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <!-- أزرار السرعة -->
+            <div class="d-flex align-items-center gap-1 flex-wrap">
+              <small class="text-muted fw-bold" style="font-size:0.73rem; min-width:fit-content;">
+                <i class="bi bi-speedometer2 me-1"></i>السرعة:
+              </small>
+              <div class="btn-group btn-group-sm" role="group" aria-label="سرعة القراءة">
+                <button type="button" class="btn btn-outline-secondary prev-speed-btn" onclick="setPrevMinutesSpeed(0.75, this)" title="بطيء جداً" style="font-size:0.72rem; padding:2px 7px;">0.75×</button>
+                <button type="button" class="btn btn-outline-secondary prev-speed-btn" onclick="setPrevMinutesSpeed(0.85, this)" title="بطيء" style="font-size:0.72rem; padding:2px 7px;">0.85×</button>
+                <button type="button" class="btn btn-outline-primary prev-speed-btn active" onclick="setPrevMinutesSpeed(1.0, this)" title="طبيعي" style="font-size:0.72rem; padding:2px 7px;">1.0×</button>
+                <button type="button" class="btn btn-outline-secondary prev-speed-btn" onclick="setPrevMinutesSpeed(1.25, this)" title="سريع" style="font-size:0.72rem; padding:2px 7px;">1.25×</button>
+                <button type="button" class="btn btn-outline-secondary prev-speed-btn" onclick="setPrevMinutesSpeed(1.5, this)" title="سريع جداً" style="font-size:0.72rem; padding:2px 7px;">1.5×</button>
+              </div>
+            </div>
+
+            <!-- نوع الصوت -->
+            <div class="d-flex align-items-center gap-1 flex-wrap">
+              <small class="text-muted fw-bold" style="font-size:0.73rem; min-width:fit-content;">
+                <i class="bi bi-mic-fill me-1"></i>نوع الصوت:
+              </small>
+              <div class="btn-group btn-group-sm" role="group" aria-label="نوع الصوت">
+                <button type="button" id="prev-mode-neural" class="btn btn-outline-primary active" onclick="setPrevMinutesMode('cloud_neural')" title="صوت عصبي عالي الجودة (يتطلب اتصال بالإنترنت)" style="font-size:0.72rem; padding:2px 8px;">
+                  <i class="bi bi-cloud-fill me-1"></i>صوت عصبي
+                </button>
+                <button type="button" id="prev-mode-local" class="btn btn-outline-secondary" onclick="setPrevMinutesMode('browser_local')" title="صوت المتصفح المحلي (لا يحتاج اتصال)" style="font-size:0.72rem; padding:2px 8px;">
+                  <i class="bi bi-laptop me-1"></i>محلي
+                </button>
+              </div>
+            </div>
+
+            <!-- تلميح النقر -->
+            <small class="text-muted d-none d-md-inline" style="font-size:0.71rem;">
+              <i class="bi bi-hand-index-thumb me-1 text-info"></i>انقر على أي موضوع للقراءة منه مباشرة
+            </small>
+          </div>
+        </div>
+
+        <!-- شريط التقدم في القراءة -->
+        <div id="prev-minutes-progress-bar-wrap" class="mt-2 d-none">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <small class="text-muted fw-bold" id="prev-minutes-progress-label">تقدم القراءة:</small>
+            <small class="text-muted font-monospace" id="prev-minutes-progress-text">0 / 0</small>
+          </div>
+          <div class="progress" style="height: 6px; border-radius: 4px;">
+            <div id="prev-minutes-progress-bar" class="progress-bar bg-primary progress-bar-striped progress-bar-animated" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- جسم المودال: عرض المحضر -->
+      <div class="modal-body p-0" style="max-height: 72vh; overflow-y: auto; background: #f8fafc;">
+
+        <!-- حالة التحميل -->
+        <div id="prev-minutes-loading" class="text-center py-5 d-none">
+          <div class="spinner-border text-primary" style="width: 2.5rem; height: 2.5rem;"></div>
+          <p class="text-muted small mt-3 mb-0">جارٍ تحميل محضر الجلسة...</p>
+        </div>
+
+        <!-- حالة الفراغ الابتدائي -->
+        <div id="prev-minutes-empty" class="text-center py-5 px-3">
+          <span class="fs-1 d-block mb-3">📋</span>
+          <h6 class="fw-bold text-navy mb-2" style="color:#1B365D;">اختر الجلسة السابقة من القائمة أعلاه</h6>
+          <p class="text-muted small mb-0">سيتم عرض المحضر كاملاً هنا بما يشمل الحضور، المواضيع، والقرارات.</p>
+        </div>
+
+        <!-- محتوى المحضر -->
+        <div id="prev-minutes-content" class="d-none">
+
+          <!-- ديباجة المحضر وترويسة الجلسة الرسمية -->
+          <div id="prev-minutes-header-section" class="p-4 border-bottom" style="background: linear-gradient(180deg, #f0f4f9 0%, #ffffff 100%);">
+            
+            <!-- عنوان الجلسة والشارات التوثيقية -->
+            <div class="text-center mb-3">
+              <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-1 mb-2 rounded-pill fw-bold" style="font-size:0.75rem;">
+                <i class="bi bi-file-earmark-text-fill me-1"></i> وثيقة المحضر المعتمد
+              </span>
+              <h4 class="fw-bold mb-2" id="prev-minutes-title" style="color:#1B365D; letter-spacing: -0.3px;"></h4>
+              <div class="d-flex flex-wrap justify-content-center gap-2 mt-2" id="prev-minutes-meta-badges"></div>
+            </div>
+
+            <!-- بطاقات هيئة الرئاسة والأمانة (شبكة متناسقة من 3 بطاقات) -->
+            <div class="row g-2 mt-2" id="prev-minutes-presidency-grid">
+              <!-- بطاقة رئيس المجلس -->
+              <div class="col-md-4" id="prev-chair-card-wrap">
+                <div class="p-2.5 px-3 bg-white rounded-3 border h-100 shadow-sm" style="border-right: 4px solid #1B365D !important;">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge rounded-circle p-1 d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary" style="width:24px; height:24px;">
+                      <i class="bi bi-person-workspace" style="font-size:0.8rem;"></i>
+                    </span>
+                    <small class="text-muted fw-bold" style="font-size:0.75rem;">رئيس المجلس</small>
+                  </div>
+                  <div class="fw-bold text-navy text-truncate" id="prev-chair-name" style="color:#1B365D; font-size:0.85rem;" title="">-</div>
+                </div>
+              </div>
+
+              <!-- بطاقة مقرر المجلس -->
+              <div class="col-md-4" id="prev-secretary-card-wrap">
+                <div class="p-2.5 px-3 bg-white rounded-3 border h-100 shadow-sm" style="border-right: 4px solid #0284c7 !important;">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge rounded-circle p-1 d-flex align-items-center justify-content-center bg-info bg-opacity-10 text-info" style="width:24px; height:24px;">
+                      <i class="bi bi-journal-text" style="font-size:0.8rem;"></i>
+                    </span>
+                    <small class="text-muted fw-bold" style="font-size:0.75rem;">مقرر المجلس</small>
+                  </div>
+                  <div class="fw-bold text-dark text-truncate" id="prev-secretary-name" style="font-size:0.85rem;" title="">-</div>
+                </div>
+              </div>
+
+              <!-- بطاقة مساعد المقرر -->
+              <div class="col-md-4" id="prev-assistant-card-wrap">
+                <div class="p-2.5 px-3 bg-white rounded-3 border h-100 shadow-sm" style="border-right: 4px solid #64748b !important;">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge rounded-circle p-1 d-flex align-items-center justify-content-center bg-secondary bg-opacity-10 text-secondary" style="width:24px; height:24px;">
+                      <i class="bi bi-person-badge" style="font-size:0.8rem;"></i>
+                    </span>
+                    <small class="text-muted fw-bold" style="font-size:0.75rem;">مساعد المقرر</small>
+                  </div>
+                  <div class="fw-bold text-muted text-truncate" id="prev-assistant-name" style="font-size:0.85rem;" title="">-</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- افتتاحية وتكريمات -->
+            <div id="prev-minutes-opening-wrap" class="mt-3 p-3 bg-white rounded-3 border border-warning border-opacity-50 shadow-sm d-none" style="background: #fffdf5 !important;">
+              <h6 class="fw-bold text-navy mb-2" style="font-size:0.85rem; color:#1B365D;">
+                <i class="bi bi-star-fill text-warning me-1"></i> الافتتاحية والمراسم الرسمية:
+              </h6>
+              <div id="prev-minutes-opening" class="small text-dark" style="white-space: pre-line; line-height:1.75;"></div>
+            </div>
+          </div>
+
+          <!-- إحصائية الحضور والنصاب القانوني (بدون سرد الأسماء) -->
+          <div class="p-3 px-4 border-bottom bg-white">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-pie-chart-fill text-primary"></i>
+                <h6 class="fw-bold text-navy mb-0" style="color:#1B365D; font-size:0.9rem;">إحصائية الحضور والنصاب القانوني للجلسة</h6>
+              </div>
+            </div>
+            <div class="row g-2 justify-content-center">
+              <div class="col-4 col-sm-3 col-md-2">
+                <div class="text-center p-2 rounded-3 border border-success border-opacity-25" style="background-color: #ecfdf5;">
+                  <div class="fs-4 fw-bold text-success" id="prev-att-present-count">0</div>
+                  <small class="fw-bold text-success d-block" style="font-size:0.74rem;">✓ حاضر</small>
+                </div>
+              </div>
+              <div class="col-4 col-sm-3 col-md-2">
+                <div class="text-center p-2 rounded-3 border border-warning border-opacity-25" style="background-color: #fffbeb;">
+                  <div class="fs-4 fw-bold text-warning" id="prev-att-excused-count">0</div>
+                  <small class="fw-bold text-warning d-block" style="font-size:0.74rem;">⏸️ معتذر</small>
+                </div>
+              </div>
+              <div class="col-4 col-sm-3 col-md-2">
+                <div class="text-center p-2 rounded-3 border border-secondary border-opacity-25" style="background-color: #f8fafc;">
+                  <div class="fs-4 fw-bold text-secondary" id="prev-att-absent-count">0</div>
+                  <small class="fw-bold text-secondary d-block" style="font-size:0.74rem;">✕ غائب</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- قائمة المواضيع والقرارات -->
+          <div class="p-4" id="prev-minutes-topics-container">
+            <!-- تُبنى ديناميكياً بواسطة JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- تذييل المودال -->
+      <div class="modal-footer py-2 px-4 bg-white border-top d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <span class="text-muted small" id="prev-minutes-footer-hint">
+            <i class="bi bi-info-circle me-1 text-primary"></i>
+            يمكنك استخدام القراءة الآلية لإسماع المحضر جميع الأعضاء
+          </span>
+        </div>
+        <button type="button" class="btn btn-sm btn-secondary fw-bold px-4" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg me-1"></i> إغلاق
         </button>
       </div>
     </div>
@@ -1529,6 +1961,207 @@
   </div>
 </div>
 
+{% if can_moderate_live_session %}
+<!-- =========================================================================
+     اللوحة الطائرة المنكمشة لإدارة وتوجيه الأعضاء الحاضرين (Live Moderation Dock)
+     تظهر بشكل منكمش وأنيق على شاشة رئيس المجلس والمخوّلين بالصلاحية
+     ========================================================================= -->
+<div id="president-moderation-dock" class="moderation-dock-container">
+  
+  <!-- الزر العائم في حالته المنكمشة الأنيقة (Collapsed Pill) -->
+  <div id="moderation-dock-collapsed" class="moderation-pill-wrap shadow-lg" onclick="toggleModerationDock(true)" title="فتح لوحة ضبط وتوجيه الأعضاء الحاضرين">
+    <div class="d-flex align-items-center gap-2 px-3 py-2">
+      <span class="moderation-glow-icon">
+        <i class="bi bi-shield-lock-fill text-gold fs-5"></i>
+      </span>
+      <div class="text-start d-none d-sm-block" style="line-height: 1.2;">
+        <span class="fw-bold d-block text-white" style="font-size: 0.82rem;">توجيه وضبط الحضور</span>
+        <small class="text-white-50" style="font-size: 0.68rem;"><span id="dock-present-count">{{ present_members|length }}</span> عضواً حاضراً</small>
+      </div>
+      <span class="badge rounded-pill fw-bold" id="dock-present-badge" style="background: #f3c65f; color: #1B365D; font-size: 0.72rem;">{{ present_members|length }}</span>
+      <i class="bi bi-chevron-up text-white-50 ms-1" style="font-size: 0.75rem;"></i>
+    </div>
+  </div>
+
+  <!-- جسم اللوحة الطائرة المنبثقة عند التمدد (Expanded Floating Panel) -->
+  <div id="moderation-dock-panel" class="moderation-floating-panel card shadow-2xl border-0 d-none">
+    
+    <!-- ترويسة اللوحة الملكية (شريط السحب والتحريك) -->
+    <div id="moderation-dock-header" class="card-header moderation-dock-header py-2.5 px-3 d-flex align-items-center justify-content-between text-white" style="background: linear-gradient(135deg, #0d1b2a 0%, #1B365D 100%); border-bottom: 2px solid #D4AF37;">
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-warning bg-opacity-20 text-warning border border-warning rounded-circle p-1.5">
+          <i class="bi bi-sliders fs-6 text-gold"></i>
+        </span>
+        <div>
+          <h6 class="mb-0 fw-bold fs-6 text-gold" style="color: #f3c65f;">
+            <i class="bi bi-grip-vertical text-white-50 ms-1 d-none d-sm-inline opacity-75" title="اسحب اللوحة لتحريكها"></i>ضبط وتوجيه الحضور | رئاسة المجلس
+          </h6>
+          <small class="text-white-50" style="font-size: 0.68rem;">إرسال نقاط النظام ورسائل الهدوء والتوجيهات المباشرة</small>
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-1">
+        <button type="button" class="btn btn-sm btn-link text-white-50 p-1 hover-white" onclick="refreshPresentMembersList()" title="تحديث كشف الحاضرين">
+          <i class="bi bi-arrow-clockwise fs-6"></i>
+        </button>
+        <button type="button" class="btn btn-sm btn-link text-white-50 p-1 hover-white" onclick="toggleModerationDock(false)" title="طي اللوحة">
+          <i class="bi bi-dash-lg fs-5"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- شريط البحث السريع بين الحاضرين -->
+    <div class="p-2 bg-light border-bottom">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+        <input type="text" id="moderationMemberSearch" class="form-control border-start-0" placeholder="بحث فوري في أسماء الحاضرين..." onkeyup="filterModerationMembers()">
+        <span class="input-group-text bg-white text-muted small" id="moderation-search-stats" style="font-size: 0.72rem;">{{ present_members|length }} عضو</span>
+      </div>
+    </div>
+
+    <!-- قائمة الأعضاء الحاضرين في الجلسة فقط -->
+    <div class="card-body p-2 overflow-auto" id="moderation-members-list" style="max-height: 420px; min-height: 180px;">
+      {% for m in present_members %}
+      <div class="moderation-member-row card p-2 mb-2 border shadow-2xs hover-shadow-sm transition-all" id="member-mod-card-{{ m.id }}" data-member-id="{{ m.id }}" data-member-name="{{ m.name|lower }}">
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-1.5">
+          <div class="overflow-hidden flex-grow-1">
+            <div class="fw-bold text-dark text-truncate small" style="font-size: 0.84rem;" title="{{ m.name }}">
+              <span class="online-indicator-dot me-1"></span>{{ m.name }}
+            </div>
+            <small class="text-muted text-truncate d-block" style="font-size: 0.72rem;">
+              {{ m.seat_name|default:m.title }}
+              {% if m.is_proxy %}
+                <span class="badge bg-info text-dark ms-1 py-0 px-1" style="font-size: 0.60rem;">إنابة: {{ m.proxy_name }}</span>
+              {% endif %}
+            </small>
+          </div>
+        </div>
+
+        <!-- الأزرار الثلاثة المحددة لكل عضو -->
+        <div class="d-flex align-items-center justify-content-between gap-1 pt-1.5 border-top mt-1">
+          <!-- الزر الأول: نقطة نظام (فلاشي تصويري) -->
+          <button type="button" id="btn-dir-poo-{{ m.id }}" class="btn btn-sm btn-outline-danger py-1 px-2 fw-bold flex-fill d-inline-flex align-items-center justify-content-center gap-1 action-btn-point"
+                  onclick="sendPresidentDirective({{ m.id }}, 'point_of_order', '{{ m.name|escapejs }}', this)"
+                  title="إرسال نقطة نظام فلاشية مصحوبة بوميض وتنبيه صوتي">
+            <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+            <span style="font-size: 0.70rem;">نقطة نظام</span>
+          </button>
+
+          <!-- الزر الثاني: يرجى الهدوء والتركيز -->
+          <button type="button" id="btn-dir-calm-{{ m.id }}" class="btn btn-sm btn-outline-warning text-dark py-1 px-2 fw-bold flex-fill d-inline-flex align-items-center justify-content-center gap-1 bg-warning bg-opacity-10"
+                  onclick="sendPresidentDirective({{ m.id }}, 'calm_focus', '{{ m.name|escapejs }}', this)"
+                  title="إرسال تنبيه: يرجى الهدوء والتركيز">
+            <i class="bi bi-volume-mute-fill text-warning"></i>
+            <span style="font-size: 0.70rem;">هدوء وتركيز</span>
+          </button>
+
+          <!-- الزر الثالث: رسالة نصية مخصصة -->
+          <button type="button" id="btn-dir-msg-{{ m.id }}" class="btn btn-sm btn-outline-primary py-1 px-2 fw-bold flex-fill d-inline-flex align-items-center justify-content-center gap-1"
+                  onclick="toggleCustomMessageInput({{ m.id }})"
+                  title="كتابة نص مخصص وإرساله لهذا العضو">
+            <i class="bi bi-chat-text-fill text-primary"></i>
+            <span style="font-size: 0.70rem;">رسالة نصية</span>
+          </button>
+        </div>
+
+        <!-- مربع النص المنبثق للزر الثالث (المخصص) -->
+        <div id="custom-msg-box-{{ m.id }}" class="custom-msg-drawer mt-2 p-2 bg-light rounded border d-none">
+          <label class="small text-navy fw-bold mb-1 d-block" style="font-size: 0.72rem; color: #1B365D;">
+            <i class="bi bi-pencil-square me-1 text-primary"></i>توجيه خاص إلى: <strong class="text-dark">د. {{ m.name }}</strong>
+          </label>
+          <textarea id="custom-msg-text-{{ m.id }}" class="form-control form-control-sm mb-1.5" rows="2" placeholder="اكتب التوجيه أو الملاحظة هنا..." style="font-size: 0.75rem; resize: vertical;"></textarea>
+          <div class="d-flex justify-content-end gap-1">
+            <button type="button" class="btn btn-xs btn-outline-secondary py-0.5 px-2" style="font-size: 0.70rem;" onclick="toggleCustomMessageInput({{ m.id }})">إلغاء</button>
+            <button type="button" id="btn-dir-submit-{{ m.id }}" class="btn btn-xs btn-primary text-white py-0.5 px-2.5 fw-bold" style="font-size: 0.70rem; background:#1B365D;" onclick="submitCustomDirective({{ m.id }}, '{{ m.name|escapejs }}', this)">
+              <i class="bi bi-send-fill me-1"></i>إرسال التوجيه
+            </button>
+          </div>
+        </div>
+
+        <!-- شريط التأكيد والتغذية الراجعة بعد الإرسال -->
+        <div id="directive-feedback-{{ m.id }}" class="directive-feedback-bar alert alert-success py-1 px-2 mb-0 mt-1 small d-none" style="font-size: 0.68rem;"></div>
+      </div>
+      {% empty %}
+      <div class="text-center py-4 text-muted small" id="moderation-empty-msg">
+        <i class="bi bi-person-x fs-2 d-block mb-1 text-secondary opacity-50"></i>
+        لا يوجد أعضاء حاضرون مسجلون حالياً.
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- تذييل اللوحة المنبثقة -->
+    <div class="card-footer py-1.5 px-3 bg-light border-top d-flex justify-content-between align-items-center">
+      <small class="text-muted" style="font-size: 0.68rem;"><i class="bi bi-info-circle me-1"></i>تصل التنبيهات فلاشياً مع نغمة صوتية متزامنة</small>
+      <button type="button" class="btn btn-xs btn-outline-secondary py-0.5 px-2" style="font-size: 0.70rem;" onclick="toggleModerationDock(false)">طي ▲</button>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
+<!-- =========================================================================
+     المؤثر الفلاشي البصري والتصويري لشاشة العضو عند تلقي نقطة نظام
+     ========================================================================= -->
+<div id="flashDirectiveOverlay" class="flash-directive-overlay d-none"></div>
+
+<!-- =========================================================================
+     شاشة الرسائل والتوجيهات الرئاسية المناسبة والأنيقة لدى العضو المستهدف
+     تحمل اسم العضو بوضوح وتتزامن لحظياً مع نغمة التنبيه الصوتية
+     ========================================================================= -->
+<div id="memberDirectiveModal" class="member-directive-modal-backdrop d-none" tabindex="-1" role="dialog" aria-modal="true">
+  <div class="member-directive-dialog animate-pop-in">
+    <div class="member-directive-card shadow-2xl border-0 overflow-hidden">
+      
+      <!-- الشريط العلوي الفخم المتغير بحسب نوع التوجيه -->
+      <div id="directiveHeaderBand" class="directive-header-band p-3 text-white text-center position-relative">
+        <div class="directive-icon-circle mx-auto mb-2 shadow-sm" id="directiveIconCircle">
+          <i class="bi bi-exclamation-octagon-fill fs-2" id="directiveHeaderIcon"></i>
+        </div>
+        <h5 class="fw-bold mb-0" id="directiveHeaderTitle" style="letter-spacing: 0.5px;">نقطة نظام من رئاسة المجلس</h5>
+        <div class="directive-time-tag text-white-50 small mt-1" id="directiveHeaderTime"></div>
+      </div>
+
+      <!-- محتوى الرسالة والتوجيه الرسمي الموجه باسم العضو -->
+      <div class="p-3 p-md-4 bg-white">
+        
+        <!-- إدراج اسم العضو وصفته الرسمية صراحةً على الرسالة -->
+        <div class="directive-recipient-box p-2.5 rounded-3 mb-3 border d-flex align-items-center gap-2" style="background: rgba(27, 54, 93, 0.04); border-color: rgba(27, 54, 93, 0.15) !important;">
+          <div class="avatar-badge-md rounded-circle d-flex align-items-center justify-content-center shadow-xs" style="width: 38px; height: 38px; font-size: 0.85rem; flex-shrink: 0; background: #1B365D; color: #f3c65f;">
+            <i class="bi bi-person-fill"></i>
+          </div>
+          <div>
+            <div class="text-muted small" style="font-size: 0.70rem;">توجيه رئاسي خاص موجّه إلى:</div>
+            <div class="fw-bold fs-6" id="directiveRecipientName" style="color: #1B365D;">
+              {% if request.user.full_name|slice:":2" == "د." or request.user.full_name|slice:":4" == "أ.د." %}{{ request.user.full_name }}{% else %}د. {{ request.user.full_name }}{% endif %}
+            </div>
+            <div class="text-secondary small" style="font-size: 0.72rem;" id="directiveRecipientTitle">
+              {{ request.user.official_title|default:request.user.get_title_display }}
+            </div>
+          </div>
+        </div>
+
+        <!-- نص الرسالة في إطار ملكي أنيق -->
+        <div class="directive-quote-card p-3 rounded-3 mb-3 border-start border-4" id="directiveQuoteCard">
+          <div class="small text-muted mb-1 fw-bold" id="directiveLabelSmall">نص التوجيه:</div>
+          <div class="fs-6 fw-semibold text-dark directive-message-body" id="directiveMessageBody" style="line-height: 1.8; white-space: pre-line;"></div>
+        </div>
+
+        <!-- بيانات المصدر والرئاسة -->
+        <div class="d-flex align-items-center justify-content-between small text-muted mb-3 px-1">
+          <div><i class="bi bi-bank me-1 text-gold" style="color: #D4AF37;"></i>رئاسة مجلس الجامعة</div>
+          <div id="directiveSenderTag"><i class="bi bi-shield-check me-1 text-success"></i>بتوجيه معالي رئيس المجلس</div>
+        </div>
+
+        <!-- زر الإقرار والاستيعاب (تأكيد القراءة والإغلاق) -->
+        <button type="button" id="btn-dismiss-directive" class="btn btn-lg w-100 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2" onclick="dismissCurrentDirective()" style="background: #1B365D; color: #ffffff; border-radius: 10px;">
+          <i class="bi bi-check2-circle fs-5"></i>
+          <span>فهمت واستوعبت التوجيه (إغلاق التنبيه)</span>
+        </button>
+
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- =========================================================================
      JavaScript: المحرك التفاعلي للجلسة الحية، المؤقت، التسجيل، وطابور الكلمة
      ========================================================================= -->
@@ -1546,6 +2179,922 @@ const CAN_POSTPONE_TOPIC = {{ can_postpone_topic|yesno:"true,false" }};
 let IS_SESSION_SUSPENDED_CLIENT = {{ is_suspended|yesno:"true,false" }};
 let currentActiveSpeakerId = {{ active_speaker.pk|default:0 }};
 let currentActiveTopicId = {{ active_topic.pk|default:0 }};
+let CAN_MODERATE_LIVE = {{ can_moderate_live_session|yesno:"true,false" }};
+const CURRENT_USER_ID = {{ request.user.pk }};
+const CURRENT_USER_NAME = "{{ request.user.full_name|escapejs }}";
+let activeIncomingDirectiveId = null;
+
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║         نظام عرض المحضر السابق والقراءة الآلية المتزامنة                   ║
+// ║  Previous Minutes Ratification System with Synchronized Smart Audio Reader  ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+const prevMinutesState = {
+  loaded: false,
+  isLoadingList: false,       // لمنع تكرار الطلبات المتوازية
+  sessionsList: [],           // قائمة الجلسات السابقة
+  selectedSessionId: null,    // الجلسة المختارة
+  chunks: [],                 // مقاطع النص للقراءة الآلية
+  chunkFieldMap: {},          // field → chunkIndex للقفز السريع
+  currentChunkIndex: 0,
+  totalChunks: 0,
+  isReading: false,
+  isPaused: false,
+  _forceStopped: false,       // flag لمنع الـ callbacks بعد الإيقاف
+  speed: 1.0,                 // سرعة القراءة الحالية
+  audioElement: null,         // HTML5 Audio لوضع السحابة العصبية
+  readingMode: 'cloud_neural',// cloud_neural أو browser_local
+  isBroadcasting: false,      // هل يبث رئيس المجلس المحضر حالياً؟
+  broadcastedSessionId: null, // رقم الجلسة المبثوثة حالياً
+  openedByBroadcast: false    // هل فتح المودال عند العضو بواسطة بث الرئيس؟
+};
+
+// تهيئة عنصر الصوت
+prevMinutesState.audioElement = new Audio();
+prevMinutesState.audioElement.onended = () => {
+  if (prevMinutesState._forceStopped) return;
+  advancePrevMinutesChunk();
+};
+prevMinutesState.audioElement.onerror = () => {
+  if (prevMinutesState._forceStopped) return;
+  // Fallback للمتصفح
+  const chunk = prevMinutesState.chunks[prevMinutesState.currentChunkIndex];
+  if (chunk) playPrevMinutesChunkLocal(chunk.text);
+};
+
+/**
+ * تشغيل أو إيقاف بث المحضر السابق لشاشات جميع الأعضاء
+ */
+function togglePrevMinutesBroadcast() {
+  if (!prevMinutesState.selectedSessionId) {
+    showToastAlert('يرجى اختيار الجلسة السابقة أولاً لبدء بثها.', 'warning');
+    return;
+  }
+
+  const newAction = prevMinutesState.isBroadcasting ? 'stop' : 'start';
+  const btn = document.getElementById('btn-broadcast-prev-minutes');
+
+  fetch(`/api/sessions/${SESSION_ID}/broadcast-minutes/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({
+      action: newAction,
+      previous_session_id: prevMinutesState.selectedSessionId
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.ok) {
+      showToastAlert(data.error || 'تعذر تحديث حالة البث.', 'danger');
+      return;
+    }
+
+    prevMinutesState.isBroadcasting = (newAction === 'start');
+    prevMinutesState.broadcastedSessionId = data.broadcast_prev_minutes_id;
+    _updateBroadcastButtonUI(prevMinutesState.isBroadcasting, data.broadcast_prev_minutes_label);
+    showToastAlert(data.message, prevMinutesState.isBroadcasting ? 'success' : 'info');
+  })
+  .catch(() => showToastAlert('خطأ في الاتصال بالخادم أثناء تحديث البث.', 'danger'));
+}
+
+/**
+ * إيقاف بث المحضر السابق لشاشات جميع الأعضاء فوراً
+ */
+function stopPrevMinutesBroadcast() {
+  if (!confirm('هل ترغب في إغلاق بث المحضر السابق فوراً وإيقافه عن شاشات جميع الأعضاء؟')) return;
+
+  fetch(`/api/sessions/${SESSION_ID}/broadcast-minutes/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({
+      action: 'stop'
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.ok) {
+      showToastAlert(data.error || 'تعذر إيقاف البث.', 'danger');
+      return;
+    }
+    prevMinutesState.isBroadcasting = false;
+    prevMinutesState.broadcastedSessionId = null;
+    _updateBroadcastButtonUI(false);
+    showToastAlert('تم إيقاف بث المحضر السابق وإغلاقه عن جميع الأعضاء.', 'info');
+  })
+  .catch(() => showToastAlert('خطأ في الاتصال بالخادم أثناء إيقاف البث.', 'danger'));
+}
+
+function _updateBroadcastButtonUI(isBroadcasting, broadcastLabel) {
+  const btnStart = document.getElementById('btn-broadcast-prev-minutes');
+  const btnStop = document.getElementById('btn-stop-prev-minutes-broadcast');
+  const banner = document.getElementById('live-prev-minutes-broadcast-banner');
+  const bannerText = document.getElementById('live-prev-minutes-banner-text');
+  const headerBadge = document.getElementById('prev-minutes-header-broadcast-badge');
+
+  if (isBroadcasting) {
+    if (btnStart) btnStart.classList.add('d-none');
+    if (btnStop) {
+      btnStop.classList.remove('d-none');
+      btnStop.classList.add('d-inline-flex', 'align-items-center', 'justify-content-center');
+    }
+    if (banner) {
+      banner.style.display = 'block';
+      if (bannerText && broadcastLabel) {
+        bannerText.textContent = `محضر ${broadcastLabel} معروض حالياً على شاشات جميع أعضاء المجلس.`;
+      }
+    }
+    if (headerBadge) {
+      headerBadge.classList.remove('d-none');
+      headerBadge.classList.add('d-flex');
+    }
+  } else {
+    if (btnStart) btnStart.classList.remove('d-none');
+    if (btnStop) {
+      btnStop.classList.add('d-none');
+      btnStop.classList.remove('d-inline-flex');
+    }
+    if (banner) banner.style.display = 'none';
+    if (headerBadge) {
+      headerBadge.classList.remove('d-flex');
+      headerBadge.classList.add('d-none');
+    }
+  }
+}
+
+/**
+ * معالجة حالة البث المتزامنة القادمة من نبضة pollQueue
+ */
+function _applyPrevMinutesBroadcastState(broadcastId, broadcastLabel) {
+  const isControllerUser = (typeof IS_CONTROLLER !== 'undefined' && IS_CONTROLLER) || (typeof IS_PRESIDENT !== 'undefined' && IS_PRESIDENT);
+  const modalEl = document.getElementById('previousMinutesModal');
+  if (!modalEl) return;
+
+  if (isControllerUser) {
+    // تحديث واجهة الرئيس / المتحكم
+    prevMinutesState.isBroadcasting = !!broadcastId;
+    prevMinutesState.broadcastedSessionId = broadcastId;
+    _updateBroadcastButtonUI(prevMinutesState.isBroadcasting, broadcastLabel);
+  } else {
+    // ── واجهة العضو المشارك (المطالعة فقط بدون أدوات تحكم) ──
+    const ctrlBar = document.getElementById('prev-minutes-controller-controls');
+    const memberBanner = document.getElementById('prev-minutes-member-banner');
+
+    if (broadcastId) {
+      // الرئيس يبث محضر جلسة سابقة
+      // إخفاء أدوات التحكم كلياً للأعضاء
+      if (ctrlBar) ctrlBar.classList.add('d-none');
+      if (memberBanner) {
+        memberBanner.classList.remove('d-none');
+        memberBanner.classList.add('d-flex');
+        const bannerText = document.getElementById('prev-minutes-member-banner-text');
+        if (bannerText && broadcastLabel) {
+          bannerText.innerHTML = `<i class="bi bi-broadcast me-1 text-primary"></i> يعرض رئيس المجلس حالياً محضر ${broadcastLabel} للمطالعة والمصادقة`;
+        }
+      }
+
+      // إذا لم يكن المحضر معروضاً بعد أو تغيرت الجلسة المعروضة:
+      if (prevMinutesState.selectedSessionId !== broadcastId || !modalEl.classList.contains('show')) {
+        prevMinutesState.openedByBroadcast = true;
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+        loadPreviousMinutesContent(broadcastId);
+      }
+    } else {
+      // تم إيقاف البث من قبل الرئيس
+      if (prevMinutesState.openedByBroadcast) {
+        prevMinutesState.openedByBroadcast = false;
+        if (memberBanner) {
+          memberBanner.classList.remove('d-flex');
+          memberBanner.classList.add('d-none');
+        }
+        // إغلاق المودال برفق عند انتهاء البث
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal && modalEl.classList.contains('show')) {
+          modal.hide();
+        }
+      }
+    }
+  }
+}
+
+
+
+/**
+ * فتح Modal المحضر السابق وتحميل قائمة الجلسات
+ */
+function openPreviousMinutesModal() {
+  const modalEl = document.getElementById('previousMinutesModal');
+  if (modalEl) {
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+  }
+
+  // نحمّل قائمة الجلسات إن لم تُحمَّل بعد
+  if (!prevMinutesState.loaded && !prevMinutesState.isLoadingList) {
+    _loadPreviousSessionsList();
+  }
+}
+
+/**
+ * جلب قائمة الجلسات السابقة من الـ API واقتراح أحدث جلسة تلقائياً
+ */
+function _loadPreviousSessionsList() {
+  if (prevMinutesState.isLoadingList) return;
+  prevMinutesState.isLoadingList = true;
+
+  const select = document.getElementById('prevMinutesSessionSelect');
+  if (select && (!select.options || select.options.length <= 1)) {
+    select.innerHTML = '<option value="">⏳ جارٍ تحميل الجلسات السابقة...</option>';
+  }
+
+  fetch(`/api/sessions/${SESSION_ID}/previous-sessions/`)
+    .then(r => r.json())
+    .then(data => {
+      prevMinutesState.isLoadingList = false;
+      if (!data.ok) {
+        showToastAlert('تعذر تحميل قائمة الجلسات السابقة.', 'danger');
+        if (select) select.innerHTML = '<option value="">-- تعذر تحميل الجلسات --</option>';
+        return;
+      }
+      prevMinutesState.sessionsList = data.sessions || [];
+      prevMinutesState.loaded = true;
+
+      if (!select) return;
+      select.innerHTML = '<option value="">-- اختر الجلسة المراد عرض محضرها --</option>';
+
+      if (data.sessions.length === 0) {
+        select.innerHTML += '<option value="" disabled>لا توجد جلسات سابقة محمَّلة في النظام بعد</option>';
+        return;
+      }
+
+      data.sessions.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        const hijri = s.hijri_date ? ` (${s.hijri_date})` : '';
+        const topics = s.topics_count > 0 ? ` – ${s.topics_count} موضوع` : '';
+        opt.textContent = `الجلسة رقم (${s.session_number})${hijri}${topics}`;
+        select.appendChild(opt);
+      });
+
+      // اقتراح وتحميل أحدث محضر سابق تلقائياً دائماً ليعرض مباشرة
+      if (data.sessions.length > 0) {
+        const latestSessionId = data.sessions[0].id;
+        select.value = latestSessionId;
+        loadPreviousMinutesContent(latestSessionId);
+      }
+    })
+    .catch(() => {
+      prevMinutesState.isLoadingList = false;
+      showToastAlert('خطأ في الاتصال بالخادم.', 'danger');
+      if (select) select.innerHTML = '<option value="">-- خطأ في الاتصال --</option>';
+    });
+}
+
+/**
+ * تحميل محتوى محضر الجلسة المختارة
+ */
+function loadPreviousMinutesContent(sessionId) {
+  if (!sessionId) {
+    _showPrevMinutesSection('empty');
+    stopPrevMinutesReading();
+    return;
+  }
+
+  prevMinutesState.selectedSessionId = parseInt(sessionId);
+  _showPrevMinutesSection('loading');
+  stopPrevMinutesReading();
+
+  fetch(`/api/sessions/${sessionId}/minutes/`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) {
+        showToastAlert(data.error || 'تعذر تحميل محضر الجلسة.', 'danger');
+        _showPrevMinutesSection('empty');
+        return;
+      }
+
+      // تحديث بيانات القراءة الآلية
+      if (data.smart_reader && data.smart_reader.chunks) {
+        prevMinutesState.chunks = data.smart_reader.chunks;
+        prevMinutesState.totalChunks = data.smart_reader.total_chunks || data.smart_reader.chunks.length;
+      } else {
+        prevMinutesState.chunks = [];
+        prevMinutesState.totalChunks = 0;
+      }
+      prevMinutesState.currentChunkIndex = 0;
+
+      // بناء واجهة المحضر
+      _renderPreviousMinutesContent(data);
+      _showPrevMinutesSection('content');
+
+      // إظهار زر القراءة إذا يوجد محتوى
+      const btnRead = document.getElementById('btn-prev-minutes-read');
+      if (prevMinutesState.totalChunks > 0) {
+        btnRead.classList.remove('d-none');
+      } else {
+        btnRead.classList.add('d-none');
+      }
+
+      // تحديث التسمية الفرعية في رأس المودال
+      document.getElementById('prevMinutesSessionLabel').textContent = data.session.label || 'محضر الجلسة السابقة';
+    })
+    .catch(() => {
+      showToastAlert('خطأ في تحميل بيانات المحضر.', 'danger');
+      _showPrevMinutesSection('empty');
+    });
+}
+
+/**
+ * بناء وعرض محتوى المحضر في واجهة المودال
+ */
+function _renderPreviousMinutesContent(data) {
+  const s = data.session;
+  const att = data.attendance;
+  const topics = data.topics;
+
+  // بناء خريطة field → index للقفز السريع إلى أي مقطع
+  prevMinutesState.chunkFieldMap = {};
+  prevMinutesState.chunks.forEach((c, i) => {
+    prevMinutesState.chunkFieldMap[c.field] = i;
+  });
+
+  // === الديباجة ===
+  document.getElementById('prev-minutes-title').textContent = s.label || 'محضر الجلسة';
+
+  // الشارات التوثيقية المنظمة
+  const metaBadges = document.getElementById('prev-minutes-meta-badges');
+  metaBadges.innerHTML = '';
+  if (s.date) {
+    metaBadges.innerHTML += `<span class="badge bg-white text-navy border px-2.5 py-1.5 shadow-sm" style="color:#1B365D; font-size:0.78rem;">
+      <i class="bi bi-calendar-event me-1 text-primary"></i>${s.date}</span>`;
+  }
+  if (s.hijri_date) {
+    metaBadges.innerHTML += `<span class="badge bg-white text-success border px-2.5 py-1.5 shadow-sm" style="font-size:0.78rem;">
+      <i class="bi bi-moon-stars me-1 text-success"></i>${s.hijri_date}</span>`;
+  }
+  if (s.academic_year) {
+    metaBadges.innerHTML += `<span class="badge bg-white text-secondary border px-2.5 py-1.5 shadow-sm" style="font-size:0.78rem;">
+      <i class="bi bi-mortarboard me-1 text-secondary"></i>${s.academic_year}</span>`;
+  }
+  if (s.location) {
+    metaBadges.innerHTML += `<span class="badge bg-white text-dark border px-2.5 py-1.5 shadow-sm" style="font-size:0.78rem;">
+      <i class="bi bi-geo-alt-fill me-1 text-danger"></i>${s.location}</span>`;
+  }
+
+  // بطاقات هيئة الرئاسة والأمانة
+  const chairNameEl = document.getElementById('prev-chair-name');
+  const chairWrap = document.getElementById('prev-chair-card-wrap');
+  if (s.chair_name && s.chair_name.trim()) {
+    chairNameEl.textContent = s.chair_name;
+    chairNameEl.title = s.chair_name;
+    chairWrap.classList.remove('d-none');
+  } else {
+    chairWrap.classList.add('d-none');
+  }
+
+  const secNameEl = document.getElementById('prev-secretary-name');
+  const secWrap = document.getElementById('prev-secretary-card-wrap');
+  if (s.secretary_name && s.secretary_name.trim()) {
+    secNameEl.textContent = s.secretary_name;
+    secNameEl.title = s.secretary_name;
+    secWrap.classList.remove('d-none');
+  } else {
+    secWrap.classList.add('d-none');
+  }
+
+  const assNameEl = document.getElementById('prev-assistant-name');
+  const assWrap = document.getElementById('prev-assistant-card-wrap');
+  if (s.assistant_name && s.assistant_name.trim()) {
+    assNameEl.textContent = s.assistant_name;
+    assNameEl.title = s.assistant_name;
+    assWrap.classList.remove('d-none');
+  } else {
+    assWrap.classList.add('d-none');
+  }
+
+  // الافتتاحية والمراسم
+  const openingWrap = document.getElementById('prev-minutes-opening-wrap');
+  if (s.opening_honors && s.opening_honors.trim()) {
+    document.getElementById('prev-minutes-opening').textContent = s.opening_honors;
+    openingWrap.classList.remove('d-none');
+  } else {
+    openingWrap.classList.add('d-none');
+  }
+
+  // === إحصائية الحضور (أرقام فقط) ===
+  document.getElementById('prev-att-present-count').textContent = att.present_count || 0;
+  document.getElementById('prev-att-excused-count').textContent = att.excused_count || 0;
+  document.getElementById('prev-att-absent-count').textContent = att.absent_count || 0;
+
+  // === المواضيع والقرارات ===
+  const topicsContainer = document.getElementById('prev-minutes-topics-container');
+  topicsContainer.innerHTML = '';
+
+  if (!topics || topics.length === 0) {
+    topicsContainer.innerHTML = '<div class="text-center text-muted py-3 small">لا توجد مواضيع مسجلة لهذه الجلسة.</div>';
+    return;
+  }
+
+  // تجميع المواضيع بحسب التصنيف
+  const catGroups = {};
+  const catOrder = [];
+  topics.forEach(t => {
+    const catKey = t.category || 'general';
+    if (!catGroups[catKey]) {
+      catGroups[catKey] = { label: t.category_label || catKey, topics: [] };
+      catOrder.push(catKey);
+    }
+    catGroups[catKey].topics.push(t);
+  });
+
+  const catColors = {
+    'general': { color: '#1e3a8a', bg: '#eff6ff', border: '#93c5fd', icon: 'bi-building' },
+    'appointments': { color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', icon: 'bi-person-plus-fill' },
+    'academic': { color: '#4338ca', bg: '#eef2ff', border: '#a5b4fc', icon: 'bi-mortarboard-fill' },
+    'postgrad': { color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd', icon: 'bi-award-fill' },
+    'students': { color: '#d97706', bg: '#fffbeb', border: '#fcd34d', icon: 'bi-people-fill' },
+    'centers': { color: '#0284c7', bg: '#f0f9ff', border: '#7dd3fc', icon: 'bi-cpu-fill' },
+    'new_business': { color: '#e11d48', bg: '#fff1f2', border: '#fda4af', icon: 'bi-lightning-charge-fill' },
+  };
+  const defaultCat = { color: '#b45309', bg: '#fffdf5', border: '#fde68a', icon: 'bi-folder-check' };
+
+  catOrder.forEach(catKey => {
+    const group = catGroups[catKey];
+    const theme = catColors[catKey] || defaultCat;
+
+    // ترويسة التصنيف
+    const catHeader = document.createElement('div');
+    catHeader.className = 'mb-3 p-3 rounded-3 d-flex align-items-center justify-content-between';
+    catHeader.style.cssText = `background-color: ${theme.bg}; border: 1.5px solid ${theme.border}; border-right: 5px solid ${theme.color} !important;`;
+    catHeader.innerHTML = `
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi ${theme.icon} fs-5" style="color:${theme.color};"></i>
+        <h6 class="mb-0 fw-bold" style="color:${theme.color};">${group.label}</h6>
+      </div>
+      <span class="badge rounded-pill fw-bold" style="background-color:${theme.color}; color:#fff;">${group.topics.length} موضوع</span>
+    `;
+    topicsContainer.appendChild(catHeader);
+
+    // كروت المواضيع
+    group.topics.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'card border-0 shadow-sm mb-3';
+      card.id = `prev-topic-card-${t.id}`;
+      card.style.cssText = `border-right: 4px solid ${theme.color} !important; border-radius: 10px; overflow: hidden;`;
+
+      // حساب فهارس الـ chunks لهذا الموضوع (خاص بالرئيس/المتحكم فقط، الأعضاء مطالعة فقط)
+      const isControllerUser = (typeof IS_CONTROLLER !== 'undefined' && IS_CONTROLLER) || (typeof IS_PRESIDENT !== 'undefined' && IS_PRESIDENT);
+      const titleChunkIdx  = isControllerUser ? prevMinutesState.chunkFieldMap[`topic_${t.id}_title`] : undefined;
+      const bgChunkIdx     = isControllerUser ? prevMinutesState.chunkFieldMap[`topic_${t.id}_background`] : undefined;
+      const decChunkIdx    = isControllerUser ? prevMinutesState.chunkFieldMap[`topic_${t.id}_decision`] : undefined;
+
+      // دوال مساعدة لإنشاء سمات النقر
+      const clickAttr = (idx) => (idx !== undefined && isControllerUser)
+        ? `onclick="jumpToPrevMinutesChunk(${idx})" style="cursor:pointer;" title="انقر للقراءة من هنا ▶"`
+        : '';
+
+      // بناء محتوى البطاقة
+      let tableHtml = '';
+      if (t.tables && t.tables.length > 0) {
+        t.tables.forEach(tbl => {
+          tableHtml += `
+            <div class="mt-3">
+              ${tbl.title ? `<div class="small fw-bold text-navy mb-1"><i class="bi bi-table me-1"></i>${tbl.title}</div>` : ''}
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0" style="font-size:0.78rem;">
+                  ${tbl.headers && tbl.headers.length ? `<thead class="table-light"><tr>${tbl.headers.map(h => `<th class="fw-bold">${h}</th>`).join('')}</tr></thead>` : ''}
+                  <tbody>
+                    ${tbl.rows && tbl.rows.length ? tbl.rows.map(row => `<tr>${row.map(cell => `<td>${cell ?? ''}</td>`).join('')}</tr>`).join('') : '<tr><td class="text-muted text-center" colspan="10">لا توجد بيانات</td></tr>'}
+                    ${tbl.total_row && tbl.total_row.length ? `<tr class="table-primary fw-bold">${tbl.total_row.map(cell => `<td>${cell ?? ''}</td>`).join('')}</tr>` : ''}
+                  </tbody>
+                </table>
+              </div>
+            </div>`;
+        });
+      }
+
+      const decisionHtml = t.has_decision ? `
+        <div class="mt-3 p-3 bg-success bg-opacity-10 rounded border border-success border-opacity-25">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-patch-check-fill text-success fs-5"></i>
+            <strong class="small text-success">قرار المجلس المعتمد:</strong>
+            ${decChunkIdx !== undefined ? '<small class="text-muted" style="font-size:0.7rem;"><i class="bi bi-hand-index-thumb ms-2 text-info"></i>انقر للقراءة منه</small>' : ''}
+          </div>
+          <div class="small text-dark fw-semibold prev-minutes-chunk" id="prev-dec-${t.id}"
+               style="white-space: pre-line; line-height: 1.8; ${decChunkIdx !== undefined ? 'cursor:pointer;' : ''}"
+               ${decChunkIdx !== undefined ? `onclick="jumpToPrevMinutesChunk(${decChunkIdx})" title="انقر للقراءة من هنا ▶"` : ''}>
+            ${escapeHtml(t.decision_text)}
+          </div>
+        </div>` : '';
+
+      const bgHtml = t.background ? `
+        <div class="small text-dark prev-minutes-chunk" id="prev-bg-${t.id}"
+             style="white-space:pre-line; line-height:1.7; ${bgChunkIdx !== undefined ? 'cursor:pointer;' : ''}"
+             ${bgChunkIdx !== undefined ? `onclick="jumpToPrevMinutesChunk(${bgChunkIdx})" title="انقر للقراءة من هنا ▶"` : ''}>
+          ${escapeHtml(t.background)}
+        </div>` : '';
+
+      card.innerHTML = `
+        <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between"
+             style="background: ${theme.bg}; border-bottom: 1px solid ${theme.border}; ${titleChunkIdx !== undefined ? 'cursor:pointer;' : ''}"
+             ${titleChunkIdx !== undefined ? `onclick="jumpToPrevMinutesChunk(${titleChunkIdx})" title="انقر للقراءة من العنوان ▶"` : ''}>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge fw-bold" style="background-color:${theme.color}; font-size:0.75rem;">${escapeHtml(t.ordinal_label)}</span>
+            <h6 class="mb-0 fw-bold text-dark prev-minutes-chunk" id="prev-title-${t.id}" style="font-size:0.9rem; line-height:1.4;">${escapeHtml(t.title)}</h6>
+            ${titleChunkIdx !== undefined ? '<i class="bi bi-hand-index-thumb text-info ms-1" style="font-size:0.8rem;" title="انقر للقراءة من هنا"></i>' : ''}
+          </div>
+          ${t.has_decision ? '<span class="badge bg-success" style="font-size:0.7rem;">✓ قرار معتمد</span>' : '<span class="badge bg-secondary" style="font-size:0.7rem;">مداولة</span>'}
+        </div>
+        <div class="card-body p-3">
+          ${t.presenting_entity ? `<div class="text-muted small mb-2"><i class="bi bi-building me-1 text-primary"></i>${escapeHtml(t.presenting_entity)}</div>` : ''}
+          ${t.memo_number ? `<div class="text-muted small mb-2"><i class="bi bi-file-earmark me-1"></i>رقم المذكرة: ${escapeHtml(t.memo_number)}${t.memo_date ? ` بتاريخ ${escapeHtml(t.memo_date)}` : ''}</div>` : ''}
+          ${bgHtml}
+          ${tableHtml}
+          ${decisionHtml}
+        </div>`;
+
+      topicsContainer.appendChild(card);
+    });
+  });
+}
+
+/**
+ * مساعد: التحكم في أقسام المودال (تحميل / فارغ / محتوى)
+ */
+function _showPrevMinutesSection(section) {
+  document.getElementById('prev-minutes-loading').classList.toggle('d-none', section !== 'loading');
+  document.getElementById('prev-minutes-empty').classList.toggle('d-none', section !== 'empty');
+  document.getElementById('prev-minutes-content').classList.toggle('d-none', section !== 'content');
+}
+
+/**
+ * ترميز HTML للأمان
+ */
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// ─── محرك القراءة الآلية للمحضر السابق ──────────────────────────────────────
+
+/**
+ * تشغيل القراءة الآلية للمحضر السابق
+ */
+function startPreviousMinutesReading() {
+  if (prevMinutesState.chunks.length === 0) return;
+
+  prevMinutesState.isReading = true;
+  prevMinutesState.isPaused = false;
+  prevMinutesState.currentChunkIndex = 0;
+
+  _updatePrevReadingUI('reading');
+  document.getElementById('prev-minutes-progress-bar-wrap').classList.remove('d-none');
+
+  _playPrevMinutesCurrentChunk();
+}
+
+function pausePrevMinutesReading() {
+  prevMinutesState.isPaused = true;
+  if (prevMinutesState.audioElement) prevMinutesState.audioElement.pause();
+  window.speechSynthesis.pause();
+  _updatePrevReadingUI('paused');
+}
+
+function resumePrevMinutesReading() {
+  prevMinutesState.isPaused = false;
+  if (prevMinutesState.audioElement && prevMinutesState.audioElement.src) {
+    prevMinutesState.audioElement.play();
+  } else if (window.speechSynthesis.paused) {
+    window.speechSynthesis.resume();
+  } else {
+    _playPrevMinutesCurrentChunk();
+  }
+  _updatePrevReadingUI('reading');
+}
+
+
+function stopPrevMinutesReading() {
+  prevMinutesState.isReading = false;
+  prevMinutesState.isPaused  = false;
+  prevMinutesState._forceStopped = true;      // منع أي callback تالٍ
+  prevMinutesState.currentChunkIndex = 0;
+
+  // إيقاف الـ Audio HTML5
+  const audio = prevMinutesState.audioElement;
+  if (audio) {
+    audio.pause();
+    audio.currentTime = 0;
+    try { audio.removeAttribute('src'); audio.load(); } catch(e) {}
+  }
+
+  // إيقاف speechSynthesis وتفريغ المؤقتات
+  if (window._prevMinutesKeepAliveTimer) clearInterval(window._prevMinutesKeepAliveTimer);
+  if (window._prevMinutesSafetyTimer) clearTimeout(window._prevMinutesSafetyTimer);
+  window._prevMinutesActiveUtterance = null;
+  window.speechSynthesis.cancel();
+
+  // إعادة الواجهة بعد تأخير قصير لضمان انتهاء الـ callbacks
+  setTimeout(() => {
+    prevMinutesState._forceStopped = false;
+    document.querySelectorAll('.prev-chunk-highlight')
+            .forEach(el => el.classList.remove('prev-chunk-highlight'));
+    _updatePrevReadingUI('idle');
+    document.getElementById('prev-minutes-progress-bar-wrap').classList.add('d-none');
+  }, 120);
+}
+
+function advancePrevMinutesChunk() {
+  if (!prevMinutesState.isReading || prevMinutesState.isPaused || prevMinutesState._forceStopped) return;
+  prevMinutesState.currentChunkIndex++;
+  _playPrevMinutesCurrentChunk();
+}
+
+function _playPrevMinutesCurrentChunk() {
+  const state = prevMinutesState;
+  if (state._forceStopped) return;
+  if (state.currentChunkIndex >= state.totalChunks) {
+    // انتهت القراءة
+    stopPrevMinutesReading();
+    setTimeout(() => {
+      const badge = document.getElementById('prev-minutes-status-badge');
+      if (badge) badge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> اكتملت القراءة';
+    }, 150);
+    return;
+  }
+
+  const chunk = state.chunks[state.currentChunkIndex];
+  _highlightPrevChunk(chunk);
+  _updatePrevProgressBar();
+
+  if (state.readingMode === 'browser_local') {
+    // وضع الصوت المحلي مباشرة بدون محاولة السحابة
+    playPrevMinutesChunkLocal(chunk.text);
+    return;
+  }
+
+  // محاولة الصوت العصبي السحابي أولاً
+  fetch('/api/smart-reader/synthesize/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+    body: JSON.stringify({ text: chunk.text, speed: state.speed || 1.0 })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (state._forceStopped) return;
+    if (res.success && res.audio_url) {
+      state.audioElement.src = res.audio_url;
+      state.audioElement.playbackRate = state.speed || 1.0;
+      state.audioElement.play().catch(() => {
+        if (!state._forceStopped) playPrevMinutesChunkLocal(chunk.text);
+      });
+    } else if (res.fallback_to_local) {
+      if (!state._forceStopped) playPrevMinutesChunkLocal(chunk.text);
+    } else {
+      if (!state._forceStopped) playPrevMinutesChunkLocal(chunk.text);
+    }
+  })
+  .catch(() => {
+    if (!prevMinutesState._forceStopped) playPrevMinutesChunkLocal(chunk.text);
+  });
+}
+
+// متغيرات الحفاظ على كائن الصوت ومنع تنظيف الذاكرة في كروم (Chrome Speech Keep-Alive)
+window._prevMinutesActiveUtterance = null;
+window._prevMinutesKeepAliveTimer = null;
+window._prevMinutesSafetyTimer = null;
+
+function playPrevMinutesChunkLocal(text) {
+  if (prevMinutesState._forceStopped) return;
+
+  // إلغاء أي مؤقتات سابقة
+  if (window._prevMinutesKeepAliveTimer) clearInterval(window._prevMinutesKeepAliveTimer);
+  if (window._prevMinutesSafetyTimer) clearTimeout(window._prevMinutesSafetyTimer);
+
+  window.speechSynthesis.cancel();
+
+  const currentIdx = prevMinutesState.currentChunkIndex;
+  const utterance = new SpeechSynthesisUtterance(text);
+  window._prevMinutesActiveUtterance = utterance; // حفظ المرجع عالمياً لمنع Chrome GC
+
+  utterance.lang = 'ar-SA';
+  utterance.rate = prevMinutesState.speed || 1.0;
+
+  const cleanupAndAdvance = () => {
+    if (window._prevMinutesKeepAliveTimer) clearInterval(window._prevMinutesKeepAliveTimer);
+    if (window._prevMinutesSafetyTimer) clearTimeout(window._prevMinutesSafetyTimer);
+    window._prevMinutesActiveUtterance = null;
+    if (!prevMinutesState._forceStopped && prevMinutesState.currentChunkIndex === currentIdx) {
+      advancePrevMinutesChunk();
+    }
+  };
+
+  utterance.onend = cleanupAndAdvance;
+  utterance.onerror = cleanupAndAdvance;
+
+  // حل مشكلة تعليق وتجميد محرك الصوت في متصفح Chrome بعد 10-15 ثانية
+  window._prevMinutesKeepAliveTimer = setInterval(() => {
+    if (!window.speechSynthesis.speaking) {
+      clearInterval(window._prevMinutesKeepAliveTimer);
+    } else {
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    }
+  }, 7000);
+
+  // صمام أمان زمني ذكي للانتقال في حال حدوث أي حجب أو صمت غير متوقع من المتصفح
+  const expectedDurationMs = Math.max(3500, ((text.length / 7) * 1000) / (prevMinutesState.speed || 1.0) + 3000);
+  window._prevMinutesSafetyTimer = setTimeout(() => {
+    if (prevMinutesState.isReading && !prevMinutesState.isPaused && prevMinutesState.currentChunkIndex === currentIdx) {
+      cleanupAndAdvance();
+    }
+  }, expectedDurationMs);
+
+  window.speechSynthesis.speak(utterance);
+}
+
+/**
+ * القفز إلى مقطع محدد بالنقر عليه — يبدأ القراءة من ذلك المقطع مباشرة
+ */
+function jumpToPrevMinutesChunk(index) {
+  if (index === undefined || index < 0 || index >= prevMinutesState.totalChunks) return;
+
+  if (prevMinutesState.isReading) {
+    // إيقاف القراءة الحالية فوراً ثم إعادة التشغيل من المقطع المطلوب
+    prevMinutesState._forceStopped = true;
+    window.speechSynthesis.cancel();
+    const audio = prevMinutesState.audioElement;
+    if (audio) {
+      audio.pause();
+      try { audio.removeAttribute('src'); audio.load(); } catch(e) {}
+    }
+    setTimeout(() => {
+      prevMinutesState._forceStopped = false;
+      prevMinutesState.currentChunkIndex = index;
+      prevMinutesState.isPaused = false;
+      _updatePrevReadingUI('reading');
+      document.getElementById('prev-minutes-progress-bar-wrap').classList.remove('d-none');
+      _playPrevMinutesCurrentChunk();
+    }, 150);
+  } else {
+    // بدء قراءة جديدة من المقطع المحدد
+    prevMinutesState.currentChunkIndex = index;
+    prevMinutesState.isReading = true;
+    prevMinutesState.isPaused  = false;
+    prevMinutesState._forceStopped = false;
+    _updatePrevReadingUI('reading');
+    document.getElementById('prev-minutes-progress-bar-wrap').classList.remove('d-none');
+    _playPrevMinutesCurrentChunk();
+  }
+}
+
+/**
+ * تغيير سرعة القراءة
+ */
+function setPrevMinutesSpeed(speed, btn) {
+  prevMinutesState.speed = speed;
+  // تحديث مظهر الأزرار
+  document.querySelectorAll('.prev-speed-btn').forEach(b => {
+    b.classList.remove('active', 'btn-outline-primary', 'btn-primary');
+    b.classList.add('btn-outline-secondary');
+  });
+  if (btn) {
+    btn.classList.remove('btn-outline-secondary');
+    btn.classList.add('btn-outline-primary', 'active');
+  }
+  // تطبيق السرعة فوراً على الـ Audio الحالي إن كان يعمل
+  if (prevMinutesState.audioElement && prevMinutesState.isReading) {
+    prevMinutesState.audioElement.playbackRate = speed;
+  }
+}
+
+/**
+ * تغيير نوع الصوت (عصبي سحابي / محلي)
+ */
+function setPrevMinutesMode(mode) {
+  prevMinutesState.readingMode = mode;
+  const neuralBtn = document.getElementById('prev-mode-neural');
+  const localBtn  = document.getElementById('prev-mode-local');
+  if (mode === 'cloud_neural') {
+    neuralBtn.classList.add('active', 'btn-outline-primary');
+    neuralBtn.classList.remove('btn-outline-secondary');
+    localBtn.classList.remove('active', 'btn-outline-primary');
+    localBtn.classList.add('btn-outline-secondary');
+  } else {
+    localBtn.classList.add('active', 'btn-outline-primary');
+    localBtn.classList.remove('btn-outline-secondary');
+    neuralBtn.classList.remove('active', 'btn-outline-primary');
+    neuralBtn.classList.add('btn-outline-secondary');
+  }
+}
+
+
+function _highlightPrevChunk(chunk) {
+  // إزالة التمييز السابق
+  document.querySelectorAll('.prev-chunk-highlight').forEach(el => el.classList.remove('prev-chunk-highlight'));
+  // نحاول العثور على العنصر المرتبط بهذا الـ chunk بحسب الحقل
+  // نُلوّن عنوان الموضوع أو نص القرار بحسب field
+  const field = chunk.field || '';
+  let targetEl = null;
+  if (field.startsWith('topic_') && field.endsWith('_title')) {
+    const topicId = field.replace('topic_', '').replace('_title', '');
+    targetEl = document.getElementById(`prev-title-${topicId}`);
+  } else if (field.startsWith('topic_') && field.endsWith('_decision')) {
+    const topicId = field.replace('topic_', '').replace('_decision', '');
+    targetEl = document.getElementById(`prev-dec-${topicId}`);
+  } else if (field.startsWith('topic_') && field.endsWith('_background')) {
+    const topicId = field.replace('topic_', '').replace('_background', '');
+    targetEl = document.getElementById(`prev-bg-${topicId}`);
+  }
+  if (targetEl) {
+    targetEl.classList.add('prev-chunk-highlight');
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function _updatePrevProgressBar() {
+  const state = prevMinutesState;
+  const current = state.currentChunkIndex + 1;
+  const total = state.totalChunks;
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  document.getElementById('prev-minutes-progress-bar').style.width = pct + '%';
+  document.getElementById('prev-minutes-progress-text').textContent = `${current} / ${total}`;
+}
+
+function _updatePrevReadingUI(mode) {
+  const btnRead   = document.getElementById('btn-prev-minutes-read');
+  const btnPause  = document.getElementById('btn-prev-minutes-pause');
+  const btnResume = document.getElementById('btn-prev-minutes-resume');
+  const btnStop   = document.getElementById('btn-prev-minutes-stop');
+  const statusDiv = document.getElementById('prev-minutes-reading-status');
+  const statusBadge = document.getElementById('prev-minutes-status-badge');
+
+  btnRead.classList.add('d-none');
+  btnPause.classList.add('d-none');
+  btnResume.classList.add('d-none');
+  btnStop.classList.add('d-none');
+  statusDiv.classList.add('d-none');
+
+  if (mode === 'reading') {
+    btnPause.classList.remove('d-none');
+    btnStop.classList.remove('d-none');
+    statusDiv.classList.remove('d-none');
+    if (statusBadge) statusBadge.innerHTML = '<i class="bi bi-soundwave me-1"></i> جاري القراءة...';
+  } else if (mode === 'paused') {
+    btnResume.classList.remove('d-none');
+    btnStop.classList.remove('d-none');
+    statusDiv.classList.remove('d-none');
+    if (statusBadge) statusBadge.innerHTML = '<i class="bi bi-pause-fill me-1"></i> متوقفة مؤقتاً';
+    if (statusBadge) statusBadge.className = 'badge bg-warning text-dark animate-pulse px-2 py-1';
+  } else {
+    // idle
+    if (prevMinutesState.totalChunks > 0) btnRead.classList.remove('d-none');
+  }
+}
+
+// إضافة CSS التمييز البصري لمقاطع القراءة
+(function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .prev-chunk-highlight {
+      background-color: #fef08a !important;
+      color: #854d0e !important;
+      font-weight: 700 !important;
+      box-shadow: 0 0 10px rgba(234,179,8,0.4);
+      border-radius: 4px;
+      padding: 2px 4px;
+      transition: background-color 0.3s ease;
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+// إيقاف القراءة عند إغلاق المودال والتحميل المسبق لقائمة الجلسات
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('previousMinutesModal');
+  if (modal) {
+    modal.addEventListener('hide.bs.modal', () => {
+      stopPrevMinutesReading();
+    });
+  }
+
+  // تحميل مسبق واستباقي لقائمة الجلسات السابقة لضمان جاهزيتها الفورية عند فتح المودال
+  {% if can_start_session_live or is_frozen_manager %}
+  if (typeof _loadPreviousSessionsList === 'function') {
+    _loadPreviousSessionsList();
+  }
+  {% endif %}
+});
 let mediaRecorder = null;
 let recordingInterval = null;
 let recordingSeconds = 0;
@@ -1828,6 +3377,13 @@ function openSessionAdjournModal() {
 }
 
 function confirmSessionAdjourn() {
+  const btn = document.getElementById('btnConfirmAdjourn');
+  const originalHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> جاري رفع الجلسة...';
+  }
+
   fetch(`/api/sessions/${SESSION_ID}/lifecycle-control/`, {
     method: 'POST',
     headers: {
@@ -1836,13 +3392,29 @@ function confirmSessionAdjourn() {
     },
     body: JSON.stringify({ action: 'adjourn' })
   })
-  .then(res => res.json())
-  .then(data => {
-    if (data.ok) {
+  .then(res => {
+    return res.json().then(data => ({ ok: res.ok, status: res.status, data: data }))
+      .catch(() => ({ ok: false, status: res.status, data: { error: `خطأ في استجابة الخادم (${res.status})` } }));
+  })
+  .then(result => {
+    if (result.ok && result.data && result.data.ok) {
       alert('تم رفع الجلسة وتوثيق وقت الانتهاء بنجاح.');
-      window.location.href = data.redirect_url || `/sessions/${SESSION_ID}/`;
+      window.location.href = result.data.redirect_url || `/sessions/${SESSION_ID}/`;
     } else {
-      alert(data.error || 'حدث خطأ أثناء رفع الجلسة.');
+      const errMsg = (result.data && result.data.error) ? result.data.error : 'حدث خطأ غير متوقع أثناء رفع الجلسة.';
+      alert(errMsg);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+    }
+  })
+  .catch(err => {
+    console.error('Error adjourning session:', err);
+    alert('تعذر الاتصال بالخادم، يرجى التحقق من اتصال الشبكة وإعادة المحاولة.');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
     }
   });
 }
@@ -1911,19 +3483,20 @@ function confirmPostponeTopic() {
   });
 }
 
-// 1. التحكم بالمواضيع (عرض، طي، فتح تصويت، إغلاق تصويت)
-function controlTopic(topicId, action) {
+// 1. التحكم بالمواضيع (عرض، طي، فتح تصويت، إغلاق تصويت، وإعادة الطرح)
+function controlTopic(topicId, action, extraPayload = {}) {
   if (!IS_CONTROLLER) {
     showToastAlert('🔒 أدوات التحكم بالجلسة مجمدة حالياً بانتظار تمكين رئيس الجلسة.', 'warning');
     return;
   }
+  const payload = Object.assign({ action: action }, extraPayload);
   fetch(`/api/topics/${topicId}/control/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-CSRFToken': getCookie('csrftoken')
     },
-    body: JSON.stringify({ action: action })
+    body: JSON.stringify(payload)
   })
   .then(res => res.json())
   .then(data => {
@@ -1931,17 +3504,59 @@ function controlTopic(topicId, action) {
       sessionStorage.setItem('live_active_topic_' + SESSION_ID, topicId);
       currentActiveTopicId = topicId;
       updateTopicUI(topicId, data);
-      if (action === 'show' || action === 'open_voting') {
+      if (action === 'show' || action === 'open_voting' || action === 'reopen_discussion' || action === 'reopen_voting') {
         ensureTopicExpanded(topicId);
       } else if (action === 'hide') {
         const detailEl = document.getElementById(`topic-detail-body-${topicId}`);
         if (detailEl) detailEl.style.display = 'none';
+      }
+      if (data.message && typeof showToastAlert === 'function') {
+        showToastAlert(data.message, 'success');
       }
       pollQueue();
     } else {
       alert(data.error || 'حدث خطأ أثناء تنفيذ الإجراء.');
     }
   });
+}
+
+function confirmReopenDiscussion(topicId, topicTitle) {
+  if (!IS_CONTROLLER) {
+    showToastAlert('🔒 أدوات التحكم بالجلسة مجمدة حالياً بانتظار تمكين رئيس الجلسة.', 'warning');
+    return;
+  }
+  if (!confirm(`هل أنت متأكد من إعادة الموضوع «${topicTitle}» للنقاش والمداولة العامة في القاعة؟`)) return;
+  controlTopic(topicId, 'reopen_discussion');
+}
+
+function openReopenVotingModal(topicId, topicTitle) {
+  if (!IS_CONTROLLER) {
+    showToastAlert('🔒 أدوات التحكم بالجلسة مجمدة حالياً بانتظار تمكين رئيس الجلسة.', 'warning');
+    return;
+  }
+  const idEl = document.getElementById('reopen_voting_topic_id');
+  const titleEl = document.getElementById('reopen_voting_topic_title');
+  const resumeEl = document.getElementById('reopen_mode_resume');
+  if (idEl) idEl.value = topicId;
+  if (titleEl) titleEl.innerText = topicTitle;
+  if (resumeEl) resumeEl.checked = true;
+
+  const modalEl = document.getElementById('reopenVotingModal');
+  if (modalEl) {
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+  }
+}
+
+function executeReopenVoting() {
+  const topicId = document.getElementById('reopen_voting_topic_id')?.value;
+  if (!topicId) return;
+  const resetVotes = document.getElementById('reopen_mode_reset')?.checked || false;
+  const modalEl = document.getElementById('reopenVotingModal');
+  if (modalEl) {
+    bootstrap.Modal.getInstance(modalEl)?.hide();
+  }
+  controlTopic(topicId, 'reopen_voting', { reset_votes: resetVotes });
 }
 
 function toggleLiveCategory(idx, forceState) {
@@ -2123,6 +3738,15 @@ function updateTopicUI(topicId, data) {
   if (btnPostpone) {
     btnPostpone.style.display = isClosedOrVotedOrPostponed ? 'none' : 'block';
   }
+
+  // إظهار أو إخفاء أزرار إعادة الطرح والتصويت
+  const reopenGroup = document.querySelector(`.btn-reopen-group-${topicId}`);
+  if (reopenGroup) {
+    reopenGroup.style.display = isClosedOrVotedOrPostponed ? 'inline-block' : 'none';
+  }
+  document.querySelectorAll(`.reopen-opt-item-${topicId}`).forEach(el => {
+    el.style.display = isClosedOrVotedOrPostponed ? 'block' : 'none';
+  });
 
   // طي المواضيع الأخرى التي طُويت تلقائياً
   if (data.folded_topic_ids && Array.isArray(data.folded_topic_ids)) {
@@ -2626,6 +4250,16 @@ function pollQueue() {
             btnRes.classList.add('d-none');
           }
         }
+      }
+
+      // 1.5) مزامنة بث عرض المحضر السابق على شاشات الأعضاء
+      if (typeof _applyPrevMinutesBroadcastState === 'function') {
+        _applyPrevMinutesBroadcastState(data.broadcast_prev_minutes_id || null, data.broadcast_prev_minutes_label || null);
+      }
+
+      // 1.8) مزامنة وصول التوجيهات ونقاط النظام التفاعلية الفلاشية للعضو
+      if (typeof handleIncomingDirective === 'function') {
+        handleIncomingDirective(data.user_directive || null);
       }
 
       // أ) المتحدث الحالي
@@ -3253,8 +4887,669 @@ function getCookie(name) {
   return cookieValue;
 }
 
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║     نظام التوجيه والتنبيه التفاعلي المباشر بين رئيس الجلسة والأعضاء          ║
+// ║  Interactive Moderation Dock, Audio Alerts & Flash Point-of-Order Engine     ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+let _liveAudioCtx = null;
+
+function getLiveAudioContext() {
+  if (!_liveAudioCtx) {
+    const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtxClass) {
+      _liveAudioCtx = new AudioCtxClass();
+    }
+  }
+  if (_liveAudioCtx && _liveAudioCtx.state === 'suspended') {
+    _liveAudioCtx.resume();
+  }
+  return _liveAudioCtx;
+}
+
+// فتح صلاحية تشغيل الصوت على المتصفح تلقائياً عند أول نقرة أو تفاعل
+document.addEventListener('click', function _initLiveAudio() {
+  getLiveAudioContext();
+  document.removeEventListener('click', _initLiveAudio);
+}, { once: true });
+
+/**
+ * تشغيل نغمة تنبيه صوتية رسمية واحترافية متزامنة مع وصول التوجيه
+ */
+function playChimeAlert(directiveType) {
+  try {
+    const ctx = getLiveAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    if (directiveType === 'point_of_order') {
+      // 🚨 نقطة نظام: نغمة استدعاء انتباه مزدوجة قوية وواضحة (880Hz -> 1174Hz)
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.type = 'triangle';
+      osc2.type = 'sine';
+
+      osc1.frequency.setValueAtTime(880, now);
+      osc1.frequency.setValueAtTime(1174.66, now + 0.16);
+
+      osc2.frequency.setValueAtTime(440, now);
+      osc2.frequency.setValueAtTime(587.33, now + 0.16);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.45, now + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.9);
+      osc2.stop(now + 0.9);
+
+    } else if (directiveType === 'calm_focus') {
+      // 🤫 يرجى الهدوء والتركيز: رنين ماريمبا رخيم ومهدئ (523.25Hz -> 659.25Hz)
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.22);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.35, now + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 1.15);
+
+    } else {
+      // 💬 رسالة مخصصة: رنين نوتات بلورية متتالية (659Hz -> 880Hz -> 1046Hz)
+      [659.25, 880, 1046.5].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = now + (idx * 0.13);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+
+        gain.gain.setValueAtTime(0.001, t);
+        gain.gain.linearRampToValueAtTime(0.3, t + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(t);
+        osc.stop(t + 0.75);
+      });
+    }
+  } catch (e) {
+    console.warn("Chime alert error:", e);
+  }
+}
+
+/**
+ * وميض بصري وتصويري راقٍ للشاشة (Flash Overlay Effect)
+ */
+function triggerFlashVisualEffect(directiveType) {
+  const overlay = document.getElementById('flashDirectiveOverlay');
+  if (!overlay) return;
+
+  overlay.className = 'flash-directive-overlay ' + (directiveType === 'point_of_order' ? 'flash-crimson' : (directiveType === 'calm_focus' ? 'flash-amber' : 'flash-blue'));
+  overlay.classList.remove('d-none');
+
+  setTimeout(() => {
+    overlay.classList.add('flash-fade-out');
+    setTimeout(() => {
+      overlay.classList.add('d-none');
+      overlay.classList.remove('flash-fade-out');
+    }, 600);
+  }, 1600);
+}
+
+/**
+ * التحكم في فتح/طي اللوحة الطائرة للرئيس (Expand / Collapse Moderation Dock)
+ */
+function toggleModerationDock(expand) {
+  const dock = document.getElementById('president-moderation-dock');
+  if (dock && dock.getAttribute('data-dragged') === 'true') {
+    return; // كان إجراء سحب وليس نقرة فتح
+  }
+  const panel = document.getElementById('moderation-dock-panel');
+  const collapsedBtn = document.getElementById('moderation-dock-collapsed');
+  if (!panel || !collapsedBtn) return;
+
+  if (expand) {
+    panel.classList.remove('d-none');
+    collapsedBtn.classList.add('d-none');
+    const search = document.getElementById('moderationMemberSearch');
+    if (search) search.focus();
+  } else {
+    panel.classList.add('d-none');
+    collapsedBtn.classList.remove('d-none');
+  }
+}
+
+/**
+ * تصفية فورية للأعضاء الحاضرين في اللوحة الطائرة بالبحث النصي
+ */
+function filterModerationMembers() {
+  const query = (document.getElementById('moderationMemberSearch').value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('.moderation-member-row');
+  let visibleCount = 0;
+
+  rows.forEach(row => {
+    const name = row.getAttribute('data-member-name') || '';
+    const text = row.innerText.toLowerCase();
+    const matches = name.includes(query) || text.includes(query);
+    row.style.display = matches ? 'block' : 'none';
+    if (matches) visibleCount++;
+  });
+
+  const stats = document.getElementById('moderation-search-stats');
+  if (stats) stats.innerText = `${visibleCount} حاضر`;
+
+  const emptyMsg = document.getElementById('moderation-empty-msg');
+  if (emptyMsg) {
+    emptyMsg.style.display = (visibleCount === 0 && rows.length > 0) ? 'block' : 'none';
+    if (visibleCount === 0 && rows.length > 0) emptyMsg.innerText = 'لا توجد نتائج تطابق بحثك.';
+  }
+}
+
+/**
+ * فتح / إغلاق مربع النص للرسالة المخصصة (الزر الثالث)
+ */
+function toggleCustomMessageInput(memberId) {
+  const box = document.getElementById(`custom-msg-box-${memberId}`);
+  if (!box) return;
+  const isHidden = box.classList.contains('d-none');
+  // إغلاق كل المربعات الأخرى أولاً للترتيب
+  document.querySelectorAll('.custom-msg-drawer').forEach(el => el.classList.add('d-none'));
+  if (isHidden) {
+    box.classList.remove('d-none');
+    const txt = document.getElementById(`custom-msg-text-${memberId}`);
+    if (txt) txt.focus();
+  }
+}
+
+/**
+ * توحيد الصيغة الأكاديمية الرفيعة باسم «د. [اسم العضو]» وإزالة أي عبارات زائدة مثل «سعادة» أو «العضو»
+ */
+function formatAcademicName(name) {
+  if (!name) return 'د.';
+  let cleaned = String(name).replace(/^(سعادة\s+العضو|سعادة\s+الدكتور|سعادة\s+الأخ|سعادة|العضو|الأخ)\s*[\/:\-–]*\s*/i, '').trim();
+  if (!cleaned.startsWith('د.') && !cleaned.startsWith('أ.د.') && !cleaned.startsWith('د/')) {
+    cleaned = 'د. ' + cleaned;
+  }
+  return cleaned;
+}
+
+const activeDirectiveSendLocks = new Set();
+let lastHandledDirectiveId = null;
+
+/**
+ * إرسال التوجيه اللحظي (نقطة نظام أو هدوء وتركيز) مع حماية ضد النقرات المزدوجة والتكرار
+ */
+function sendPresidentDirective(memberId, directiveType, memberName, btnTrigger = null) {
+  const lockKey = `${memberId}_${directiveType}`;
+  if (activeDirectiveSendLocks.has(lockKey)) {
+    return; // منع الإرسال المكرر
+  }
+  activeDirectiveSendLocks.add(lockKey);
+
+  // تعطيل أزرار هذا العضو أثناء المعالجة لمنع أي نقرة إضافية
+  const row = document.getElementById(`member-mod-card-${memberId}`);
+  const buttonsToDisable = row ? row.querySelectorAll('button') : [];
+  buttonsToDisable.forEach(b => b.disabled = true);
+
+  const feedback = document.getElementById(`directive-feedback-${memberId}`);
+  if (feedback) {
+    feedback.className = 'directive-feedback-bar alert alert-info py-1 px-2 mb-0 mt-1 small';
+    feedback.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جارٍ إرسال التنبيه...';
+    feedback.classList.remove('d-none');
+  }
+
+  fetch(`/api/sessions/${SESSION_ID}/directive/send/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({
+      recipient_id: memberId,
+      directive_type: directiveType
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (feedback) {
+      if (data.ok) {
+        feedback.className = 'directive-feedback-bar alert alert-success py-1 px-2 mb-0 mt-1 small';
+        const label = directiveType === 'point_of_order' ? '🚨 تم إرسال نقطة النظام فلاشياً' : '🤫 تم إرسال تنبيه الهدوء والتركيز';
+        feedback.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>${label} لـ ${formatAcademicName(memberName)}`;
+        setTimeout(() => feedback.classList.add('d-none'), 3500);
+      } else {
+        feedback.className = 'directive-feedback-bar alert alert-danger py-1 px-2 mb-0 mt-1 small';
+        feedback.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i>${data.error || 'تعذر الإرسال'}`;
+      }
+    }
+  })
+  .catch(err => {
+    if (feedback) {
+      feedback.className = 'directive-feedback-bar alert alert-danger py-1 px-2 mb-0 mt-1 small';
+      feedback.innerHTML = `<i class="bi bi-x-circle me-1"></i>خطأ في الاتصال: ${err}`;
+    }
+  })
+  .finally(() => {
+    setTimeout(() => {
+      activeDirectiveSendLocks.delete(lockKey);
+      buttonsToDisable.forEach(b => b.disabled = false);
+    }, 1200);
+  });
+}
+
+/**
+ * إرسال الرسالة النصية المخصصة (الزر الثالث) مع حماية ضد النقرات المزدوجة
+ */
+function submitCustomDirective(memberId, memberName, btnSubmit = null) {
+  const lockKey = `${memberId}_custom_msg`;
+  if (activeDirectiveSendLocks.has(lockKey)) return;
+
+  const txt = document.getElementById(`custom-msg-text-${memberId}`);
+  const message = (txt ? txt.value : '').trim();
+  if (!message) {
+    alert('يرجى كتابة نص التوجيه قبل الإرسال.');
+    if (txt) txt.focus();
+    return;
+  }
+
+  activeDirectiveSendLocks.add(lockKey);
+  const row = document.getElementById(`member-mod-card-${memberId}`);
+  const buttonsToDisable = row ? row.querySelectorAll('button') : [];
+  buttonsToDisable.forEach(b => b.disabled = true);
+
+  if (btnSubmit) {
+    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> إرسال...';
+  }
+
+  const feedback = document.getElementById(`directive-feedback-${memberId}`);
+  if (feedback) {
+    feedback.className = 'directive-feedback-bar alert alert-info py-1 px-2 mb-0 mt-1 small';
+    feedback.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جارٍ إرسال الرسالة...';
+    feedback.classList.remove('d-none');
+  }
+
+  fetch(`/api/sessions/${SESSION_ID}/directive/send/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify({
+      recipient_id: memberId,
+      directive_type: 'custom_message',
+      message: message
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (feedback) {
+      if (data.ok) {
+        feedback.className = 'directive-feedback-bar alert alert-success py-1 px-2 mb-0 mt-1 small';
+        feedback.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>✉️ تم إرسال التوجيه الخاص بنجاح لـ ${formatAcademicName(memberName)}`;
+        toggleCustomMessageInput(memberId);
+        if (txt) txt.value = '';
+        setTimeout(() => feedback.classList.add('d-none'), 4000);
+      } else {
+        feedback.className = 'directive-feedback-bar alert alert-danger py-1 px-2 mb-0 mt-1 small';
+        feedback.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i>${data.error || 'تعذر الإرسال'}`;
+      }
+    }
+  })
+  .catch(err => {
+    if (feedback) {
+      feedback.className = 'directive-feedback-bar alert alert-danger py-1 px-2 mb-0 mt-1 small';
+      feedback.innerHTML = `<i class="bi bi-x-circle me-1"></i>خطأ في الاتصال: ${err}`;
+    }
+  })
+  .finally(() => {
+    setTimeout(() => {
+      activeDirectiveSendLocks.delete(lockKey);
+      buttonsToDisable.forEach(b => b.disabled = false);
+      if (btnSubmit) {
+        btnSubmit.innerHTML = '<i class="bi bi-send-fill me-1"></i>إرسال التوجيه';
+      }
+    }, 1200);
+  });
+}
+
+/**
+ * تحديث قائمة الأعضاء الحاضرين في اللوحة الطائرة عبر الـ API
+ */
+function refreshPresentMembersList() {
+  fetch(`/api/sessions/${SESSION_ID}/present-members/`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok || !data.members) return;
+      const countEl = document.getElementById('dock-present-count');
+      const badgeEl = document.getElementById('dock-present-badge');
+      const statsEl = document.getElementById('moderation-search-stats');
+      if (countEl) countEl.innerText = data.count;
+      if (badgeEl) badgeEl.innerText = data.count;
+      if (statsEl) statsEl.innerText = `${data.count} عضو`;
+
+      const listContainer = document.getElementById('moderation-members-list');
+      if (!listContainer) return;
+
+      if (data.members.length === 0) {
+        listContainer.innerHTML = '<div class="text-center py-4 text-muted small"><i class="bi bi-person-x fs-2 d-block mb-1 text-secondary opacity-50"></i>لا يوجد أعضاء حاضرون مسجلون حالياً.</div>';
+        return;
+      }
+
+      let html = '';
+      data.members.forEach(m => {
+        const proxyBadge = m.is_proxy ? `<span class="badge bg-info text-dark ms-1 py-0 px-1" style="font-size: 0.60rem;">إنابة: ${escapeHtml(m.proxy_name)}</span>` : '';
+        html += `
+          <div class="moderation-member-row card p-2 mb-2 border shadow-2xs hover-shadow-sm transition-all" id="member-mod-card-${m.id}" data-member-id="${m.id}" data-member-name="${escapeHtml(m.name).toLowerCase()}">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-1.5">
+              <div class="overflow-hidden flex-grow-1">
+                <div class="fw-bold text-dark text-truncate small" style="font-size: 0.84rem;" title="${escapeHtml(m.name)}">
+                  <span class="online-indicator-dot me-1"></span>${escapeHtml(m.name)}
+                </div>
+                <small class="text-muted text-truncate d-block" style="font-size: 0.72rem;">
+                  ${escapeHtml(m.seat_name || m.title)} ${proxyBadge}
+                </small>
+              </div>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between gap-1 pt-1.5 border-top mt-1">
+              <button type="button" id="btn-dir-poo-${m.id}" class="btn btn-sm btn-outline-danger py-1 px-2 fw-bold flex-fill d-inline-flex align-items-center justify-content-center gap-1 action-btn-point"
+                      onclick="sendPresidentDirective(${m.id}, 'point_of_order', '${escapeHtml(m.name)}', this)"
+                      title="إرسال نقطة نظام فلاشية مصحوبة بوميض وتنبيه صوتي">
+                <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+                <span style="font-size: 0.70rem;">نقطة نظام</span>
+              </button>
+
+              <button type="button" id="btn-dir-calm-${m.id}" class="btn btn-sm btn-outline-warning text-dark py-1 px-2 fw-bold flex-fill d-inline-flex align-items-center justify-content-center gap-1 bg-warning bg-opacity-10"
+                      onclick="sendPresidentDirective(${m.id}, 'calm_focus', '${escapeHtml(m.name)}', this)"
+                      title="إرسال تنبيه: يرجى الهدوء والتركيز">
+                <i class="bi bi-volume-mute-fill text-warning"></i>
+                <span style="font-size: 0.70rem;">هدوء وتركيز</span>
+              </button>
+
+              <button type="button" id="btn-dir-msg-${m.id}" class="btn btn-sm btn-outline-primary py-1 px-2 fw-bold flex-fill d-inline-flex align-items-center justify-content-center gap-1"
+                      onclick="toggleCustomMessageInput(${m.id})"
+                      title="كتابة نص مخصص وإرساله لهذا العضو">
+                <i class="bi bi-chat-text-fill text-primary"></i>
+                <span style="font-size: 0.70rem;">رسالة نصية</span>
+              </button>
+            </div>
+
+            <div id="custom-msg-box-${m.id}" class="custom-msg-drawer mt-2 p-2 bg-light rounded border d-none">
+              <label class="small text-navy fw-bold mb-1 d-block" style="font-size: 0.72rem; color: #1B365D;">
+                <i class="bi bi-pencil-square me-1 text-primary"></i>توجيه خاص إلى: <strong class="text-dark">د. ${escapeHtml(m.name)}</strong>
+              </label>
+              <textarea id="custom-msg-text-${m.id}" class="form-control form-control-sm mb-1.5" rows="2" placeholder="اكتب التوجيه أو الملاحظة هنا..." style="font-size: 0.75rem; resize: vertical;"></textarea>
+              <div class="d-flex justify-content-end gap-1">
+                <button type="button" class="btn btn-xs btn-outline-secondary py-0.5 px-2" style="font-size: 0.70rem;" onclick="toggleCustomMessageInput(${m.id})">إلغاء</button>
+                <button type="button" id="btn-dir-submit-${m.id}" class="btn btn-xs btn-primary text-white py-0.5 px-2.5 fw-bold" style="font-size: 0.70rem; background:#1B365D;" onclick="submitCustomDirective(${m.id}, '${escapeHtml(m.name)}', this)">
+                  <i class="bi bi-send-fill me-1"></i>إرسال التوجيه
+                </button>
+              </div>
+            </div>
+
+            <div id="directive-feedback-${m.id}" class="directive-feedback-bar alert alert-success py-1 px-2 mb-0 mt-1 small d-none" style="font-size: 0.68rem;"></div>
+          </div>
+        `;
+      });
+      listContainer.innerHTML = html;
+    })
+    .catch(() => {});
+}
+
+/**
+ * معالجة التوجيه الوارد للعضو وعرضه فلاشياً وصوتياً مع إبراز اسم العضو واللقب الأكاديمي "د."
+ */
+function handleIncomingDirective(directive) {
+  const modalEl = document.getElementById('memberDirectiveModal');
+  if (!modalEl) return;
+
+  if (!directive) {
+    return;
+  }
+
+  // إذا كان التوجيه قد تمت معالجته بالفعل مسبقاً، نمنع تكرار المؤثرات
+  if (lastHandledDirectiveId === directive.id) {
+    return;
+  }
+
+  lastHandledDirectiveId = directive.id;
+  activeIncomingDirectiveId = directive.id;
+
+  // 1. تشغيل النغمة الصوتية المتزامنة فوراً
+  playChimeAlert(directive.directive_type);
+
+  // 2. تفعيل الوميض البصري والتصويري للشاشة
+  triggerFlashVisualEffect(directive.directive_type);
+
+  // 3. اهتزاز الهاتف الذكي للموبايل (iPhone / Android Haptics)
+  if ('vibrate' in navigator) {
+    try {
+      if (directive.directive_type === 'point_of_order') {
+        navigator.vibrate([250, 100, 250, 100, 400]);
+      } else {
+        navigator.vibrate([180, 80, 180]);
+      }
+    } catch (e) {}
+  }
+
+  // 4. ضبط عناصر الواجهة بحسب نوع التوجيه مع اللقب الأكاديمي الرصين "د."
+  const band = document.getElementById('directiveHeaderBand');
+  const icon = document.getElementById('directiveHeaderIcon');
+  const title = document.getElementById('directiveHeaderTitle');
+  const timeEl = document.getElementById('directiveHeaderTime');
+  const quoteCard = document.getElementById('directiveQuoteCard');
+  const labelSmall = document.getElementById('directiveLabelSmall');
+  const body = document.getElementById('directiveMessageBody');
+  const recipName = document.getElementById('directiveRecipientName');
+  const recipTitle = document.getElementById('directiveRecipientTitle');
+  const senderTag = document.getElementById('directiveSenderTag');
+
+  if (timeEl) timeEl.innerText = `الساعة: ${directive.created_at || ''}`;
+  if (recipName) recipName.innerText = formatAcademicName(directive.recipient_name || CURRENT_USER_NAME);
+  if (recipTitle) recipTitle.innerText = directive.recipient_title || 'عضو مجلس الجامعة';
+  if (body) body.innerText = directive.message;
+  if (senderTag) senderTag.innerHTML = `<i class="bi bi-shield-check me-1 text-success"></i>صادر عن: ${escapeHtml(directive.sender_name)}`;
+
+  if (directive.directive_type === 'point_of_order') {
+    if (band) band.className = 'directive-header-band p-3 text-white text-center position-relative band-crimson';
+    if (icon) icon.className = 'bi bi-exclamation-octagon-fill fs-2';
+    if (title) title.innerText = '🚨 نقطة نظام من رئاسة المجلس';
+    if (quoteCard) quoteCard.className = 'directive-quote-card p-3 rounded-3 mb-3 border-start border-4 border-danger bg-danger bg-opacity-10';
+    if (labelSmall) labelSmall.className = 'small text-danger mb-1 fw-bold';
+  } else if (directive.directive_type === 'calm_focus') {
+    if (band) band.className = 'directive-header-band p-3 text-white text-center position-relative band-amber';
+    if (icon) icon.className = 'bi bi-volume-mute-fill fs-2';
+    if (title) title.innerText = '🤫 تنبيه رئاسي: يرجى الهدوء والتركيز';
+    if (quoteCard) quoteCard.className = 'directive-quote-card p-3 rounded-3 mb-3 border-start border-4 border-warning bg-warning bg-opacity-10';
+    if (labelSmall) labelSmall.className = 'small text-warning-emphasis mb-1 fw-bold';
+  } else {
+    if (band) band.className = 'directive-header-band p-3 text-white text-center position-relative band-navy';
+    if (icon) icon.className = 'bi bi-chat-quote-fill fs-2';
+    if (title) title.innerText = '✉️ توجيه مباشر خاص من رئاسة المجلس';
+    if (quoteCard) quoteCard.className = 'directive-quote-card p-3 rounded-3 mb-3 border-start border-4 border-primary bg-primary bg-opacity-10';
+    if (labelSmall) labelSmall.className = 'small text-primary mb-1 fw-bold';
+  }
+
+  // 5. إظهار الشاشة المناسبة فوراً
+  modalEl.classList.remove('d-none');
+}
+
+/**
+ * إغلاق شاشة التوجيه والإقرار باستيعاب التوجيه
+ */
+function dismissCurrentDirective() {
+  const modalEl = document.getElementById('memberDirectiveModal');
+  const targetId = activeIncomingDirectiveId;
+
+  if (modalEl) modalEl.classList.add('d-none');
+  activeIncomingDirectiveId = null;
+
+  if (targetId) {
+    fetch(`/api/directives/${targetId}/dismiss/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken')
+      }
+    }).catch(() => {});
+  }
+}
+
+/**
+ * نظام سحب وإفلات الشاشة الطائرة (Drag and Drop)
+ * يدعم الفأرة (Mouse) وشاشات اللمس (iPhone / Samsung / Android)
+ * مع حماية من الخروج خارج الشاشة وتخزين الموضع
+ */
+function initDraggableModerationDock() {
+  const dock = document.getElementById('president-moderation-dock');
+  if (!dock) return;
+
+  const dragHandles = [
+    document.getElementById('moderation-dock-header'),
+    document.getElementById('moderation-dock-collapsed')
+  ].filter(Boolean);
+
+  let isDragging = false;
+  let startX = 0, startY = 0;
+  let initialLeft = 0, initialTop = 0;
+  let hasMoved = false;
+
+  // استعادة آخر موضع تم حفظه إذا كان متوافقاً مع حجم الشاشة الحالي
+  const savedPos = localStorage.getItem('president_dock_pos');
+  if (savedPos) {
+    try {
+      const pos = JSON.parse(savedPos);
+      const maxX = window.innerWidth - 80;
+      const maxY = window.innerHeight - 80;
+      if (pos.left >= 0 && pos.left <= maxX && pos.top >= 0 && pos.top <= maxY) {
+        dock.style.left = `${pos.left}px`;
+        dock.style.top = `${pos.top}px`;
+        dock.style.right = 'auto';
+        dock.style.bottom = 'auto';
+      }
+    } catch (e) {}
+  }
+
+  function onDragStart(e) {
+    if (e.target.closest('button, input, textarea, a, .btn')) {
+      return;
+    }
+
+    isDragging = true;
+    hasMoved = false;
+
+    const point = e.touches ? e.touches[0] : e;
+    startX = point.clientX;
+    startY = point.clientY;
+
+    const rect = dock.getBoundingClientRect();
+    initialLeft = rect.left;
+    initialTop = rect.top;
+
+    dock.style.left = `${initialLeft}px`;
+    dock.style.top = `${initialTop}px`;
+    dock.style.right = 'auto';
+    dock.style.bottom = 'auto';
+    dock.classList.add('is-dragging');
+
+    document.addEventListener('mousemove', onDragMove, { passive: false });
+    document.addEventListener('mouseup', onDragEnd);
+    document.addEventListener('touchmove', onDragMove, { passive: false });
+    document.addEventListener('touchend', onDragEnd);
+  }
+
+  function onDragMove(e) {
+    if (!isDragging) return;
+
+    const point = e.touches ? e.touches[0] : e;
+    const dx = point.clientX - startX;
+    const dy = point.clientY - startY;
+
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+      hasMoved = true;
+      if (e.cancelable) e.preventDefault(); // منع تمرير الصفحة على الجوال أثناء السحب
+    }
+
+    if (!hasMoved) return;
+
+    let newLeft = initialLeft + dx;
+    let newTop = initialTop + dy;
+
+    const dockWidth = dock.offsetWidth || 300;
+    const dockHeight = dock.offsetHeight || 60;
+    const padding = 10;
+
+    const maxLeft = window.innerWidth - dockWidth - padding;
+    const maxTop = window.innerHeight - dockHeight - padding;
+
+    newLeft = Math.max(padding, Math.min(newLeft, maxLeft));
+    newTop = Math.max(padding, Math.min(newTop, maxTop));
+
+    dock.style.left = `${newLeft}px`;
+    dock.style.top = `${newTop}px`;
+  }
+
+  function onDragEnd(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    dock.classList.remove('is-dragging');
+
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+    document.removeEventListener('touchmove', onDragMove);
+    document.removeEventListener('touchend', onDragEnd);
+
+    if (hasMoved) {
+      const rect = dock.getBoundingClientRect();
+      try {
+        localStorage.setItem('president_dock_pos', JSON.stringify({
+          left: Math.round(rect.left),
+          top: Math.round(rect.top)
+        }));
+      } catch (err) {}
+
+      dock.setAttribute('data-dragged', 'true');
+      setTimeout(() => dock.removeAttribute('data-dragged'), 250);
+    }
+  }
+
+  dragHandles.forEach(handle => {
+    handle.addEventListener('mousedown', onDragStart);
+    handle.addEventListener('touchstart', onDragStart, { passive: false });
+  });
+}
+
 // تشغيل الفحص الفوري عند التحميل ثم دورياً كل 3.5 ثانية واستعادة موضع الشاشة
 document.addEventListener('DOMContentLoaded', () => {
+  // تهيئة ميزة السحب والإفلات للوحة الطائرة للرئيس
+  initDraggableModerationDock();
+
+  // تفعيل وتهيئة سياق الصوت التلقائي مع أول لمسة أو نقرة (مراعاة لسياسات آيفون وسامسونج)
+  const unlockAudio = () => {
+    if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {});
+    }
+  };
+  document.addEventListener('click', unlockAudio, { once: true });
+  document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+
   pollQueue();
   setInterval(pollQueue, 3500);
 
@@ -3432,6 +5727,211 @@ document.addEventListener('DOMContentLoaded', () => {
 }
 .filter-ribbon-btn:hover {
   transform: translateY(-1px);
+}
+
+/* ── اللوحة الطائرة المنكمشة لإدارة وتوجيه الأعضاء الحاضرين ── */
+.moderation-dock-container {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  z-index: 1065;
+  font-family: inherit;
+  touch-action: none;
+}
+
+.moderation-dock-container.is-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+  transition: none !important;
+}
+
+.moderation-dock-header, #moderation-dock-collapsed {
+  cursor: grab;
+  touch-action: none;
+}
+
+.moderation-dock-container.is-dragging .moderation-dock-header,
+.moderation-dock-container.is-dragging #moderation-dock-collapsed {
+  cursor: grabbing !important;
+}
+
+.moderation-pill-wrap {
+  cursor: pointer;
+  background: linear-gradient(135deg, #0d1b2a 0%, #1B365D 100%);
+  border: 1.5px solid #D4AF37;
+  border-radius: 50px;
+  color: #ffffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px);
+}
+
+.moderation-pill-wrap:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(212, 175, 55, 0.35);
+  border-color: #f3c65f;
+}
+
+.moderation-floating-panel {
+  width: 440px;
+  max-width: 95vw;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  background: #ffffff;
+  border: 1.5px solid rgba(27, 54, 93, 0.2) !important;
+  animation: slideUpFade 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.online-indicator-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+}
+
+.action-btn-point:hover {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* ── وميض التنبيه الفلاشي البصري والتصويري لكامل الشاشة ── */
+.flash-directive-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1080;
+  pointer-events: none;
+  animation: flashPulse 1.2s infinite alternate;
+}
+
+@keyframes flashPulse {
+  0% { opacity: 0.15; }
+  100% { opacity: 0.65; }
+}
+
+.flash-crimson {
+  background: radial-gradient(circle, transparent 40%, rgba(220, 38, 38, 0.45) 100%);
+  border: 8px solid rgba(220, 38, 38, 0.85);
+  box-shadow: inset 0 0 50px rgba(220, 38, 38, 0.6);
+}
+
+.flash-amber {
+  background: radial-gradient(circle, transparent 40%, rgba(245, 158, 11, 0.40) 100%);
+  border: 8px solid rgba(245, 158, 11, 0.80);
+  box-shadow: inset 0 0 50px rgba(245, 158, 11, 0.5);
+}
+
+.flash-blue {
+  background: radial-gradient(circle, transparent 40%, rgba(27, 54, 93, 0.40) 100%);
+  border: 8px solid rgba(27, 54, 93, 0.80);
+  box-shadow: inset 0 0 50px rgba(27, 54, 93, 0.5);
+}
+
+.flash-fade-out {
+  transition: opacity 0.6s ease;
+  opacity: 0 !important;
+}
+
+/* ── شاشة الرسائل والتوجيهات الرئاسية لدى العضو ── */
+.member-directive-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.70);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1090;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.member-directive-dialog {
+  width: 100%;
+  max-width: 520px;
+}
+
+.animate-pop-in {
+  animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.member-directive-card {
+  border-radius: 20px;
+  background: #ffffff;
+  border: 2px solid #D4AF37 !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+}
+
+.directive-header-band.band-crimson {
+  background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%);
+}
+
+.directive-header-band.band-amber {
+  background: linear-gradient(135deg, #78350f 0%, #d97706 100%);
+}
+
+.directive-header-band.band-navy {
+  background: linear-gradient(135deg, #0d1b2a 0%, #1B365D 100%);
+}
+
+.directive-icon-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+/* ── ملاءمة فائقة لشاشات الجوال والهواتف الذكية (آيفون، سامسونج، أندرويد) ── */
+@media (max-width: 576px) {
+  .moderation-dock-container {
+    bottom: max(16px, env(safe-area-inset-bottom, 16px));
+    right: max(12px, env(safe-area-inset-right, 12px));
+  }
+  .moderation-floating-panel {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: 84vh;
+  }
+  #moderation-members-list {
+    max-height: 52vh !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .member-directive-modal-backdrop {
+    padding: 0.6rem;
+  }
+  .member-directive-dialog {
+    max-width: 100%;
+  }
+  .moderation-member-row {
+    padding: 0.5rem !important;
+  }
+  .moderation-member-row .btn {
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
+  }
 }
 </style>
 {% endblock %}

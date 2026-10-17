@@ -53,7 +53,7 @@
         <div class="p-3 bg-light rounded-3 border d-flex align-items-center justify-content-between">
           <div>
             <div class="small text-muted fw-bold">إجمالي الصلاحيات الممنوحة:</div>
-            <div class="fs-4 fw-bold text-navy" id="live-granted-count">0 / 58</div>
+            <div class="fs-4 fw-bold text-navy" id="live-granted-count">0 / 60</div>
           </div>
           <div id="granted-status-badge">
             <span class="badge bg-secondary p-2">لا توجد صلاحيات</span>
@@ -70,7 +70,7 @@
         <div class="p-3 bg-white rounded-3 border border-2 border-gold shadow-sm mb-3">
           <div class="form-check form-switch fs-5 d-flex align-items-center justify-content-between m-0">
             <label class="form-check-label fw-bold text-navy cursor-pointer" for="master-select-all" style="cursor: pointer;">
-              منح كافة صلاحيات النظام دفعة واحدة (شامل - 58 صلاحية)
+              منح كافة صلاحيات النظام دفعة واحدة (شامل لجميع الصلاحيات)
             </label>
             <input class="form-check-input" type="checkbox" id="master-select-all" style="cursor: pointer; width: 2.8em; height: 1.4em;">
           </div>
@@ -227,6 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     {% if permission_obj.can_approve_new_session %}'can_approve_new_session',{% endif %}
     {% if permission_obj.can_view_live_session %}'can_view_live_session',{% endif %}
     {% if permission_obj.can_start_session_live %}'can_start_session_live',{% endif %}
+    {% if permission_obj.can_reopen_topic_live %}'can_reopen_topic_live',{% endif %}
     {% if permission_obj.can_suspend_resume_session %}'can_suspend_resume_session',{% endif %}
     {% if permission_obj.can_set_topic_timer %}'can_set_topic_timer',{% endif %}
     {% if permission_obj.can_manage_speak_requests %}'can_manage_speak_requests',{% endif %}
@@ -236,6 +237,8 @@ document.addEventListener('DOMContentLoaded', () => {
     {% if permission_obj.can_approve_exit_permit %}'can_approve_exit_permit',{% endif %}
     {% if permission_obj.can_view_projector %}'can_view_projector',{% endif %}
     {% if permission_obj.can_view_analytics %}'can_view_analytics',{% endif %}
+    {% if permission_obj.can_open_previous_minutes %}'can_open_previous_minutes',{% endif %}
+    {% if permission_obj.can_broadcast_previous_minutes %}'can_broadcast_previous_minutes',{% endif %}
     {% if permission_obj.can_search_minutes %}'can_search_minutes',{% endif %}
     {% if permission_obj.can_search_person %}'can_search_person',{% endif %}
     {% if permission_obj.can_view_notifications %}'can_view_notifications',{% endif %}
@@ -344,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'can_vote', 'can_view_vote_details', 'can_draft_decision', 'can_delete_decision',
       'can_upload_signed_decision', 'can_send_decisions', 'can_view_correspondence',
       'can_view_dispatch_log', 'can_add_table', 'can_edit_table',
-      'can_advance_session_stage', 'can_view_live_session', 'can_start_session_live',
+      'can_advance_session_stage', 'can_view_live_session', 'can_start_session_live', 'can_reopen_topic_live',
       'can_set_topic_timer', 'can_manage_speak_requests', 'can_control_recording',
       'can_approve_exit_permit', 'can_view_projector', 'can_view_analytics',
       'can_search_minutes', 'can_search_person', 'can_view_notifications',

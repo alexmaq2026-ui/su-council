@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     CouncilSession, Topic, TopicTable, Attendance,
-    Decision, Vote, TopicAttachment, TopicRecording
+    Decision, Vote, TopicAttachment, TopicRecording,
+    LiveSessionDirective
 )
 
 @admin.register(CouncilSession)
@@ -45,3 +46,10 @@ class TopicAttachmentAdmin(admin.ModelAdmin):
 @admin.register(TopicRecording)
 class TopicRecordingAdmin(admin.ModelAdmin):
     list_display = ('topic', 'duration_seconds', 'recorded_by', 'recorded_at')
+
+@admin.register(LiveSessionDirective)
+class LiveSessionDirectiveAdmin(admin.ModelAdmin):
+    list_display = ('session', 'directive_type', 'recipient_name', 'sender', 'is_read', 'created_at')
+    list_filter = ('directive_type', 'is_read', 'session')
+    search_fields = ('recipient_name', 'message')
+

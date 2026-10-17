@@ -126,6 +126,9 @@ urlpatterns = [
     path('api/sessions/<int:session_pk>/active-topic/', live_session_views.api_session_active_topic, name='api_session_active_topic'),
     path('api/sessions/<int:session_pk>/lifecycle-control/', live_session_views.api_session_lifecycle_control, name='api_session_lifecycle_control'),
     path('api/sessions/<int:session_pk>/delegate-control/', live_session_views.api_session_delegate_control, name='api_session_delegate_control'),
+    path('api/sessions/<int:session_pk>/previous-sessions/', live_session_views.api_previous_sessions_list, name='api_previous_sessions_list'),
+    path('api/sessions/<int:session_pk>/minutes/', live_session_views.api_previous_session_minutes, name='api_previous_session_minutes'),
+    path('api/sessions/<int:session_pk>/broadcast-minutes/', live_session_views.api_session_broadcast_minutes, name='api_session_broadcast_minutes'),
 
     # APIs for Speech Queue (SpeakRequest)
     path('api/sessions/<int:session_pk>/speak/toggle/', live_session_views.api_speak_request_toggle, name='api_speak_request_toggle'),
@@ -139,6 +142,11 @@ urlpatterns = [
     # APIs for Exit Permits
     path('api/sessions/<int:session_pk>/exit-permit/request/', live_session_views.api_exit_permit_request, name='api_exit_permit_request'),
     path('api/exit-permits/<int:permit_pk>/action/', live_session_views.api_exit_permit_action, name='api_exit_permit_action'),
+
+    # APIs for Interactive Moderation & Directives (Points of order, Calm & Focus, Custom text)
+    path('api/sessions/<int:session_pk>/present-members/', live_session_views.api_session_present_members, name='api_session_present_members'),
+    path('api/sessions/<int:session_pk>/directive/send/', live_session_views.api_send_live_directive, name='api_send_live_directive'),
+    path('api/directives/<int:directive_pk>/dismiss/', live_session_views.api_dismiss_live_directive, name='api_dismiss_live_directive'),
 
     # ── Phase 4: Signed Decisions, Faculty Dispatches & Digital Hash ─────
     path('topics/<int:topic_pk>/signed-decision/upload/', dispatch_views.upload_signed_decision_view, name='upload_signed_decision'),
