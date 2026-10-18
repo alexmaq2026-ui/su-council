@@ -1013,12 +1013,16 @@ def api_speak_queue(request, session_pk):
 
     session = get_object_or_404(CouncilSession, pk=session_pk)
 
-    # Heartbeat presence tracking for operators/managers
+    # Heartbeat presence tracking for operators/managers (throttled to update at most once every 30s)
     if user.is_authenticated and (user.is_super or user.can_start_session_live):
-        LiveSessionPresence.objects.update_or_create(
-            session=session, user=user,
-            defaults={'last_seen': timezone.now(), 'is_active': True}
-        )
+        now = timezone.now()
+        presence = LiveSessionPresence.objects.filter(session=session, user=user).first()
+        if not presence:
+            LiveSessionPresence.objects.create(session=session, user=user, last_seen=now, is_active=True)
+        elif (now - presence.last_seen).total_seconds() > 30 or not presence.is_active:
+            presence.last_seen = now
+            presence.is_active = True
+            presence.save(update_fields=['last_seen', 'is_active'])
 
     active_speaker = SpeakRequest.objects.filter(
         session=session, status='speaking'

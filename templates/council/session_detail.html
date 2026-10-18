@@ -965,7 +965,7 @@ function launchTopicToLive(topicId, liveUrl) {
       })
       .catch(err => console.debug('Sync check err:', err));
   }
-  setInterval(checkActiveTopicForMember, 2500);
+  setInterval(checkActiveTopicForMember, 8000);
 })();
 {% endif %}
 </script>

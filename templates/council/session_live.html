@@ -5551,7 +5551,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
 
   pollQueue();
-  setInterval(pollQueue, 3500);
+  setInterval(pollQueue, 6000);
 
   // استعادة موضع الشاشة والفتح التلقائي للموضوع النشط بدقة دون بدء من الصفر
   const urlParams = new URLSearchParams(window.location.search);

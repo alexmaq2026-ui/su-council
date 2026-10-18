@@ -432,6 +432,12 @@ class CouncilSession(models.Model):
         Strictly counts active official EntitySeats (never exceeds total_seats / 100%).
         Takes into account approved ExitPermits (departed members).
         """
+        from django.core.cache import cache
+        cache_key = f"quorum_info_session_{self.pk}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         active_seats = list(EntitySeat.objects.filter(is_active=True).values(
             'id', 'primary_rep_id', 'deputy_rep_1_id', 'deputy_rep_2_id'
         ))
@@ -472,7 +478,7 @@ class CouncilSession(models.Model):
         is_achieved = present_count >= quorum_required
         missing_count = max(0, quorum_required - present_count)
 
-        return {
+        res = {
             'total_seats': total_seats,
             'quorum_required': quorum_required,
             'present_count': present_count,
@@ -480,6 +486,8 @@ class CouncilSession(models.Model):
             'missing_count': missing_count,
             'quorum_percentage': round((present_count / total_seats) * 100, 1) if total_seats else 0,
         }
+        cache.set(cache_key, res, 4)
+        return res
 
     def get_present_members(self):
         """
