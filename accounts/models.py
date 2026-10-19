@@ -221,6 +221,10 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.is_superuser = True
         super().save(*args, **kwargs)
 
+    def refresh_from_db(self, *args, **kwargs):
+        self._cached_council_perm = None
+        super().refresh_from_db(*args, **kwargs)
+
     def generate_access_token(self):
         """Generate or regenerate on-demand a cryptographically secure random token for direct entry."""
         import secrets
@@ -426,6 +430,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     def can_broadcast_previous_minutes(self): return self._has_perm('can_broadcast_previous_minutes')
     @property
     def can_moderate_live_session(self): return self._has_perm('can_moderate_live_session')
+    @property
+    def enforce_force_majeure(self):
+        """Returns True only if the Super Admin explicitly applied Force Majeure on this user."""
+        if self.is_super:
+            return False
+        perm = self.get_permission()
+        return bool(perm and getattr(perm, 'enforce_force_majeure', False))
 
     # 10. Search, Notifications, Smart Reader & Audit
     @property
@@ -444,6 +455,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     def can_manage_smart_reader(self):   return self._has_perm('can_manage_smart_reader')
     @property
     def can_view_audit_log(self):        return self._has_perm('can_view_audit_log')
+    @property
+    def can_toggle_audit_backup(self):   return self._has_perm('can_toggle_audit_backup')
+    @property
+    def can_clear_audit_log(self):       return self._has_perm('can_clear_audit_log')
 
     @property
     def has_any_permission(self):
@@ -507,12 +522,13 @@ class CouncilPermission(models.Model):
         'can_request_exit_permit', 'can_approve_exit_permit',
         'can_view_projector', 'can_view_analytics',
         'can_open_previous_minutes', 'can_broadcast_previous_minutes',
-        'can_moderate_live_session',
+        'can_moderate_live_session', 'enforce_force_majeure',
         # 10. Search, Notifications, Smart Reader & Audit
         'can_search_minutes', 'can_search_person',
         'can_view_notifications', 'can_view_notification_log',
         'can_manage_sms_template', 'can_use_smart_reader',
         'can_manage_smart_reader', 'can_view_audit_log',
+        'can_toggle_audit_backup', 'can_clear_audit_log',
     ]
 
     # 🌟 الصلاحيات الأساسية للأعضاء من لهم حق التصويت (11 صلاحية قياسية معتمدة)
@@ -618,6 +634,8 @@ class CouncilPermission(models.Model):
                                                          help_text='إظهار وإتاحة زر «بث لشاشات الأعضاء» لبث المحضر السابق لشاشات الأعضاء وإيقافه')
     can_moderate_live_session      = models.BooleanField('اللوحة العائمة للتوجيه والتنبيه التفاعلي ونقاط النظام للأعضاء', default=False,
                                                          help_text='إظهار اللوحة العائمة المنكمشة لرئيس الجلسة أو المفوّض لإرسال نقاط النظام ورسائل الهدوء والتوجيهات المخصصة للأعضاء الحاضرين')
+    enforce_force_majeure          = models.BooleanField('زر تطبيق القوة القاهرة (تجميد شاشة العضو والتنقل أثناء النقاش)', default=False,
+                                                         help_text='تطبيق القوة القاهرة حصراً على هذا العضو بقرار المدير الأعلى؛ بحيث تُوجَّه شاشته إجبارياً لموضوع النقاش وتُجمَّد روابط التنقل في السايدبار والنافبار أثناء انعقاد الجلسة')
 
     # 10. Search, Notifications, Smart Reader & Audit
     can_search_minutes        = models.BooleanField('استخدام شاشة البحث في المحاضر', default=False)
@@ -628,6 +646,8 @@ class CouncilPermission(models.Model):
     can_use_smart_reader      = models.BooleanField('استخدام القراءة الذكية للمحاضر والمواضيع', default=False)
     can_manage_smart_reader   = models.BooleanField('إدارة إعدادات وسجل القراءة الذكية', default=False)
     can_view_audit_log        = models.BooleanField('عرض سجل رقابة المستخدمين', default=False)
+    can_toggle_audit_backup   = models.BooleanField('إيقاف/تشغيل نظام رقابة المستخدمين والنسخ الاحتياطي', default=False)
+    can_clear_audit_log       = models.BooleanField('تصفير ومسح سجلات الرقابة والنسخ الاحتياطي', default=False)
 
     # Audit & Delegation Info
     granted_by  = models.ForeignKey(

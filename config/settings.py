@@ -67,12 +67,16 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'council.context_processors.live_session_context',
+                'council.context_processors.isolation_context',
             ],
         },
     },
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+
+# ── Isolation Mode & Dynamic Air-Gap Controller ───────────────────────────────
+from config.isolation import is_isolated, get_isolation_status
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASES = {
@@ -84,9 +88,16 @@ DATABASES = {
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
-    DATABASES['default']['DISABLE_SERVER_SIDE_CURSORS'] = True
-    DATABASES['default']['CONN_HEALTH_CHECKS'] = False
+    DATABASES['cloud'] = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+    DATABASES['cloud']['DISABLE_SERVER_SIDE_CURSORS'] = True
+    DATABASES['cloud']['CONN_HEALTH_CHECKS'] = False
+
+    # Strict Isolation Logic:
+    # When ISOLATED (default), 'default' database is ALWAYS local SQLite.
+    # Only if isolation is explicitly switched to CONNECTED by Super Admin will 'default' use the cloud database.
+    if not is_isolated():
+        DATABASES['default'] = DATABASES['cloud']
+
 
 # ── In-Memory Caching (Optimizes repetitive live session polling & queries) ───
 CACHES = {
@@ -133,10 +144,12 @@ SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://hhqrohrclfekmjqhlaet.supabase.
 SUPABASE_KEY = os.getenv('SUPABASE_KEY', 'sb_publishable_4cBv9I9tNFWSaTYbLxs3fA_bGBHifXz')
 SUPABASE_STORAGE_BUCKET = os.getenv('SUPABASE_STORAGE_BUCKET', 'council-media')
 
-if SUPABASE_URL and SUPABASE_KEY:
+# If in isolated mode, FORCE local FileSystemStorage; only use Supabase if connected
+if not is_isolated() and SUPABASE_URL and SUPABASE_KEY:
     DEFAULT_STORAGE_BACKEND = 'config.storage.SupabaseMediaStorage'
 else:
     DEFAULT_STORAGE_BACKEND = 'django.core.files.storage.FileSystemStorage'
+
 
 STORAGES = {
     'default': {

@@ -661,6 +661,42 @@ class NewSessionRequest(models.Model):
         return f'طلب فتح جلسة – {self.requested_by.full_name} ({self.get_status_display()})'
 
 
+# ── System Audit & Backup Control ──────────────────────────────────────────────
+class SystemAuditControl(models.Model):
+    """
+    Global configuration for Audit Logging and Automated Backup operations.
+    Acts as a master switch to strictly pause or resume audit writes and automated backups.
+    """
+    is_enabled = models.BooleanField(
+        'تفعيل تسجيل الرقابة والنسخ الاحتياطي',
+        default=True,
+        help_text='عند إلغاء التفعيل يتوقف النظام فوراً عن تسجيل حركات المستخدمين وأخذ النسخ الاحتياطية التلقائية'
+    )
+    updated_at = models.DateTimeField('تاريخ آخر تحديث', auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name='حُدِّث بواسطة'
+    )
+
+    class Meta:
+        verbose_name = 'إعدادات رقابة المستخدمين والنسخ الاحتياطي'
+        verbose_name_plural = 'إعدادات رقابة المستخدمين والنسخ الاحتياطي'
+
+    @classmethod
+    def get_setting(cls):
+        obj = cls.objects.first()
+        if not obj:
+            obj = cls.objects.create(is_enabled=True)
+        return obj
+
+    @classmethod
+    def is_audit_and_backup_active(cls):
+        try:
+            return cls.get_setting().is_enabled
+        except Exception:
+            return True
+
+
 # ── Audit Log ──────────────────────────────────────────────────────────────────
 class AuditLog(models.Model):
     """Immutable audit trail for all system events."""
@@ -698,6 +734,11 @@ class AuditLog(models.Model):
         verbose_name = 'سجل رقابة'
         verbose_name_plural = 'سجل رقابة المستخدمين'
         ordering = ['-timestamp']
+
+    def save(self, *args, **kwargs):
+        if not SystemAuditControl.is_audit_and_backup_active():
+            return
+        super().save(*args, **kwargs)
 
     def __str__(self):
         user_str = self.user.full_name if self.user else 'النظام'

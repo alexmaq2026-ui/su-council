@@ -7,8 +7,9 @@ from django.urls import path
 from council.views import (
     session_views, topic_views, vote_views, decision_views,
     export_views, table_views, live_session_views, dispatch_views,
-    notification_views, smart_reader_views
+    notification_views, smart_reader_views, isolation_views
 )
+
 
 app_name = 'council'
 
@@ -39,6 +40,8 @@ urlpatterns = [
     path('requests/<int:pk>/review/', session_views.new_session_request_review_view, name='new_session_request_review'),
     path('audit-log/', session_views.audit_log_view, name='audit_log'),
     path('audit-log/', session_views.audit_log_view, name='audit-log'),
+    path('audit-log/toggle/', session_views.toggle_audit_backup_view, name='toggle_audit_backup'),
+    path('audit-log/clear/', session_views.clear_audit_log_view, name='clear_audit_log'),
     path('backups/now/', session_views.backup_now_view, name='backup_now'),
 
     # ── Topics ────────────────────────────────────────────────────────────
@@ -147,6 +150,7 @@ urlpatterns = [
     path('api/sessions/<int:session_pk>/present-members/', live_session_views.api_session_present_members, name='api_session_present_members'),
     path('api/sessions/<int:session_pk>/directive/send/', live_session_views.api_send_live_directive, name='api_send_live_directive'),
     path('api/directives/<int:directive_pk>/dismiss/', live_session_views.api_dismiss_live_directive, name='api_dismiss_live_directive'),
+    path('api/users/<int:user_pk>/toggle-force-majeure/', live_session_views.api_toggle_force_majeure, name='api_toggle_force_majeure'),
 
     # ── Phase 4: Signed Decisions, Faculty Dispatches & Digital Hash ─────
     path('topics/<int:topic_pk>/signed-decision/upload/', dispatch_views.upload_signed_decision_view, name='upload_signed_decision'),
@@ -174,7 +178,11 @@ urlpatterns = [
     path('api/smart-reader/log/', smart_reader_views.api_smart_reader_log, name='api_smart_reader_log'),
     # Backward-compatible aliases for legacy /council/ prefix
     path('council/api/smart-reader/data/', smart_reader_views.api_smart_reader_data),
-    path('council/api/smart-reader/synthesize/', smart_reader_views.api_smart_reader_synthesize),
-    path('council/api/smart-reader/log/', smart_reader_views.api_smart_reader_log),
     path('smart-reader/settings/', smart_reader_views.smart_reader_settings_view, name='smart_reader_settings'),
+    
+    # ── Strict Air-Gap Isolation & Cloud Connection APIs ──────────────────
+    path('api/admin/isolation/status/', isolation_views.api_isolation_status, name='api_isolation_status'),
+    path('api/admin/isolation/toggle/', isolation_views.api_toggle_isolation, name='api_toggle_isolation'),
+    path('api/admin/isolation/sync/', isolation_views.api_manual_sync_cloud, name='api_manual_sync_cloud'),
 ]
+

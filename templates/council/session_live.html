@@ -465,16 +465,16 @@
   </div>
   {% endif %}
 
-  {% if not can_start_session_live and can_vote %}
-  <!-- شريط إشعار وضع الانضباط الرشيق لشاشة العضو المصوت (يختفي تلقائياً أثناء وضع الاستراحة) -->
+  {% if is_member_live_lockdown %}
+  <!-- شريط إشعار وضع الانضباط الرشيق لشاشة العضو الخاضع للقوة القاهرة بقرار المدير الأعلى (يختفي تلقائياً أثناء وضع الاستراحة) -->
   <div id="member-discipline-banner" class="alert mb-2 py-1.5 px-3 border-0 rounded-3 shadow-sm text-white d-flex flex-wrap align-items-center justify-content-between gap-2"
        style="background: linear-gradient(90deg, #1B365D 0%, #0f3460 100%); border-right: 4px solid #facc15 !important; {% if is_suspended %}display: none;{% endif %}">
     <div class="d-flex align-items-center gap-2">
       <span class="badge bg-warning text-dark fw-bold px-2 py-1" style="font-size: 0.72rem;">
-        <i class="bi bi-shield-lock-fill me-1"></i>وضع انضباط المداولات
+        <i class="bi bi-shield-lock-fill me-1"></i>وضع انضباط المداولات (القوة القاهرة مفعلة)
       </span>
       <span class="small text-white-50" style="font-size: 0.78rem;">
-        تطبيقاً للائحة المجلس: شاشات الأعضاء مخصصة للمداولات المباشرة. متاح لك: <strong>طلب الكلمة</strong> و<strong>التصويت</strong> عند فتحه بتوجيه رئيس المجلس.
+        تطبيقاً لتوجيه المدير الأعلى: تم إخضاع شاشتك للقوة القاهرة للمداولات المباشرة. متاح لك: <strong>طلب الكلمة</strong> و<strong>التصويت</strong> عند فتحه بتوجيه رئيس المجلس.
       </span>
     </div>
     <div class="d-flex align-items-center gap-2">
@@ -602,7 +602,7 @@
                   <div class="list-group-item p-3 topic-item {% if t.pk == active_topic.pk %}border-start border-primary border-4 bg-light{% endif %}"
                        id="topic-row-{{ t.pk }}"
                        data-cat-idx="{{ forloop.parentloop.counter }}"
-                       style="border-right: 4px solid {{ cat.theme.color }} !important; {% if not can_start_session_live and not is_frozen_manager and t.pk != active_topic.pk %}display: none;{% endif %}">
+                       style="border-right: 4px solid {{ cat.theme.color }} !important; {% if is_member_live_lockdown and t.pk != active_topic.pk %}display: none;{% endif %}">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                       <div class="flex-grow-1" style="cursor: pointer;" onclick="toggleTopicDetails({{ t.pk }})">
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
@@ -1824,6 +1824,9 @@
                 <th>المقعد</th>
                 <th>حالة الحضور</th>
                 <th>التفويض</th>
+                {% if request.user.is_super %}
+                <th style="min-width: 140px;">القوة القاهرة (تحكم الإدارة)</th>
+                {% endif %}
               </tr>
             </thead>
             <tbody class="small">
@@ -1855,10 +1858,25 @@
                     <span class="text-muted">-</span>
                   {% endif %}
                 </td>
+                {% if request.user.is_super %}
+                <td>
+                  {% if not att.member.is_super %}
+                    <button type="button" class="btn btn-sm {% if att.member.enforce_force_majeure %}btn-danger text-white{% else %}btn-outline-secondary{% endif %} py-0 px-2 fw-bold"
+                            id="btn-force-{{ att.member.pk }}"
+                            onclick="toggleMemberForceMajeure({{ att.member.pk }}, '{{ att.member.full_name|escapejs }}')"
+                            title="تطبيق أو إلغاء القوة القاهرة وتجميد الشاشة لهذا العضو">
+                      <i class="bi bi-shield-lock-fill me-1"></i>
+                      <span id="btn-force-text-{{ att.member.pk }}">{% if att.member.enforce_force_majeure %}مفعلة 🔴{% else %}تطبيق القوة القاهرة{% endif %}</span>
+                    </button>
+                  {% else %}
+                    <span class="badge bg-secondary">المدير الأعلى</span>
+                  {% endif %}
+                </td>
+                {% endif %}
               </tr>
               {% empty %}
               <tr>
-                <td colspan="6" class="text-muted py-3">لا توجد بيانات حضور مسجلة.</td>
+                <td colspan="{% if request.user.is_super %}7{% else %}6{% endif %}" class="text-muted py-3">لا توجد بيانات حضور مسجلة.</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -2180,9 +2198,13 @@ let IS_SESSION_SUSPENDED_CLIENT = {{ is_suspended|yesno:"true,false" }};
 let currentActiveSpeakerId = {{ active_speaker.pk|default:0 }};
 let currentActiveTopicId = {{ active_topic.pk|default:0 }};
 let CAN_MODERATE_LIVE = {{ can_moderate_live_session|yesno:"true,false" }};
+let IS_MEMBER_LIVE_LOCKDOWN = {{ is_member_live_lockdown|yesno:"true,false" }};
+const IS_SUPER = {{ request.user.is_super|yesno:"true,false" }};
 const CURRENT_USER_ID = {{ request.user.pk }};
 const CURRENT_USER_NAME = "{{ request.user.full_name|escapejs }}";
 let activeIncomingDirectiveId = null;
+let isSessionRedirecting = false;
+let pollQueueIntervalId = null;
 
 // ╔══════════════════════════════════════════════════════════════════════════════╗
 // ║         نظام عرض المحضر السابق والقراءة الآلية المتزامنة                   ║
@@ -3377,6 +3399,8 @@ function openSessionAdjournModal() {
 }
 
 function confirmSessionAdjourn() {
+  if (isSessionRedirecting) return;
+
   const btn = document.getElementById('btnConfirmAdjourn');
   const originalHtml = btn ? btn.innerHTML : '';
   if (btn) {
@@ -3398,8 +3422,22 @@ function confirmSessionAdjourn() {
   })
   .then(result => {
     if (result.ok && result.data && result.data.ok) {
-      alert('تم رفع الجلسة وتوثيق وقت الانتهاء بنجاح.');
-      window.location.href = result.data.redirect_url || `/sessions/${SESSION_ID}/`;
+      isSessionRedirecting = true;
+      if (pollQueueIntervalId) {
+        clearInterval(pollQueueIntervalId);
+        pollQueueIntervalId = null;
+      }
+
+      const modalEl = document.getElementById('sessionAdjournModal');
+      if (modalEl) {
+        const modalInstance = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+      }
+
+      showToastAlert('تم رفع الجلسة وتوثيق وقت الانتهاء بنجاح. جاري التحويل لقسم القرارات...', 'success');
+      setTimeout(() => {
+        window.location.href = result.data.redirect_url || `/sessions/${SESSION_ID}/`;
+      }, 600);
     } else {
       const errMsg = (result.data && result.data.error) ? result.data.error : 'حدث خطأ غير متوقع أثناء رفع الجلسة.';
       alert(errMsg);
@@ -3580,8 +3618,8 @@ function setAllLiveCategories(expandAll) {
 }
 
 function ensureTopicExpanded(topicId) {
-  if (!IS_CONTROLLER) {
-    // وضع عضو المجلس: إخفاء جميع كروت المواضيع وإظهار الموضوع المعروض للمداولة فقط
+  if (IS_MEMBER_LIVE_LOCKDOWN) {
+    // وضع القوة القاهرة للعضو: إخفاء جميع كروت المواضيع وإظهار الموضوع المعروض للمداولة فقط
     document.querySelectorAll('.topic-item').forEach(el => {
       if (el.id === `topic-row-${topicId}`) {
         el.style.display = 'block';
@@ -3592,7 +3630,7 @@ function ensureTopicExpanded(topicId) {
     const noActiveEl = document.getElementById('member-no-active-stage');
     if (noActiveEl) noActiveEl.style.display = topicId ? 'none' : 'block';
   } else {
-    // وضع رئيس المجلس: فتح أكورديون المحور والانتقال
+    // الوضع الافتراضي للجميع: إبراز الموضوع المطروح وتوسيع محوره مع إتاحة تصفح بقية البنود بحرية
     const row = document.getElementById(`topic-row-${topicId}`);
     if (row) {
       const catIdx = row.getAttribute('data-cat-idx');
@@ -4183,10 +4221,12 @@ function uploadAudioChunk(blob) {
 
 // 9. المزامنة الحية الشاملة (Polling) كل 3.5 ثانية لجميع الشاشات
 function pollQueue() {
+  if (isSessionRedirecting) return;
+
   fetch(`/api/sessions/${SESSION_ID}/speak/queue/`)
     .then(res => res.json())
     .then(data => {
-      if (!data.ok) return;
+      if (!data.ok || isSessionRedirecting) return;
 
       // -1) مزامنة صلاحية التحكم والتفويض الحي للشاشة
       if (typeof data.is_user_controller !== 'undefined') {
@@ -4203,6 +4243,22 @@ function pollQueue() {
         }
       }
 
+      // -0.5) مزامنة تطبيق/فك القوة القاهرة على شاشة العضو لحظياً بقرار المدير الأعلى
+      if (typeof data.is_member_live_lockdown !== 'undefined') {
+        const wasLockdown = IS_MEMBER_LIVE_LOCKDOWN;
+        const nowLockdown = !!data.is_member_live_lockdown;
+        if (wasLockdown !== nowLockdown) {
+          IS_MEMBER_LIVE_LOCKDOWN = nowLockdown;
+          if (nowLockdown) {
+            showToastAlert('⚠️ تم تفعيل القوة القاهرة على شاشتك بقرار المدير الأعلى.', 'warning');
+          } else {
+            showToastAlert('🔓 تم إلغاء القوة القاهرة عن شاشتك بقرار المدير الأعلى.', 'info');
+          }
+          ensureTopicExpanded(currentActiveTopicId);
+          setTimeout(() => { window.location.reload(); }, 1200);
+        }
+      }
+
       // إذا كان المستخدم هو رئيس المجلس أو مدير النظام، نحدّث قائمة المعاونين المتصلين لحظياً
       if (IS_PRESIDENT && data.online_managers) {
         updateOnlineManagersUI(data.online_managers, data.active_controller_id, data.active_controller_name);
@@ -4210,8 +4266,22 @@ function pollQueue() {
 
       // 0) التحقق من انتهاء أو رفع الجلسة الحية
       if (data.session_status === 'partial_close' || data.session_status === 'closed') {
-        alert('تم رفع الجلسة وإنهاء المداولات الحية من قبل رئيس المجلس.');
-        window.location.href = `/sessions/${SESSION_ID}/`;
+        if (!isSessionRedirecting) {
+          isSessionRedirecting = true;
+          if (pollQueueIntervalId) {
+            clearInterval(pollQueueIntervalId);
+            pollQueueIntervalId = null;
+          }
+          const modalEl = document.getElementById('sessionAdjournModal');
+          if (modalEl) {
+            const modalInstance = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
+            if (modalInstance) modalInstance.hide();
+          }
+          showToastAlert('تم رفع الجلسة وإنهاء المداولات الحية من قبل رئيس المجلس. جاري نقلك...', 'info');
+          setTimeout(() => {
+            window.location.href = `/sessions/${SESSION_ID}/`;
+          }, 800);
+        }
         return;
       }
 
@@ -4758,6 +4828,38 @@ function filterAttendanceTable() {
   document.querySelectorAll('#quickAttendanceTable tbody tr.attendance-row').forEach(row => {
     const text = row.innerText.toLowerCase();
     row.style.display = text.includes(query) ? '' : 'none';
+  });
+}
+
+function toggleMemberForceMajeure(userId, userName) {
+  fetch(`/api/users/${userId}/toggle-force-majeure/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      const btn = document.getElementById(`btn-force-${userId}`);
+      const txt = document.getElementById(`btn-force-text-${userId}`);
+      if (data.enforce_force_majeure) {
+        if (btn) btn.className = 'btn btn-sm btn-danger text-white py-0 px-2 fw-bold';
+        if (txt) txt.innerText = 'مفعلة 🔴';
+        showToastAlert(`تم تفعيل القوة القاهرة على «${userName}» بنجاح!`, 'warning');
+      } else {
+        if (btn) btn.className = 'btn btn-sm btn-outline-secondary py-0 px-2 fw-bold';
+        if (txt) txt.innerText = 'تطبيق القوة القاهرة';
+        showToastAlert(`تم إلغاء القوة القاهرة عن «${userName}».`, 'info');
+      }
+    } else {
+      alert(data.error || 'حدث خطأ أثناء تبديل حالة القوة القاهرة');
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    alert('تعذر الاتصال بالخادم لتعديل القوة القاهرة.');
   });
 }
 
@@ -5551,7 +5653,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
 
   pollQueue();
-  setInterval(pollQueue, 6000);
+  pollQueueIntervalId = setInterval(pollQueue, 6000);
 
   // استعادة موضع الشاشة والفتح التلقائي للموضوع النشط بدقة دون بدء من الصفر
   const urlParams = new URLSearchParams(window.location.search);

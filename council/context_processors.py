@@ -50,10 +50,11 @@ def live_session_context(request):
 
         is_controller = bool(user.is_super or user.can_start_session_live)
         has_voting_right = bool(getattr(user, 'can_vote', False))
-        # يقتصر القفل الصارم على الأعضاء أصحاب حق التصويت فقط؛ أما الكادر الإداري والمساعد فيتاح له التنقل بحرية
-        # وفي حالة تعليق الجلسة (الاستراحة)، يتم تحرير شاشات جميع الأعضاء فوراً
         is_session_suspended = bool(getattr(active_session, 'is_suspended', False))
-        is_member_live_lockdown = bool(is_on_live_page and not is_controller and has_voting_right and not is_session_suspended)
+        # الوضع الافتراضي: القوة القاهرة معطلة لجميع المستخدمين بما فيهم المدير الأعلى
+        # ولا تُطبَّق القوة القاهرة وتجميد الشاشة والتنقل إلا إذا قام المدير الأعلى بتفعيل زر "القوة القاهرة" على هذا العضو تحديداً
+        has_force_majeure = bool(getattr(user, 'enforce_force_majeure', False))
+        is_member_live_lockdown = bool(is_on_live_page and has_force_majeure and not is_session_suspended)
 
         return {
             'global_live_session': active_session,
@@ -69,3 +70,27 @@ def live_session_context(request):
         }
     except Exception:
         return {}
+
+
+def isolation_context(request):
+    """
+    Exposes isolation mode status to all templates, allowing Super Admins
+    to monitor and control air-gap status globally.
+    """
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return {}
+
+    try:
+        from config.isolation import get_isolation_status, is_running_on_external_server
+        status = get_isolation_status()
+        is_ext = is_running_on_external_server()
+        return {
+            'isolation_status': status,
+            'is_system_isolated': status.get('is_isolated', True),
+            'is_external_server': is_ext,
+        }
+    except Exception:
+        return {'is_system_isolated': True, 'is_external_server': False}
+
+

@@ -30,7 +30,9 @@ def log_action(user, action, obj=None, field_changes=None,
         object_repr:   override automatic object description
     """
     try:
-        from .models import AuditLog
+        from .models import AuditLog, SystemAuditControl
+        if not SystemAuditControl.is_audit_and_backup_active():
+            return
         real_user = user if (user is not None and getattr(user, 'is_authenticated', False)) else None
         AuditLog.objects.create(
             user=real_user,

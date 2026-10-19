@@ -15,11 +15,18 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 *.sqlite3
+*.bak
+isolation_config.tmp
+sync_down.py
+run_simulation.py
+run.bat
 media/
+
 staticfiles/
 backups/
 جلسات مصدرة من النظام/
 ملفات مساعدة/
+
 
 # Local Documents & Scratch
 *.pdf

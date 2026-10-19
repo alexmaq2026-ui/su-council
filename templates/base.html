@@ -164,8 +164,37 @@
         {% endif %}
       </ul>
 
+      {% if user.is_super %}
+        {% if is_external_server %}
+        <!-- External Cloud Server Badge (Informative only - No disconnect button) -->
+        <div class="me-2">
+          <span class="badge bg-primary bg-opacity-25 text-info border border-info border-opacity-50 rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1"
+                style="font-size: 0.78rem;"
+                title="السيرفر السحابي المستقل (Render Cloud)">
+            <i class="bi bi-cloud-check-fill text-warning"></i>
+            <span>سيرفر سحابي (Render)</span>
+          </span>
+        </div>
+        {% else %}
+        <!-- Local Server Air-Gap Strict Isolation Toggle Button -->
+        <div class="me-2">
+          <button type="button" 
+                  id="navbarIsolationBtn"
+                  onclick="toggleGlobalIsolation(this)"
+                  class="btn btn-sm {% if is_system_isolated %}btn-success text-white{% else %}btn-warning text-dark{% endif %} rounded-pill px-3 py-1 shadow-sm d-flex align-items-center gap-1 fw-bold"
+                  style="font-size: 0.78rem;"
+                  title="انقر للتبديل الفوري بين العزل المحلي والربط السحابي">
+            <i class="bi {% if is_system_isolated %}bi-shield-check{% else %}bi-cloud-check-fill{% endif %}" id="navbarIsoIcon"></i>
+            <span id="navbarIsoText">{% if is_system_isolated %}محلي معزول 100%{% else %}ربط سحابي مفعل{% endif %}</span>
+          </button>
+        </div>
+        {% endif %}
+      {% endif %}
+
+
       {% if user.is_super or user.can_view_notifications %}
       <!-- Phase 5: Notification Bell Dropdown -->
+
       <div class="dropdown me-2 position-relative">
         <button class="btn btn-sm btn-outline-light position-relative rounded-pill px-2 py-1"
                 type="button" id="notificationBellBtn" data-bs-toggle="dropdown" aria-expanded="false" title="التنبيهات والإشعارات">
@@ -553,7 +582,70 @@
     setInterval(fetchUnreadNotifications, 45000);
   });
   {% endif %}
+
+  {% if user.is_super and not is_external_server %}
+  function toggleGlobalIsolation(btn) {
+
+    if (btn) btn.disabled = true;
+    fetch("{% url 'council:api_toggle_isolation' %}", {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.ok) {
+        alert(data.error || 'تعذر تغيير وضع العزل.');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      // Instant page refresh to reload configuration and database states
+      window.location.reload();
+    })
+    .catch(err => {
+      alert('حدث خطأ في الاتصال أثناء تبديل وضع العزل.');
+      if (btn) btn.disabled = false;
+    });
+  }
+
+  function triggerManualSync() {
+    if (!confirm('هل ترغب في بدء المزامنة اليدوية الآن مع السيرفر السحابي؟\nسيتم نقل وتحديث البيانات بدقة دون المساس بالجلسة المحلية.')) return;
+    const btn = document.getElementById('btnManualSync');
+    const icon = document.getElementById('syncIcon');
+    if (btn) btn.disabled = true;
+    if (icon) icon.classList.add('spin-animation');
+
+    fetch("{% url 'council:api_manual_sync_cloud' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify({ direction: 'push' })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ok) {
+        alert('✅ ' + data.message + '\n' + (data.output || ''));
+        window.location.reload();
+      } else {
+        alert('❌ ' + (data.error || data.message || 'حدث خطأ أثناء المزامنة.'));
+      }
+    })
+    .catch(() => {
+      alert('حدث خطأ غير متوقع أثناء إرسال طلب المزامنة.');
+    })
+    .finally(() => {
+      if (btn) btn.disabled = false;
+      if (icon) icon.classList.remove('spin-animation');
+    });
+  }
+  {% endif %}
 </script>
+
 
 {% if user.is_super or user.can_use_smart_reader %}
 {% include 'council/components/smart_reader_modal.html' %}

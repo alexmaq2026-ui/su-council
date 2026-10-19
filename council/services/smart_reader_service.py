@@ -283,9 +283,18 @@ def synthesize_neural_chunk_sync(text: str, voice: str = 'ar-SA-HamedNeural', sp
     if os.path.exists(filepath) and os.path.getsize(filepath) > 500:
         return f"/media/smart_reader_cache/{filename}"
 
+    # Strict Air-Gap Guard: In isolated mode, avoid external network calls completely
+    try:
+        from config.isolation import is_isolated
+        if is_isolated():
+            return ""
+    except Exception:
+        pass
+
     # Synthesize via edge_tts in asyncio
     try:
         import edge_tts
+
 
         async def _synthesize():
             communicate = edge_tts.Communicate(text, voice, rate=rate_str)

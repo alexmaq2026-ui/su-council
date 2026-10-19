@@ -801,15 +801,21 @@ def audit_log_view(request):
 
     page_obj = Paginator(logs, 30).get_page(request.GET.get('page', 1))
 
+    from council.models import SystemAuditControl
+    audit_control = SystemAuditControl.get_setting()
+
     context = {
-        'page_obj':       page_obj,
-        'action_filter':  action_filter,
-        'user_filter':    user_filter,
-        'date_from':      date_from,
-        'date_to':        date_to,
-        'action_choices': AuditLog.ACTION_CHOICES,
-        'backups':        BackupLog.objects.select_related('created_by')[:10],
-        'page_title':     'سجل رقابة المستخدمين',
+        'page_obj':              page_obj,
+        'action_filter':         action_filter,
+        'user_filter':           user_filter,
+        'date_from':             date_from,
+        'date_to':               date_to,
+        'action_choices':        AuditLog.ACTION_CHOICES,
+        'backups':               BackupLog.objects.select_related('created_by')[:10],
+        'page_title':            'سجل رقابة المستخدمين',
+        'audit_control':         audit_control,
+        'user_can_toggle_audit': (request.user.is_super or request.user.can_toggle_audit_backup),
+        'user_can_clear_audit':  (request.user.is_super or request.user.can_clear_audit_log),
     }
     return render(request, 'council/audit_log.html', context)
 
@@ -824,4 +830,62 @@ def backup_now_view(request):
             messages.success(request, 'تم إنشاء نسخة احتياطية بنجاح.')
         else:
             messages.error(request, 'فشل إنشاء النسخة الاحتياطية.')
+    return redirect('council:audit_log')
+
+
+@login_required(login_url='/login/')
+def toggle_audit_backup_view(request):
+    """Toggle Audit Logging and Automated Backup on/off."""
+    if request.method != 'POST':
+        return redirect('council:audit_log')
+    if not (request.user.is_super or request.user.can_toggle_audit_backup):
+        messages.error(request, 'عذراً، ليس لديك صلاحية للتحكم في إيقاف أو تشغيل نظام الرقابة والنسخ الاحتياطي.')
+        return redirect('council:audit_log')
+
+    from council.models import SystemAuditControl
+    control = SystemAuditControl.get_setting()
+    control.is_enabled = not control.is_enabled
+    control.updated_by = request.user
+    control.save(update_fields=['is_enabled', 'updated_by', 'updated_at'])
+
+    if control.is_enabled:
+        messages.success(request, 'تم استئناف وتشغيل نظام رقابة المستخدمين والنسخ الاحتياطي بنجاح.')
+    else:
+        messages.warning(request, 'تم إيقاف نظام رقابة المستخدمين والنسخ الاحتياطي بشكل صارم وفوري.')
+
+    return redirect('council:audit_log')
+
+
+@login_required(login_url='/login/')
+def clear_audit_log_view(request):
+    """Purge all user audit logs and backup logs & physical backup files permanently."""
+    if request.method != 'POST':
+        return redirect('council:audit_log')
+    if not (request.user.is_super or request.user.can_clear_audit_log):
+        messages.error(request, 'عذراً، ليس لديك صلاحية لتصفير ومسح سجلات الرقابة والنسخ الاحتياطي.')
+        return redirect('council:audit_log')
+
+    from council.models import AuditLog, BackupLog
+    audit_count, _ = AuditLog.objects.all().delete()
+    backup_count, _ = BackupLog.objects.all().delete()
+
+    deleted_files_count = 0
+    try:
+        from django.conf import settings
+        from pathlib import Path
+        backup_dir = Path(settings.BASE_DIR) / 'backups'
+        if backup_dir.exists():
+            for f in backup_dir.glob('db_backup_*.*'):
+                try:
+                    f.unlink()
+                    deleted_files_count += 1
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    messages.success(
+        request,
+        f'تم بنجاح التصفير الشامل والنهائي: تم مسح {audit_count} سجل رقابة مستخدمين، و{backup_count} سجل نسخ احتياطي، وحذف {deleted_files_count} ملف نسخة احتياطية من الخادم.'
+    )
     return redirect('council:audit_log')

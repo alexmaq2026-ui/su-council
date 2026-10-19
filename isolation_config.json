@@ -1,0 +1,11 @@
+{
+  "is_isolated": true,
+  "is_external_server": false,
+  "mode": "ISOLATED",
+  "strict_guard_active": true,
+  "allow_external_sync": false,
+  "last_toggled": "2026-10-19 19:04:18",
+  "toggled_by": "مدير النظام الأعلى",
+  "status_title": "وضع العزل الصارم (محلي 100%)",
+  "status_description": "السيرفر المحلي معزول تماماً عن السيرفر الخارجي. قاعدة البيانات والملفات ونبضات الجلسة تعمل محلياً بأقصى سرعة واستجابة فورية دون أي اتصال خارجي."
+}

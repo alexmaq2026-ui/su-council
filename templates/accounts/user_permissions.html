@@ -122,11 +122,11 @@
           <div class="uc-card-body p-3">
             <div class="d-flex flex-column gap-3">
               {% for field_name, field_title, field_help in group.fields %}
-                <div class="p-2 px-3 rounded-3 bg-light border hover-shadow transition-all">
+                <div class="p-2 px-3 rounded-3 {% if field_name == 'enforce_force_majeure' %}bg-warning bg-opacity-10 border border-warning border-2{% else %}bg-light border{% endif %} hover-shadow transition-all">
                   <div class="form-check form-switch fs-5 d-flex align-items-center justify-content-between m-0 gap-3">
                     <div class="flex-grow-1">
                       <label class="form-check-label fw-bold text-navy fs-6" for="id_{{ field_name }}" style="cursor: pointer;">
-                        {{ field_title }}
+                        {% if field_name == 'enforce_force_majeure' %}<i class="bi bi-shield-lock-fill text-danger me-1"></i><span class="badge bg-danger text-white ms-1" style="font-size: 0.7rem;">حصري للمدير الأعلى</span> {% endif %}{{ field_title }}
                       </label>
                       <div class="text-muted small" style="font-size: 0.78rem;">
                         {{ field_help }}
@@ -239,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
     {% if permission_obj.can_view_analytics %}'can_view_analytics',{% endif %}
     {% if permission_obj.can_open_previous_minutes %}'can_open_previous_minutes',{% endif %}
     {% if permission_obj.can_broadcast_previous_minutes %}'can_broadcast_previous_minutes',{% endif %}
+    {% if permission_obj.enforce_force_majeure %}'enforce_force_majeure',{% endif %}
     {% if permission_obj.can_search_minutes %}'can_search_minutes',{% endif %}
     {% if permission_obj.can_search_person %}'can_search_person',{% endif %}
     {% if permission_obj.can_view_notifications %}'can_view_notifications',{% endif %}
@@ -247,6 +248,8 @@ document.addEventListener('DOMContentLoaded', () => {
     {% if permission_obj.can_use_smart_reader %}'can_use_smart_reader',{% endif %}
     {% if permission_obj.can_manage_smart_reader %}'can_manage_smart_reader',{% endif %}
     {% if permission_obj.can_view_audit_log %}'can_view_audit_log',{% endif %}
+    {% if permission_obj.can_toggle_audit_backup %}'can_toggle_audit_backup',{% endif %}
+    {% if permission_obj.can_clear_audit_log %}'can_clear_audit_log',{% endif %}
   ];
 
   activeFields.forEach(f => {
@@ -298,6 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
   masterBox.addEventListener('change', () => {
     const isChecked = masterBox.checked;
     allCheckboxes.forEach(cb => {
+      // لا يتم تفعيل القوة القاهرة عند تحديد الكل لأنها قيد خاص بقرار الإدارة
+      if (cb.id === 'id_enforce_force_majeure') return;
       cb.checked = isChecked;
     });
     updateCounters();
@@ -308,6 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
     groupCb.addEventListener('change', () => {
       const gId = groupCb.dataset.group;
       document.querySelectorAll(`.group-${gId}`).forEach(cb => {
+        if (cb.id === 'id_enforce_force_majeure') return;
         cb.checked = groupCb.checked;
       });
       updateCounters();

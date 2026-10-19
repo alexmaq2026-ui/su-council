@@ -64,9 +64,11 @@ class SupabaseMediaStorage(Storage):
         else:
             data = bytes(content)
 
-        # 1. Upload to Supabase Storage
-        if self.supabase_url and self.supabase_key:
+        # 1. Upload to Supabase Storage (Only if NOT in isolated mode)
+        from config.isolation import is_isolated
+        if not is_isolated() and self.supabase_url and self.supabase_key:
             content_type = mimetypes.guess_type(safe_name)[0] or 'application/octet-stream'
+
             upload_url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}/{safe_name}"
             headers = {
                 "apikey": self.supabase_key,
@@ -100,7 +102,8 @@ class SupabaseMediaStorage(Storage):
         if clean_name.startswith('http://') or clean_name.startswith('https://'):
             return clean_name
             
-        if self.supabase_url:
+        from config.isolation import is_isolated
+        if not is_isolated() and self.supabase_url:
             return f"{self.supabase_url}/storage/v1/object/public/{self.bucket_name}/{clean_name}"
             
         media_url = getattr(settings, 'MEDIA_URL', '/media/')
@@ -114,7 +117,8 @@ class SupabaseMediaStorage(Storage):
             local_path = os.path.join(self.local_media_root, clean_name.replace('/', os.sep))
             if os.path.exists(local_path):
                 return True
-        if self.supabase_url:
+        from config.isolation import is_isolated
+        if not is_isolated() and self.supabase_url:
             try:
                 resp = requests.head(self.url(clean_name), timeout=10)
                 return resp.status_code == 200
@@ -135,7 +139,8 @@ class SupabaseMediaStorage(Storage):
                 except Exception:
                     pass
         # Delete from Supabase Storage
-        if self.supabase_url and self.supabase_key:
+        from config.isolation import is_isolated
+        if not is_isolated() and self.supabase_url and self.supabase_key:
             del_url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}"
             headers = {
                 "apikey": self.supabase_key,
@@ -153,11 +158,13 @@ class SupabaseMediaStorage(Storage):
             local_path = os.path.join(self.local_media_root, clean_name.replace('/', os.sep))
             if os.path.exists(local_path):
                 return File(open(local_path, mode))
-        if self.supabase_url:
+        from config.isolation import is_isolated
+        if not is_isolated() and self.supabase_url:
             resp = requests.get(self.url(clean_name), timeout=30)
             if resp.status_code == 200:
                 return ContentFile(resp.content, name=clean_name)
         raise FileNotFoundError(f"File not found in storage: {name}")
+
 
     def path(self, name):
         clean_name = self._sanitize_key(name)

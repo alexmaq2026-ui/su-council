@@ -73,12 +73,12 @@ class UserAdmin(BaseUserAdmin):
 @admin.register(CouncilPermission)
 class CouncilPermissionAdmin(admin.ModelAdmin):
     list_display = (
-        'user', 'can_vote', 'can_draft_decision', 'can_add_topic',
+        'user', 'can_vote', 'enforce_force_majeure', 'can_draft_decision', 'can_add_topic',
         'can_upload_attachments', 'can_manage_attendance', 'can_grant_permissions',
         'granted_by', 'granted_at',
     )
     list_filter  = (
-        'can_vote', 'can_draft_decision', 'can_add_topic',
+        'can_vote', 'enforce_force_majeure', 'can_draft_decision', 'can_add_topic',
         'can_start_session_live', 'can_reopen_topic_live', 'can_moderate_live_session',
         'can_manage_attendance', 'can_grant_permissions',
     )

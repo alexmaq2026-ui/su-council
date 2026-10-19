@@ -93,6 +93,9 @@ class SessionLifecycleGuardMiddleware:
     def _daily_backup(self):
         if _RUNNING_TESTS:
             return
+        from council.models import SystemAuditControl
+        if not SystemAuditControl.is_audit_and_backup_active():
+            return
         today = timezone.localdate()
         if SessionLifecycleGuardMiddleware._last_backup_day == today:
             return

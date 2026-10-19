@@ -833,6 +833,51 @@ def api_session_delegate_control(request, session_pk):
             return JsonResponse({'ok': False, 'error': 'إجراء غير صالح.'}, status=400)
 
 
+# ── Super Admin Force Majeure Toggle API ─────────────────────────────────────
+@login_required(login_url='/login/')
+@require_POST
+def api_toggle_force_majeure(request, user_pk):
+    """
+    Exclusive endpoint for the Super Admin to toggle Force Majeure (القوة القاهرة)
+    for any council member.
+    """
+    if not getattr(request.user, 'is_super', False):
+        return JsonResponse({
+            'ok': False,
+            'error': 'تفعيل أو إلغاء القوة القاهرة مقتصر حصرياً على صلاحية المدير الأعلى للنظام.'
+        }, status=403)
+
+    from django.contrib.auth import get_user_model
+    UserModel = get_user_model()
+    target_user = get_object_or_404(UserModel, pk=user_pk)
+
+    if target_user.is_super:
+        return JsonResponse({
+            'ok': False,
+            'error': 'لا يمكن تطبيق القوة القاهرة على المدير الأعلى للنظام.'
+        }, status=400)
+
+    perm = target_user.get_permission()
+    current_val = getattr(perm, 'enforce_force_majeure', False)
+    perm.enforce_force_majeure = not current_val
+    perm.save(update_fields=['enforce_force_majeure'])
+
+    target_user._cached_council_perm = perm
+
+    new_val = perm.enforce_force_majeure
+    action_text = 'تفعيل' if new_val else 'إلغاء'
+    msg = f'تم {action_text} القوة القاهرة على العضو «{target_user.full_name}» بنجاح.'
+
+    return JsonResponse({
+        'ok': True,
+        'user_id': target_user.pk,
+        'user_name': target_user.full_name,
+        'enforce_force_majeure': new_val,
+        'status_label': 'مفعلة 🔴' if new_val else 'معطلة',
+        'message': msg
+    })
+
+
 # ── Topic Live Status Query API ──────────────────────────────────────────────
 @login_required(login_url='/login/')
 @require_GET
@@ -1212,6 +1257,8 @@ def api_speak_queue(request, session_pk):
         'online_managers': online_managers,
         'broadcast_prev_minutes_id': session.broadcast_prev_minutes_session_id,
         'broadcast_prev_minutes_label': f"الجلسة رقم ({session.broadcast_prev_minutes_session.session_number})" if session.broadcast_prev_minutes_session else None,
+        'enforce_force_majeure': bool(getattr(request.user, 'enforce_force_majeure', False)),
+        'is_member_live_lockdown': bool(getattr(request.user, 'enforce_force_majeure', False) and not getattr(session, 'is_suspended', False)),
     })
 
 
