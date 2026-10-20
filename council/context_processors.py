@@ -18,6 +18,11 @@ def live_session_context(request):
     try:
         active_session = CouncilSession.objects.filter(status='active').first()
         if not active_session:
+            import re
+            live_match = re.match(r'^/sessions/(\d+)/live/?', request.path)
+            if live_match:
+                active_session = CouncilSession.objects.filter(pk=int(live_match.group(1))).first()
+        if not active_session:
             return {}
 
         # Verify access permission

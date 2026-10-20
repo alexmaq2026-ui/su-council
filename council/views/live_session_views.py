@@ -304,6 +304,8 @@ def session_live_view(request, session_pk):
         'user_exit_permit': user_exit_permit,
         'pending_exit_permits': pending_exit_permits,
         'recording': recording,
+        'enforce_force_majeure': bool(getattr(user, 'enforce_force_majeure', False)),
+        'is_member_live_lockdown': bool(getattr(user, 'enforce_force_majeure', False) and not getattr(session, 'is_suspended', False)),
     }
     return render(request, 'council/session_live.html', context)
 

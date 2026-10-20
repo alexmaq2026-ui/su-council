@@ -5675,23 +5675,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 350);
   }
 
-  // ── وضع انضباط شاشة العضو: قفل روابط التنقل الخارجي أثناء الجلسة للأعضاء المصوتين فقط ──
-  if (!IS_CONTROLLER && CAN_VOTE) {
-    document.querySelectorAll('a[href]').forEach(a => {
-      const href = a.getAttribute('href');
-      if (href && !href.startsWith('#') && !href.startsWith('javascript') &&
-          !href.includes('/attachments/') && !href.includes('/recordings/') &&
-          !href.includes('/media/') && !href.includes('/logout/')) {
-        a.addEventListener('click', (e) => {
-          if (IS_SESSION_SUSPENDED_CLIENT) {
-            return true; // مسموح بالتنقل وتصفح الملفات أثناء تعليق واستراحة الجلسة
-          }
-          e.preventDefault();
-          alert('أنت الآن داخل قاعة الجلسة الحية لمجلس الجامعة.\nتطبيقاً للائحة المجلس: جميع أزرار وروابط التنقل الخارجي متوقفة أثناء انعقاد الجلسة؛ متاح لك فقط طلب الكلمة، مطالعة جدول الأعمال، والتصويت عند فتحه بتوجيه رئيس المجلس.');
-        });
-      }
-    });
-  }
+  // ── وضع انضباط شاشة العضو: قفل روابط التنقل الخارجي أثناء الجلسة للأعضاء الخاضعين للقوة القاهرة بقرار المدير الأعلى ──
+  document.querySelectorAll('a[href]').forEach(a => {
+    const href = a.getAttribute('href');
+    if (href && !href.startsWith('#') && !href.startsWith('javascript') &&
+        !href.includes('/attachments/') && !href.includes('/recordings/') &&
+        !href.includes('/media/') && !href.includes('/logout/')) {
+      a.addEventListener('click', (e) => {
+        if (!IS_MEMBER_LIVE_LOCKDOWN || IS_SESSION_SUSPENDED_CLIENT) {
+          return true; // مسموح بالتنقل وتصفح الملفات إذا لم تكن القوة القاهرة مفعلة على هذا المستخدم أو أثناء استراحة الجلسة
+        }
+        e.preventDefault();
+        alert('أنت الآن داخل قاعة الجلسة الحية لمجلس الجامعة.\nتطبيقاً للائحة المجلس: جميع أزرار وروابط التنقل الخارجي متوقفة أثناء انعقاد الجلسة؛ متاح لك فقط طلب الكلمة، مطالعة جدول الأعمال، والتصويت عند فتحه بتوجيه رئيس المجلس.');
+      });
+    }
+  });
 });
 </script>
 

@@ -6,14 +6,29 @@
 'use strict';
 
 // ═══════════════════════════════════════════════════════
-// CSRF Helper
+// Cookie & CSRF Helpers
 // ═══════════════════════════════════════════════════════
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+window.getCookie = getCookie;
+
 function getCsrfToken() {
   return document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
-         document.cookie.split(';')
-           .find(c => c.trim().startsWith('csrftoken='))
-           ?.split('=')[1] || '';
+         getCookie('csrftoken') || '';
 }
+window.getCsrfToken = getCsrfToken;
 
 // ═══════════════════════════════════════════════════════
 // API Helper

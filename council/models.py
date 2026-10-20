@@ -624,6 +624,18 @@ class SessionStageLog(models.Model):
     def __str__(self):
         return f'{self.session} | {self.from_stage} → {self.to_stage}'
 
+    @property
+    def to_stage_label(self):
+        labels = dict(SESSION_STATUS)
+        labels['published'] = 'منشورة – للاطلاع المسبق'
+        return labels.get(self.to_stage, self.to_stage)
+
+    @property
+    def from_stage_label(self):
+        labels = dict(SESSION_STATUS)
+        labels['published'] = 'منشورة – للاطلاع المسبق'
+        return labels.get(self.from_stage, self.from_stage)
+
 
 # ── New Session Request (Previous Session Not Frozen) ──────────────────────────
 class NewSessionRequest(models.Model):

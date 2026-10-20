@@ -268,7 +268,8 @@ def session_detail_view(request, pk):
         'next_stage_label':      STAGE_LABELS.get(next_stage, ''),
         'user_can_advance':      (user.is_super or user.can_advance_session_stage) and next_stage is not None,
         'user_can_reopen':       (user.is_super or user.can_reopen_frozen_session) and not editable,
-        'stage_logs':            session.stage_logs.select_related('changed_by')[:10],
+        'user_can_view_stage_logs': (user.is_super or user.can_view_stage_logs),
+        'stage_logs':            session.stage_logs.select_related('changed_by')[:10] if (user.is_super or user.can_view_stage_logs) else [],
         'session_recording':     SessionRecording.objects.filter(session=session).first(),
     }
     return render(request, 'council/session_detail.html', context)

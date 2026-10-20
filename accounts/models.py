@@ -401,6 +401,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def can_approve_new_session(self):   return self._has_perm('can_approve_new_session')
     @property
+    def can_view_stage_logs(self):       return self._has_perm('can_view_stage_logs')
+    @property
     def can_view_live_session(self):     return self._has_perm('can_view_live_session')
     @property
     def can_start_session_live(self):    return self._has_perm('can_start_session_live')
@@ -516,6 +518,7 @@ class CouncilPermission(models.Model):
         'can_manage_delegates', 'can_change_password',
         # 9. Lifecycle & Live Session
         'can_advance_session_stage', 'can_reopen_frozen_session', 'can_approve_new_session',
+        'can_view_stage_logs',
         'can_view_live_session', 'can_start_session_live', 'can_reopen_topic_live', 'can_suspend_resume_session',
         'can_set_topic_timer',
         'can_manage_speak_requests', 'can_request_speak', 'can_control_recording',
@@ -615,6 +618,8 @@ class CouncilPermission(models.Model):
     can_advance_session_stage  = models.BooleanField('نقل الجلسة بين المراحل الخمس', default=False)
     can_reopen_frozen_session  = models.BooleanField('إعادة فتح الجلسة المجمّدة (+ تأكيد كلمة المرور)', default=False)
     can_approve_new_session    = models.BooleanField('الموافقة على جلسة جديدة قبل إغلاق السابقة', default=False)
+    can_view_stage_logs        = models.BooleanField('عرض سجل مراحل الجلسة في الشريط الجانبي', default=False,
+                                                     help_text='إظهار بطاقة سجل مراحل الجلسة وتتبع الانتقالات والمسؤول عنها في شاشة تفاصيل الجلسة')
     can_view_live_session      = models.BooleanField('دخول غرفة الجلسة الحية (Live)', default=False)
     can_start_session_live     = models.BooleanField('إدارة الجلسة الحية وفتح التصويت وإنهاؤه', default=False)
     can_reopen_topic_live      = models.BooleanField('إعادة فتح المواضيع للنقاش والتصويت أثناء الانعقاد', default=False,

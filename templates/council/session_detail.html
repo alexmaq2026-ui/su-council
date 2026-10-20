@@ -448,7 +448,7 @@
                       </a>
                     {% endif %}
                     {% if is_controller and session.status == 'active' %}
-                      <button type="button" class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="launchTopicToLive({{ t.pk }}, '{% url 'council:session_live' session_pk=session.pk %}')" title="طرح هذا الموضوع فوراً للمداولة والتصويت في الجلسة الحية">
+                      <button type="button" class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="launchTopicToLive({{ t.pk }}, '{% url 'council:session_live' session_pk=session.pk %}', this)" title="طرح هذا الموضوع فوراً للمداولة والتصويت في الجلسة الحية">
                         <i class="bi bi-broadcast-pin me-1"></i> طرح للنقاش الحي والتصويت
                       </button>
                     {% endif %}
@@ -699,7 +699,7 @@
     {% endif %}
 
     <!-- Stage Transition History -->
-    {% if stage_logs %}
+    {% if user_can_view_stage_logs and stage_logs %}
       <div class="uc-card shadow-sm mb-4">
         <div class="uc-card-header">
           <h6><i class="bi bi-clock-history"></i>سجل مراحل الجلسة</h6>
@@ -709,7 +709,7 @@
             {% for log in stage_logs %}
               <div class="list-group-item px-2 py-2">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                  <strong>{{ log.to_stage }}</strong>
+                  <strong class="text-navy">{{ log.to_stage_label|default:log.to_stage }}</strong>
                   <span class="text-muted" style="font-size: 0.75rem;">{{ log.changed_at|date:"Y-m-d H:i" }}</span>
                 </div>
                 <div class="text-muted" style="font-size: 0.8rem;">
@@ -904,17 +904,41 @@ function verifySessionIntegrity(sessionPk) {
   });
 }
 
-function launchTopicToLive(topicId, liveUrl) {
-  const btn = window.event ? window.event.currentTarget : null;
+// Helper for CSRF cookie extraction (standalone fallback)
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+function launchTopicToLive(topicId, liveUrl, btnEl) {
+  const btn = btnEl || (window.event ? window.event.currentTarget : null) || document.activeElement;
+  const originalHtml = btn ? btn.innerHTML : '<i class="bi bi-broadcast-pin me-1"></i> طرح للنقاش الحي والتصويت';
+
   if (btn) {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جارٍ الطرح والانتقال...';
   }
+
+  const csrfToken = (typeof getCookie === 'function' ? getCookie('csrftoken') : null) ||
+                    (typeof getCsrfToken === 'function' ? getCsrfToken() : null) ||
+                    document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                    '{{ csrf_token }}';
+
   fetch(`/api/topics/${topicId}/control/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-CSRFToken': getCookie('csrftoken')
+      'X-CSRFToken': csrfToken
     },
     body: JSON.stringify({ action: 'show' })
   })
@@ -926,13 +950,19 @@ function launchTopicToLive(topicId, liveUrl) {
       alert(data.error || 'تعذر طرح الموضوع للجلسة الحية.');
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-broadcast-pin me-1"></i> طرح للنقاش الحي والتصويت';
+        btn.innerHTML = originalHtml;
       }
     }
   })
   .catch(err => {
-    console.error(err);
-    window.location.href = `${liveUrl}#topic-row-${topicId}`;
+    console.error('Error launching topic to live:', err);
+    if (liveUrl) {
+      window.location.href = `${liveUrl}#topic-row-${topicId}`;
+    } else if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      alert('حدث خطأ في الاتصال أثناء محاولة طرح الموضوع للجلسة الحية.');
+    }
   });
 }
 

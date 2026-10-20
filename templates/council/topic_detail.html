@@ -40,7 +40,7 @@
             <i class="bi bi-broadcast"></i> المعروض حالياً بالقاعة ← انتقال
           </a>
         {% else %}
-          <button type="button" class="btn btn-danger btn-sm fw-bold shadow-sm d-inline-flex align-items-center gap-1" onclick="launchTopicFromDetail({{ topic.pk }}, '{% url 'council:session_live' session_pk=session.pk %}')">
+          <button type="button" class="btn btn-danger btn-sm fw-bold shadow-sm d-inline-flex align-items-center gap-1" onclick="launchTopicFromDetail({{ topic.pk }}, '{% url 'council:session_live' session_pk=session.pk %}', this)">
             <i class="bi bi-broadcast-pin"></i> طرح للجلسة الحية والتصويت ←
           </button>
         {% endif %}
@@ -762,17 +762,22 @@
       .catch(err => alert('تعذر الاتصال بالخادم.'));
     }
 
-    function launchTopicFromDetail(topicId, liveUrl) {
-      const btn = window.event ? window.event.currentTarget : null;
+    function launchTopicFromDetail(topicId, liveUrl, btnEl) {
+      const btn = btnEl || (window.event ? window.event.currentTarget : null) || document.activeElement;
+      const originalHtml = btn ? btn.innerHTML : '<i class="bi bi-broadcast-pin me-1"></i> طرح للجلسة الحية والتصويت ←';
       if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جارٍ الطرح والانتقال...';
       }
+      const csrfToken = '{{ csrf_token }}' ||
+                        (typeof getCookie === 'function' ? getCookie('csrftoken') : null) ||
+                        (typeof getCsrfToken === 'function' ? getCsrfToken() : null) ||
+                        document.querySelector('[name=csrfmiddlewaretoken]')?.value;
       fetch('/api/topics/' + topicId + '/control/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRFToken': '{{ csrf_token }}'
+          'X-CSRFToken': csrfToken
         },
         body: JSON.stringify({ action: 'show' })
       })
@@ -784,12 +789,19 @@
           alert(data.error || 'تعذر طرح الموضوع للجلسة الحية.');
           if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-broadcast-pin me-1"></i> طرح للجلسة الحية والتصويت ←';
+            btn.innerHTML = originalHtml;
           }
         }
       })
       .catch(err => {
-        window.location.href = liveUrl + '#topic-row-' + topicId;
+        console.error('Error launching topic from detail:', err);
+        if (liveUrl) {
+          window.location.href = liveUrl + '#topic-row-' + topicId;
+        } else if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+          alert('حدث خطأ في الاتصال أثناء محاولة طرح الموضوع للجلسة الحية.');
+        }
       });
     }
     </script>
