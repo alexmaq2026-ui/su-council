@@ -461,6 +461,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     def can_toggle_audit_backup(self):   return self._has_perm('can_toggle_audit_backup')
     @property
     def can_clear_audit_log(self):       return self._has_perm('can_clear_audit_log')
+    @property
+    def can_toggle_sms(self):                  return self._has_perm('can_toggle_sms')
+    @property
+    def can_toggle_inapp(self):                return self._has_perm('can_toggle_inapp')
+    @property
+    def can_clear_notification_log(self):      return self._has_perm('can_clear_notification_log')
+    @property
+    def can_manual_backup_notifications(self): return self._has_perm('can_manual_backup_notifications')
 
     @property
     def has_any_permission(self):
@@ -653,6 +661,10 @@ class CouncilPermission(models.Model):
     can_view_audit_log        = models.BooleanField('عرض سجل رقابة المستخدمين', default=False)
     can_toggle_audit_backup   = models.BooleanField('إيقاف/تشغيل نظام رقابة المستخدمين والنسخ الاحتياطي', default=False)
     can_clear_audit_log       = models.BooleanField('تصفير ومسح سجلات الرقابة والنسخ الاحتياطي', default=False)
+    can_toggle_sms                  = models.BooleanField('إيقاف/تشغيل رسائل SMS', default=False)
+    can_toggle_inapp                = models.BooleanField('إيقاف/تشغيل إشعارات النظام المباشرة للأعضاء', default=False)
+    can_clear_notification_log      = models.BooleanField('تصفير ومسح سجلات التنبيهات', default=False)
+    can_manual_backup_notifications = models.BooleanField('أخذ نسخة احتياطية يدوية لسجلات التنبيهات', default=False)
 
     # Audit & Delegation Info
     granted_by  = models.ForeignKey(

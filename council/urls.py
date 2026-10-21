@@ -169,6 +169,9 @@ urlpatterns = [
     path('api/notifications/read-all/', notification_views.api_mark_all_notifications_read, name='api_mark_all_notifications_read'),
     path('notifications/', notification_views.notification_list_view, name='notification_list'),
     path('notifications/log/', notification_views.notification_log_view, name='notification_log'),
+    path('notifications/toggle-service/', notification_views.toggle_notification_service_view, name='toggle_notification_service'),
+    path('notifications/clear-log/', notification_views.clear_notification_log_view, name='clear_notification_log'),
+    path('notifications/manual-backup/', notification_views.manual_backup_notifications_view, name='manual_backup_notifications'),
     path('notifications/sms-templates/', notification_views.sms_template_list_view, name='sms_template_list'),
     path('notifications/sms-templates/<int:pk>/edit/', notification_views.sms_template_edit_view, name='sms_template_edit'),
 

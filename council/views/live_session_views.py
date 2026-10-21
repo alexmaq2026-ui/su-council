@@ -76,6 +76,21 @@ def session_live_view(request, session_pk):
         messages.error(request, 'لا يمكنك استعراض هذه الجلسة.')
         return redirect('/dashboard/')
 
+    # ── Strict Session Status Verification (منع دخول القاعة الحية للجلسات المجمّدة أو غير المنعقدة) ──
+    if session.is_frozen():
+        messages.warning(
+            request,
+            f'الجلسة رقم {session.session_number} مغلقة ومجمّدة رسمياً؛ لا يمكن فتح غرفة الانعقاد الحي لجلسة مجمّدة ومؤرشفة.'
+        )
+        return redirect('council:session_detail', pk=session.pk)
+
+    if session.status != 'active':
+        messages.info(
+            request,
+            f'الجلسة رقم {session.session_number} ليست في مرحلة الانعقاد الحي حالياً (حالتها: {session.get_status_display()}).'
+        )
+        return redirect('council:session_detail', pk=session.pk)
+
     # ── Manager Presence Tracking in Live Session ──
     if user.is_super or user.can_start_session_live:
         LiveSessionPresence.objects.update_or_create(
@@ -469,6 +484,19 @@ def api_topic_control(request, topic_pk):
     topic = get_object_or_404(Topic.objects.select_related('session'), pk=topic_pk)
     session = topic.session
 
+    # حماية الجلسة: التحقق من التجميد ومرحلة الانعقاد الحي
+    if session.is_frozen():
+        return JsonResponse({
+            'ok': False,
+            'error': 'الجلسة مغلقة ومجمّدة رسمياً؛ لا يمكن إجراء أي تعديل على مواضيعها.'
+        }, status=403)
+
+    if session.status != 'active':
+        return JsonResponse({
+            'ok': False,
+            'error': f'الجلسة الحالية غير منعقدة (حالتها: {session.get_status_display()})؛ لا يمكن تشغيل أدوات الانعقاد الحي.'
+        }, status=403)
+
     # Strict live control gatekeeper: tools must be authorized by the President
     if not session.user_can_manage_live_controls(user):
         return JsonResponse({
@@ -692,6 +720,18 @@ def api_session_lifecycle_control(request, session_pk):
     user = request.user
     session = get_object_or_404(CouncilSession, pk=session_pk)
 
+    if session.is_frozen():
+        return JsonResponse({
+            'ok': False,
+            'error': 'الجلسة مغلقة ومجمّدة رسمياً ولا يمكن تغيير دورة حياتها أو تعليقها أو رفعها من هذه الشاشة.'
+        }, status=403)
+
+    if session.status != 'active':
+        return JsonResponse({
+            'ok': False,
+            'error': f'لا يمكن تنفيذ إجراءات الانعقاد الحي؛ الجلسة ليست منعقدة حالياً (حالتها: {session.get_status_display()}).'
+        }, status=403)
+
     try:
         data = json.loads(request.body) if request.body else request.POST
     except Exception:
@@ -779,6 +819,12 @@ def api_session_delegate_control(request, session_pk):
     """
     user = request.user
     session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    if session.is_frozen() or session.status != 'active':
+        return JsonResponse({
+            'ok': False,
+            'error': 'لا يمكن تفويض إدارة الجلسة إلا أثناء انعقادها الفعلي.'
+        }, status=403)
 
     if not (session.is_user_president(user) or user.is_super):
         return JsonResponse({
@@ -928,6 +974,9 @@ def api_speak_request_toggle(request, session_pk):
 
     session = get_object_or_404(CouncilSession, pk=session_pk)
 
+    if session.is_frozen() or session.status != 'active':
+        return JsonResponse({'ok': False, 'error': 'الجلسة غير منعقدة حالياً؛ لا يمكن تقديم أو تعديل طلبات الكلمة.'}, status=403)
+
     # Check if user has an approved exit permit
     if ExitPermit.objects.filter(session=session, member=request.user, status='approved').exists():
         return JsonResponse({
@@ -983,6 +1032,9 @@ def api_speak_request_action(request, request_pk):
     """
     sr = get_object_or_404(SpeakRequest.objects.select_related('session', 'member'), pk=request_pk)
     session = sr.session
+
+    if session.is_frozen() or session.status != 'active':
+        return JsonResponse({'ok': False, 'error': 'الجلسة غير منعقدة حالياً؛ لا يمكن إدارة طابور المداخلات.'}, status=403)
 
     if not session.user_can_manage_live_controls(request.user):
         return JsonResponse({'ok': False, 'error': 'أدوات إدارة طابور الكلمة مجمدة حالياً بانتظار تمكين رئيس الجلسة.'}, status=403)
@@ -1275,6 +1327,9 @@ def api_session_recording_action(request, session_pk):
     """
     session = get_object_or_404(CouncilSession, pk=session_pk)
 
+    if session.is_frozen() or session.status != 'active':
+        return JsonResponse({'ok': False, 'error': 'الجلسة غير منعقدة حالياً؛ لا يمكن التحكم بالتسجيل الصوتي.'}, status=403)
+
     if not (request.user.is_super or session.user_can_manage_live_controls(request.user) or request.user.can_control_recording):
         return JsonResponse({'ok': False, 'error': 'أدوات التحكم بتسجيل الجلسة مجمدة حالياً بانتظار تمكين رئيس الجلسة.'}, status=403)
 
@@ -1358,6 +1413,9 @@ def api_session_recording_chunk(request, session_pk):
         return JsonResponse({'ok': False, 'error': 'غير مصرح.'}, status=403)
 
     session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    if session.is_frozen():
+        return JsonResponse({'ok': False, 'error': 'الجلسة مغلقة ومجمّدة؛ لا يمكن رفع أجزاء تسجيل جديدة.'}, status=403)
     recording, _ = SessionRecording.objects.get_or_create(session=session)
 
     audio_file = request.FILES.get('audio_chunk')
@@ -1409,6 +1467,9 @@ def api_exit_permit_request(request, session_pk):
 
     session = get_object_or_404(CouncilSession, pk=session_pk)
 
+    if session.is_frozen() or session.status != 'active':
+        return JsonResponse({'ok': False, 'error': 'الجلسة غير منعقدة حالياً؛ لا يمكن تقديم طلب استئذان ومغادرة.'}, status=403)
+
     # Check existing permit
     existing = ExitPermit.objects.filter(session=session, member=request.user).first()
     if existing and existing.status == 'approved':
@@ -1449,6 +1510,10 @@ def api_exit_permit_action(request, permit_pk):
         return JsonResponse({'ok': False, 'error': 'غير مصرح لك بالبت في أذونات المغادرة.'}, status=403)
 
     permit = get_object_or_404(ExitPermit.objects.select_related('session', 'member', 'seat'), pk=permit_pk)
+    session = permit.session
+
+    if session.is_frozen() or session.status != 'active':
+        return JsonResponse({'ok': False, 'error': 'الجلسة غير منعقدة حالياً؛ لا يمكن البت في أذونات المغادرة.'}, status=403)
 
     try:
         data = json.loads(request.body) if request.body else request.POST
@@ -1776,6 +1841,10 @@ def api_session_broadcast_minutes(request, session_pk):
     Requires session control permission (chair / superuser / controller).
     """
     session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    if session.is_frozen() or session.status != 'active':
+        return JsonResponse({'ok': False, 'error': 'الجلسة غير منعقدة حالياً؛ لا يمكن بث المحاضر السابقة.'}, status=403)
+
     user = request.user
     if not (user.is_super or (session.user_can_manage_live_controls(user) and user.can_broadcast_previous_minutes)):
         return JsonResponse({'ok': False, 'error': 'غير مصرح لك بإدارة بث المحضر السابق للأعضاء.'}, status=403)
@@ -1838,6 +1907,10 @@ def api_send_live_directive(request, session_pk):
     from the Council President/Controller directly to a specific attending member.
     """
     session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    if session.is_frozen() or session.status != 'active':
+        return JsonResponse({'ok': False, 'error': 'الجلسة غير منعقدة حالياً؛ لا يمكن إرسال التوجيهات الحية.'}, status=403)
+
     user = request.user
     if not (session.is_user_president(user) or user.is_super or getattr(user, 'can_moderate_live_session', False) or session.user_can_manage_live_controls(user)):
         return JsonResponse({'ok': False, 'error': 'غير مصرح لك بإرسال التنبيهات ونقاط النظام التفاعلية.'}, status=403)

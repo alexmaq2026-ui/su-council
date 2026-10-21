@@ -1967,6 +1967,46 @@ class InAppNotification(models.Model):
             self.save(update_fields=['is_read', 'read_at'])
 
 
+# ── System Notification & SMS Master Control ──────────────────────────────────
+class SystemNotificationControl(models.Model):
+    """
+    Global configuration for In-App and SMS Notification operations.
+    Acts as a master switch to strictly pause or resume SMS or In-App notifications,
+    and controls auto-cleanup of previous sessions without backup.
+    """
+    is_inapp_enabled = models.BooleanField(
+        'تفعيل إشعارات النظام المباشرة للأعضاء',
+        default=True,
+        help_text='عند إلغاء التفعيل يتوقف النظام فوراً عن إرسال التنبيهات المباشرة إلى شاشات وقوائم الأعضاء'
+    )
+    is_sms_enabled = models.BooleanField(
+        'تفعيل خدمة الرسائل النصية القصيرة SMS',
+        default=False,
+        help_text='معطلة افتراضياً طالما أن البوابة غير مفعلة، وتمنع كتابة أي سجلات SMS في قاعدة البيانات'
+    )
+    auto_cleanup_on_new_session = models.BooleanField(
+        'التنظيف الآلي لإشعارات الجلسات السابقة عند إعلان جلسة جديدة',
+        default=True,
+        help_text='حذف إشعارات الجلسات السابقة من صناديق الأعضاء وسجل التنبيهات تلقائياً دون أخذ أي نسخة احتياطية'
+    )
+    updated_at = models.DateTimeField('تاريخ آخر تحديث', auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name='حُدِّث بواسطة'
+    )
+
+    class Meta:
+        verbose_name = 'إعدادات منظومة التنبيهات و SMS'
+        verbose_name_plural = 'إعدادات منظومة التنبيهات و SMS'
+
+    @classmethod
+    def get_setting(cls):
+        obj = cls.objects.first()
+        if not obj:
+            obj = cls.objects.create(is_inapp_enabled=True, is_sms_enabled=False, auto_cleanup_on_new_session=True)
+        return obj
+
+
 class NotificationLog(models.Model):
     """
     Unified central delivery log for all SMS and In-App notifications sent by the system.
@@ -1995,6 +2035,8 @@ class NotificationLog(models.Model):
         CouncilSession, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='notifications', verbose_name='الجلسة'
     )
+    session_label   = models.CharField('رقم واسم الجلسة', max_length=150, blank=True, default='',
+                                       help_text='رقم واسم الجلسة محفوظ بشكل دائم حتى لو حذفت الجلسة')
     topic           = models.ForeignKey(
         Topic, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='notifications', verbose_name='الموضوع'

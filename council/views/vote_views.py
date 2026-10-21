@@ -34,7 +34,14 @@ def vote_view(request, topic_pk):
             status=403
         )
 
-    topic = get_object_or_404(Topic, pk=topic_pk)
+    topic = get_object_or_404(Topic.objects.select_related('session'), pk=topic_pk)
+
+    # التحقق الصارم من حالة الجلسة: منع التصويت في الجلسات المجمّدة أو غير المنعقدة
+    if topic.session.is_frozen() or topic.session.status != 'active':
+        return JsonResponse({
+            'ok': False,
+            'error': 'الجلسة غير منعقدة حالياً (مغلقة أو مجمّدة)؛ لا يمكن تسجيل أو تعديل أي تصويت.'
+        }, status=403)
 
     # Parse request data – support both JSON body and form data
     content_type = request.content_type or ''

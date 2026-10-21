@@ -182,6 +182,9 @@ def notification_log_view(request):
 
     sessions = CouncilSession.objects.order_by('-session_number')[:15]
 
+    from council.models import SystemNotificationControl
+    control = SystemNotificationControl.get_setting()
+
     context = {
         'page_obj': page_obj,
         'total_logs': total_logs,
@@ -192,8 +195,119 @@ def notification_log_view(request):
         'selected_status': status,
         'selected_session': session_id,
         'search_q': search_q,
+        'control': control,
+        'user_can_toggle_sms': user.is_super or getattr(user, 'can_toggle_sms', False),
+        'user_can_toggle_inapp': user.is_super or getattr(user, 'can_toggle_inapp', False),
+        'user_can_clear_log': user.is_super or getattr(user, 'can_clear_notification_log', False),
+        'user_can_manual_backup': user.is_super or getattr(user, 'can_manual_backup_notifications', False),
     }
     return render(request, 'council/notification_log.html', context)
+
+
+@login_required(login_url='/login/')
+@require_POST
+def toggle_notification_service_view(request):
+    """
+    Toggle In-App or SMS notification service on/off.
+    Requires can_toggle_inapp or can_toggle_sms permission.
+    """
+    user = request.user
+    service_type = request.POST.get('service_type')  # 'inapp' or 'sms'
+
+    from council.models import SystemNotificationControl
+    control = SystemNotificationControl.get_setting()
+
+    if service_type == 'sms':
+        if not (user.is_super or getattr(user, 'can_toggle_sms', False)):
+            messages.error(request, 'عذراً، ليس لديك صلاحية لإيقاف أو تشغيل رسائل SMS.')
+            return redirect('council:notification_log')
+        control.is_sms_enabled = not control.is_sms_enabled
+        control.updated_by = user
+        control.save(update_fields=['is_sms_enabled', 'updated_by', 'updated_at'])
+        state = 'تشغيل وتفعيل' if control.is_sms_enabled else 'إيقاف وتعطيل'
+        messages.success(request, f'تم {state} خدمة الرسائل النصية القصيرة SMS بنجاح.')
+
+    elif service_type == 'inapp':
+        if not (user.is_super or getattr(user, 'can_toggle_inapp', False)):
+            messages.error(request, 'عذراً، ليس لديك صلاحية لإيقاف أو تشغيل إشعارات النظام.')
+            return redirect('council:notification_log')
+        control.is_inapp_enabled = not control.is_inapp_enabled
+        control.updated_by = user
+        control.save(update_fields=['is_inapp_enabled', 'updated_by', 'updated_at'])
+        state = 'تشغيل وتفعيل' if control.is_inapp_enabled else 'إيقاف وتعطيل'
+        messages.success(request, f'تم {state} إشعارات النظام المباشرة للأعضاء بنجاح.')
+
+    return redirect('council:notification_log')
+
+
+@login_required(login_url='/login/')
+@require_POST
+def clear_notification_log_view(request):
+    """
+    Purge and clear notification logs permanently WITHOUT TAKING ANY BACKUP.
+    Requires can_clear_notification_log or superuser.
+    """
+    user = request.user
+    if not (user.is_super or getattr(user, 'can_clear_notification_log', False)):
+        messages.error(request, 'عذراً، ليس لديك صلاحية لتصفير ومسح سجلات التنبيهات.')
+        return redirect('council:notification_log')
+
+    purge_mode = request.POST.get('purge_mode', 'all')  # 'all', 'sms_only', 'old_sessions'
+
+    from council.models import NotificationLog, InAppNotification, CouncilSession
+
+    if purge_mode == 'sms_only':
+        deleted_count, _ = NotificationLog.objects.filter(channel='sms').delete()
+        messages.success(request, f'تم تصفير وحذف كافة رسائل الـ SMS ({deleted_count} رسالة) بنجاح ودون أخذ أي نسخة احتياطية.')
+    elif purge_mode == 'old_sessions':
+        latest_session = CouncilSession.objects.order_by('-date', '-session_number').first()
+        if latest_session:
+            deleted_count, _ = NotificationLog.objects.exclude(session=latest_session).delete()
+            InAppNotification.objects.exclude(target_url__contains=f'/sessions/{latest_session.pk}/').delete()
+            messages.success(request, f'تم حذف إشعارات الجلسات السابقة ({deleted_count} سجل) والإبقاء على الجلسة الحالية فقط بنجاح دون أي نسخ احتياطي.')
+        else:
+            deleted_count, _ = NotificationLog.objects.all().delete()
+            InAppNotification.objects.all().delete()
+            messages.success(request, 'تم تصفير سجلات التنبيهات بالكامل بنجاح.')
+    else:
+        # Full clear: delete all notification logs and in-app notifications
+        deleted_count, _ = NotificationLog.objects.all().delete()
+        InAppNotification.objects.all().delete()
+        messages.success(request, f'تم تصفير ومسح كافة سجلات التنبيهات والإشعارات ({deleted_count} سجل) نهائياً بنجاح ودون أخذ أي نسخة احتياطية.')
+
+    return redirect('council:notification_log')
+
+
+@login_required(login_url='/login/')
+def manual_backup_notifications_view(request):
+    """
+    Explicit manual backup for notification logs (downloadable JSON).
+    Executes ONLY when manually requested by authorized user.
+    Requires can_manual_backup_notifications or superuser.
+    """
+    user = request.user
+    if not (user.is_super or getattr(user, 'can_manual_backup_notifications', False)):
+        messages.error(request, 'عذراً، ليس لديك صلاحية لأخذ نسخة احتياطية لسجلات التنبيهات.')
+        return redirect('council:notification_log')
+
+    import json
+    from django.http import HttpResponse
+    from django.utils import timezone
+    from council.models import NotificationLog
+
+    logs = list(NotificationLog.objects.all().values(
+        'id', 'channel', 'recipient_name', 'recipient_phone',
+        'title', 'message_body', 'status', 'session_id', 'session_label', 'sent_at'
+    ))
+    for l in logs:
+        if l.get('sent_at'):
+            l['sent_at'] = l['sent_at'].isoformat()
+
+    json_data = json.dumps(logs, ensure_ascii=False, indent=2)
+    response = HttpResponse(json_data, content_type='application/json; charset=utf-8')
+    filename = f'notifications_backup_{timezone.now().strftime("%Y%m%d_%H%M%S")}.json'
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 # ── 4. SMS Templates Management (can_manage_sms_template) ────────────────────

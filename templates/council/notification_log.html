@@ -39,6 +39,55 @@
     </div>
   </div>
 
+  <!-- Control Bar (أزرار التحكم المركزية بالخدمة والتصفير) -->
+  <div class="card shadow-sm border-0 mb-4 bg-white rounded-4 overflow-hidden">
+    <div class="card-body p-3 bg-light border-bottom d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="fw-bold text-navy small"><i class="bi bi-toggles me-1 text-gold"></i>مفاتيح التحكم بالخدمة:</span>
+
+        <!-- Toggle In-App Notifications -->
+        {% if user_can_toggle_inapp %}
+          <form method="post" action="{% url 'council:toggle_notification_service' %}" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="service_type" value="inapp">
+            <button type="submit" class="btn btn-sm {% if control.is_inapp_enabled %}btn-success{% else %}btn-outline-secondary{% endif %} fw-bold shadow-sm d-inline-flex align-items-center gap-1" title="انقر لتشغيل أو إيقاف إشعارات النظام المباشرة للأعضاء">
+              <i class="bi {% if control.is_inapp_enabled %}bi-bell-fill{% else %}bi-bell-slash{% endif %}"></i>
+              <span>إشعارات النظام: {% if control.is_inapp_enabled %}مفعلة 🟢{% else %}متوقفة ⚪{% endif %}</span>
+            </button>
+          </form>
+        {% endif %}
+
+        <!-- Toggle SMS Notifications -->
+        {% if user_can_toggle_sms %}
+          <form method="post" action="{% url 'council:toggle_notification_service' %}" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="service_type" value="sms">
+            <button type="submit" class="btn btn-sm {% if control.is_sms_enabled %}btn-warning text-dark{% else %}btn-outline-secondary{% endif %} fw-bold shadow-sm d-inline-flex align-items-center gap-1" title="انقر لتشغيل أو إيقاف رسائل الـ SMS ومنع حفظ سجلاتها">
+              <i class="bi {% if control.is_sms_enabled %}bi-chat-text-fill{% else %}bi-chat-slash{% endif %}"></i>
+              <span>رسائل SMS: {% if control.is_sms_enabled %}مفعلة 🟢{% else %}متوقفة ⚪ (بدون حفظ){% endif %}</span>
+            </button>
+          </form>
+        {% endif %}
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <!-- Manual Backup Button -->
+        {% if user_can_manual_backup %}
+          <a href="{% url 'council:manual_backup_notifications' %}" class="btn btn-outline-primary btn-sm fw-bold d-inline-flex align-items-center gap-1" title="تنزيل نسخة احتياطية يدوية بتنسيق JSON لسجلات التنبيهات">
+            <i class="bi bi-download"></i><span>أخذ نسخة احتياطية يدوية</span>
+          </a>
+        {% endif %}
+
+        <!-- Purge / Clear Log Button -->
+        {% if user_can_clear_log %}
+          <button type="button" class="btn btn-outline-danger btn-sm fw-bold d-inline-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#clearLogModal">
+            <i class="bi bi-trash3-fill"></i><span>تصفير ومسح السجلات</span>
+          </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
   <!-- Stat Cards -->
   <div class="row g-3 mb-4">
     <div class="col-md-4">
@@ -140,8 +189,12 @@
                   <td>
                     <strong>{{ log.recipient_name|default:log.recipient.full_name|default:"عضو المجلس" }}</strong>
                   </td>
-                  <td class="font-monospace text-muted small">
-                    {{ log.recipient_phone|default:"—" }}
+                  <td class="font-monospace small">
+                    {% if log.recipient_phone and log.recipient_phone != '(غير مسجل بالملف الشخصي)' and log.recipient_phone != '—' %}
+                      <span class="text-dark">{{ log.recipient_phone }}</span>
+                    {% else %}
+                      <span class="badge bg-light text-muted border fw-normal" style="font-size: 0.72rem;">غير مسجل بالملف</span>
+                    {% endif %}
                   </td>
                   <td>
                     <span class="fw-semibold text-navy">{{ log.title }}</span>
@@ -152,6 +205,8 @@
                   <td>
                     {% if log.session %}
                       <span class="badge bg-light text-dark border">جلسة {{ log.session.session_number }}</span>
+                    {% elif log.session_label %}
+                      <span class="badge bg-light text-dark border">{{ log.session_label }}</span>
                     {% else %}
                       <span class="text-muted">—</span>
                     {% endif %}
@@ -161,12 +216,14 @@
                       <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>{{ log.get_status_display }}</span>
                     {% elif log.status == 'simulated' %}
                       <span class="badge bg-info text-dark"><i class="bi bi-cpu me-1"></i>سجل محاكاة</span>
+                    {% elif log.status == 'failed' %}
+                      <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>تعذر الإرسال</span>
                     {% else %}
                       <span class="badge bg-secondary">{{ log.get_status_display }}</span>
                     {% endif %}
                   </td>
-                  <td class="text-muted small">
-                    {{ log.sent_at|date:"Y-m-d H:i:s" }}
+                  <td class="small text-nowrap">
+                    <span dir="ltr" class="font-monospace text-muted">{{ log.sent_at|date:"Y-m-d" }} <span class="text-secondary fw-bold">{{ log.sent_at|date:"H:i:s" }}</span></span>
                   </td>
                 </tr>
               {% endfor %}
@@ -199,6 +256,63 @@
       {% endif %}
     </div>
   </div>
+
+  <!-- Modal: تصفير ومسح سجل التنبيهات -->
+  {% if user_can_clear_log %}
+  <div class="modal fade" id="clearLogModal" tabindex="-1" aria-labelledby="clearLogModalLabel" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <form method="post" action="{% url 'council:clear_notification_log' %}">
+          {% csrf_token %}
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title fw-bold" id="clearLogModalLabel">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>تصفير ومسح سجلات التنبيهات
+            </h5>
+            <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-4">
+            <p class="text-dark fw-bold mb-3">اختر خيار التصفير المطلوب تنفيذه فوراً (بدون أخذ أي نسخة احتياطية):</p>
+
+            <div class="form-check p-3 mb-2 rounded border bg-light">
+              <input class="form-check-input ms-2" type="radio" name="purge_mode" id="mode_all" value="all" checked>
+              <label class="form-check-label fw-bold text-danger" for="mode_all">
+                تصفير شامل وكامل (مسح كافة الإشعارات ورسائل SMS نهائياً)
+              </label>
+              <div class="text-muted small mt-1">يحذف كافة سجلات التنبيهات ({{ total_logs }}) وإشعارات الأعضاء ويبدأ من الصفر.</div>
+            </div>
+
+            <div class="form-check p-3 mb-2 rounded border bg-light">
+              <input class="form-check-input ms-2" type="radio" name="purge_mode" id="mode_sms" value="sms_only">
+              <label class="form-check-label fw-bold text-navy" for="mode_sms">
+                حذف رسائل SMS فقط ({{ sms_count }} رسالة محاكاة)
+              </label>
+              <div class="text-muted small mt-1">تصفير رسائل الـ SMS الوهمية والإبقاء على إشعارات النظام.</div>
+            </div>
+
+            <div class="form-check p-3 rounded border bg-light">
+              <input class="form-check-input ms-2" type="radio" name="purge_mode" id="mode_old" value="old_sessions">
+              <label class="form-check-label fw-bold text-navy" for="mode_old">
+                حذف إشعارات وسجلات الجلسات السابقة المنتهية فقط
+              </label>
+              <div class="text-muted small mt-1">الإبقاء على إشعارات الجلسة الأحدث وحذف أرشيف الجلسات القديمة.</div>
+            </div>
+
+            <div class="alert alert-warning d-flex align-items-center gap-2 mt-3 mb-0 py-2 small">
+              <i class="bi bi-info-circle-fill fs-5 text-warning"></i>
+              <span>تنبيه: سيتم المسح فوراً وبشكل دائم دون إنشاء أي نسخة احتياطية تلقائية.</span>
+            </div>
+          </div>
+          <div class="modal-footer bg-light border-0 py-2">
+            <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">إلغاء</button>
+            <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold">
+              <i class="bi bi-trash3 me-1"></i>تأكيد التصفير والمسح الفوري
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
 </div>
 {% endblock %}

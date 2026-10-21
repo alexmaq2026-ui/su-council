@@ -66,9 +66,14 @@ def create_in_app_notification(
     sent_by=None
 ):
     """
-    Creates an in-app notification and records a matching delivery log.
+    Creates an in-app notification and records a matching delivery log if enabled.
     """
     if not recipient:
+        return None
+
+    from council.models import SystemNotificationControl
+    control = SystemNotificationControl.get_setting()
+    if not control.is_inapp_enabled:
         return None
 
     notif = InAppNotification.objects.create(
@@ -79,6 +84,8 @@ def create_in_app_notification(
         target_url=target_url
     )
 
+    session_lbl = f'الجلسة رقم {session.session_number}' if session else ''
+
     # Log in central NotificationLog
     NotificationLog.objects.create(
         channel='in_app',
@@ -86,6 +93,7 @@ def create_in_app_notification(
         recipient_phone=recipient.phone or '',
         recipient_name=recipient.full_name,
         session=session,
+        session_label=session_lbl,
         topic=topic,
         title=title,
         message_body=message,
@@ -107,27 +115,44 @@ def send_sms_notification(
     sent_by=None
 ):
     """
-    Dispatches SMS notification (live gateway if configured or simulated delivery log).
+    Dispatches SMS notification if SMS service is enabled in SystemNotificationControl.
     """
+    from council.models import SystemNotificationControl, SMSTemplate
+    control = SystemNotificationControl.get_setting()
+    if not control.is_sms_enabled:
+        # Master switch is OFF: do not create or write any records to DB!
+        return None
+
     recip_name = recipient_name or (recipient.full_name if recipient else '')
-    phone = recipient_phone or (recipient.phone if recipient else '')
+    phone = (recipient_phone or (recipient.phone if recipient else '') or '').strip()
 
     status = 'simulated'
     error_msg = ''
 
+    if not phone:
+        phone = '(غير مسجل بالملف الشخصي)'
+        status = 'failed'
+        error_msg = 'لا يوجد رقم هاتف مسجل لهذا العضو في النظام'
+
+    # Get Arabic template title if template_code is provided
+    title_text = 'رسالة نصية SMS'
+    if template_code:
+        tmpl = SMSTemplate.objects.filter(code=template_code).first()
+        if tmpl and tmpl.title:
+            title_text = f'رسالة نصية: {tmpl.title}'
+        else:
+            title_text = f'رسالة نصية: {template_code}'
+
+    session_lbl = f'الجلسة رقم {session.session_number}' if session else ''
+
     # Check if external SMS gateway credentials exist in django settings
     sms_gateway_url = getattr(settings, 'SMS_GATEWAY_URL', None)
-    if sms_gateway_url:
+    if sms_gateway_url and status != 'failed':
         try:
-            # Here pluggable HTTP call to SMS gateway provider would happen
-            # e.g. requests.post(sms_gateway_url, json={'to': phone, 'text': message_body}, timeout=5)
             status = 'sent'
         except Exception as e:
             status = 'failed'
             error_msg = str(e)
-    else:
-        # Default behavior: recorded as simulated local dispatch (ready for carrier binding)
-        status = 'simulated'
 
     log_entry = NotificationLog.objects.create(
         channel='sms',
@@ -135,8 +160,9 @@ def send_sms_notification(
         recipient_phone=phone,
         recipient_name=recip_name,
         session=session,
+        session_label=session_lbl,
         topic=topic,
-        title=f'SMS: {template_code or "رسالة نصية"}',
+        title=title_text,
         message_body=message_body,
         status=status,
         sent_by=sent_by,
@@ -146,13 +172,47 @@ def send_sms_notification(
     return log_entry
 
 
+def auto_cleanup_previous_session_notifications(current_session=None):
+    """
+    Automatically cleans up previous session notifications without taking any backup.
+    1. Purges in-app notifications for previous sessions so members see only fresh notifications.
+    2. Purges previous notification log records for old sessions if current_session is given.
+    Strictly runs WITHOUT taking any backup!
+    """
+    from council.models import SystemNotificationControl, InAppNotification, NotificationLog
+    control = SystemNotificationControl.get_setting()
+    if not control.auto_cleanup_on_new_session:
+        return 0, 0
+
+    deleted_inapp = 0
+    deleted_logs = 0
+
+    try:
+        if current_session:
+            target_prefix = f'/sessions/{current_session.pk}/'
+            inapp_qs = InAppNotification.objects.exclude(target_url__startswith=target_prefix)
+            deleted_inapp, _ = inapp_qs.delete()
+
+            log_qs = NotificationLog.objects.filter(session__isnull=False).exclude(session=current_session)
+            deleted_logs, _ = log_qs.delete()
+        else:
+            deleted_inapp, _ = InAppNotification.objects.all().delete()
+    except Exception:
+        pass
+
+    return deleted_inapp, deleted_logs
+
+
 from django.db.models import Q
 
 def notify_session_publishing(session, sent_by=None):
     """
     Triggered when session moves to 'publishing' (منشورة للاطلاع المسبق).
     Notifies all active council members.
+    Automatically purges previous session notifications without taking any backup.
     """
+    auto_cleanup_previous_session_notifications(current_session=session)
+
     ensure_default_sms_templates()
     template = SMSTemplate.objects.filter(code='session_publishing', is_active=True).first()
 

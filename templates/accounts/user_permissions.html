@@ -244,6 +244,10 @@ document.addEventListener('DOMContentLoaded', () => {
     {% if permission_obj.can_search_person %}'can_search_person',{% endif %}
     {% if permission_obj.can_view_notifications %}'can_view_notifications',{% endif %}
     {% if permission_obj.can_view_notification_log %}'can_view_notification_log',{% endif %}
+    {% if permission_obj.can_toggle_sms %}'can_toggle_sms',{% endif %}
+    {% if permission_obj.can_toggle_inapp %}'can_toggle_inapp',{% endif %}
+    {% if permission_obj.can_clear_notification_log %}'can_clear_notification_log',{% endif %}
+    {% if permission_obj.can_manual_backup_notifications %}'can_manual_backup_notifications',{% endif %}
     {% if permission_obj.can_manage_sms_template %}'can_manage_sms_template',{% endif %}
     {% if permission_obj.can_use_smart_reader %}'can_use_smart_reader',{% endif %}
     {% if permission_obj.can_manage_smart_reader %}'can_manage_smart_reader',{% endif %}

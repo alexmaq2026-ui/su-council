@@ -16,13 +16,17 @@ def live_session_context(request):
         return {}
 
     try:
-        active_session = CouncilSession.objects.filter(status='active').first()
+        import re
+        live_match = re.match(r'^/sessions/(\d+)/live/?', request.path)
+        if live_match:
+            active_session = CouncilSession.objects.filter(pk=int(live_match.group(1)), status='active').first()
+        else:
+            active_session = None
+
         if not active_session:
-            import re
-            live_match = re.match(r'^/sessions/(\d+)/live/?', request.path)
-            if live_match:
-                active_session = CouncilSession.objects.filter(pk=int(live_match.group(1))).first()
-        if not active_session:
+            active_session = CouncilSession.objects.filter(status='active').first()
+
+        if not active_session or active_session.status != 'active' or active_session.is_frozen():
             return {}
 
         # Verify access permission
