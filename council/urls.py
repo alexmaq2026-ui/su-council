@@ -153,6 +153,9 @@ urlpatterns = [
     path('api/users/<int:user_pk>/toggle-force-majeure/', live_session_views.api_toggle_force_majeure, name='api_toggle_force_majeure'),
 
     # ── Phase 4: Signed Decisions, Faculty Dispatches & Digital Hash ─────
+    path('dispatch-center/', dispatch_views.dispatch_center_view, name='dispatch_center'),
+    path('api/dispatch-center/session-data/<int:session_pk>/', dispatch_views.get_session_dispatch_data_api, name='session_dispatch_data_api'),
+    path('circulars/<int:dispatch_pk>/file/', dispatch_views.view_circular_file_view, name='view_circular_file'),
     path('topics/<int:topic_pk>/signed-decision/upload/', dispatch_views.upload_signed_decision_view, name='upload_signed_decision'),
     path('topics/<int:topic_pk>/signed-decision/dispatch/', dispatch_views.dispatch_signed_decision_view, name='dispatch_signed_decision'),
     path('correspondence/', dispatch_views.entity_correspondence_view, name='entity_correspondence'),
@@ -160,6 +163,8 @@ urlpatterns = [
     path('correspondence/<int:seat_pk>/', dispatch_views.entity_correspondence_view, name='entity_correspondence_seat'),
     path('dispatches/<int:dispatch_pk>/file/', dispatch_views.view_signed_decision_file_view, name='view_signed_decision_file'),
     path('dispatches/log/', dispatch_views.dispatch_log_view, name='dispatch_log'),
+    path('dispatches/export-manifest/', dispatch_views.export_dispatch_manifest_view, name='export_dispatch_manifest'),
+    path('dispatches/reset-all/', dispatch_views.reset_all_dispatches_view, name='reset_all_dispatches'),
     path('api/sessions/<int:session_pk>/verify-hash/', dispatch_views.verify_session_hash_view, name='verify_session_hash'),
     path('sessions/<int:session_pk>/archived-pdf/', dispatch_views.export_archived_pdf_view, name='session_archived_pdf'),
 

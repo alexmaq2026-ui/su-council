@@ -26,6 +26,20 @@
         </div>
 
         <div class="d-flex align-items-center gap-2">
+          {% if request.user.is_super or request.user.can_export_dispatch_manifest %}
+            <a href="{% url 'council:export_dispatch_manifest' %}" class="btn btn-success btn-sm px-3 fw-bold shadow-sm d-flex align-items-center gap-1" title="تصدير كشف Excel بعناوين وتواريخ واستلام كافة المراسلات لجميع الأعضاء دون الملفات المرفقة">
+              <i class="bi bi-file-earmark-excel-fill"></i>
+              <span>تصدير عناوين الرسائل (Excel)</span>
+            </a>
+          {% endif %}
+
+          {% if request.user.is_super or request.user.can_reset_dispatches %}
+            <button type="button" class="btn btn-outline-danger btn-sm px-3 fw-bold shadow-sm d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#resetDispatchesModal" title="تصفير وتفريغ جداول مراسلات جميع الأعضاء">
+              <i class="bi bi-trash3-fill"></i>
+              <span>تصفير جميع الرسائل</span>
+            </button>
+          {% endif %}
+
           <a href="{% url 'council:session_list' %}" class="btn btn-outline-secondary btn-sm px-3">
             العودة للجلسات
           </a>
@@ -150,14 +164,21 @@
                 <tr class="{% if not d.is_viewed %}table-warning bg-opacity-25{% endif %}">
                   <td class="text-muted">{{ forloop.counter }}</td>
                   <td class="text-end">
-                    <a href="{% url 'council:topic_detail' d.signed_decision.topic.pk %}" class="fw-bold text-decoration-none text-dark d-block">
-                      {{ d.signed_decision.topic.title }}
-                    </a>
+                    {% if d.circular.topic %}
+                      <a href="{% url 'council:topic_detail' d.circular.topic.pk %}" class="fw-bold text-decoration-none text-dark d-block">
+                        {{ d.circular.title }}
+                      </a>
+                    {% else %}
+                      <span class="fw-bold text-dark d-block">{{ d.circular.title }}</span>
+                    {% endif %}
                     <div class="d-flex align-items-center gap-1 mt-1">
-                      <span class="badge bg-light text-dark border small">الجلسة {{ d.signed_decision.session.session_number }}</span>
-                      {% if d.signed_decision.decision_number %}
-                        <span class="badge bg-primary-subtle text-primary border border-primary small">قرار {{ d.signed_decision.decision_number }}</span>
+                      {% if d.circular.session %}
+                        <span class="badge bg-light text-dark border small">الجلسة {{ d.circular.session.session_number }}</span>
                       {% endif %}
+                      {% if d.circular.circular_number %}
+                        <span class="badge bg-primary-subtle text-primary border border-primary small">رقم {{ d.circular.circular_number }}</span>
+                      {% endif %}
+                      <span class="badge bg-secondary-subtle text-secondary small">{{ d.circular.get_dispatch_type_display }}</span>
                     </div>
                   </td>
                   <td>
@@ -186,8 +207,8 @@
                     {% endif %}
                   </td>
                   <td>
-                    <a href="{% url 'council:view_signed_decision_file' d.pk %}" target="_blank" class="btn btn-sm btn-outline-primary fw-bold px-3">
-                      معاينة القرار الموقّع
+                    <a href="{% url 'council:view_circular_file' d.pk %}" target="_blank" class="btn btn-sm btn-outline-primary fw-bold px-3">
+                      معاينة / تنزيل الملف
                     </a>
                   </td>
                 </tr>
@@ -203,6 +224,44 @@
       {% endif %}
     </div>
   </div>
+
+  <!-- =========================================================================
+       مودال تأكيد تصفير كافة الرسائل (لأصحاب الصلاحية فقط)
+       ========================================================================= -->
+  {% if request.user.is_super or request.user.can_reset_dispatches %}
+  <div class="modal fade" id="resetDispatchesModal" tabindex="-1" aria-labelledby="resetDispatchesModalLabel" aria-hidden="true" dir="rtl">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title fw-bold" id="resetDispatchesModalLabel">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>تحذير أمني: تصفير جميع المراسلات والقرارات
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+        </div>
+        <form method="post" action="{% url 'council:reset_all_dispatches' %}">
+          {% csrf_token %}
+          <div class="modal-body p-4 text-end">
+            <div class="alert alert-warning border-0 small mb-3">
+              <i class="bi bi-info-circle-fill me-1"></i>
+              هذا الإجراء سيقوم بمسح وتفريغ <strong>كافة جداول وصناديق الوارد لدى جميع الأعضاء والكليات</strong> وتصفير سجلات الاستلام والاطلاع بالكامل.
+              <br>
+              <strong>ملاحظة هامة:</strong> لن يتم حذف الموضوعات أو الجلسات أو المحاضر الأصلية من النظام.
+            </div>
+            <p class="fw-bold text-navy mb-2">
+              لتأكيد هذا الإجراء الاستثنائي، يرجى كتابة عبارة <span class="badge bg-danger px-2 py-1">تأكيد التصفير</span> في الحقل أدناه:
+            </p>
+            <input type="text" name="confirm_text" class="form-control text-center fw-bold form-control-lg border-danger mb-2" placeholder="تأكيد التصفير" required autocomplete="off">
+            <small class="text-muted d-block">سيتم توثيق هذه العملية الإدارية الحساسة في سجل التدقيق الأمني (Audit Log).</small>
+          </div>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">إلغاء وتراجع</button>
+            <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold">تأكيد التصفير النهائي</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
 </div>
 {% endblock %}

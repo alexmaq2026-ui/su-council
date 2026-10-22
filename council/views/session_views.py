@@ -80,7 +80,12 @@ def session_list_view(request):
     Paginated list of council sessions, sorted by date descending.
     Requires can_view_sessions. Draft sessions are hidden from users without draft visibility.
     """
-    if not (request.user.is_super or request.user.can_view_sessions):
+    from council.models import EntitySeat
+    is_seat_rep = EntitySeat.objects.filter(
+        Q(primary_rep=request.user) | Q(deputy_rep_1=request.user) | Q(deputy_rep_2=request.user),
+        is_active=True
+    ).exists()
+    if not (request.user.is_super or request.user.can_view_sessions or is_seat_rep):
         messages.error(request, 'ليس لديك صلاحية لعرض الجلسات.')
         return redirect('/dashboard/')
 

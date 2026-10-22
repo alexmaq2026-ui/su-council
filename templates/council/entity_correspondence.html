@@ -16,7 +16,13 @@
           <div class="d-flex align-items-center gap-2 mb-1">
             <span class="badge bg-primary px-3 py-2 fs-6">صندوق المراسلات والقرارات الرسمية</span>
             {% if unviewed_count > 0 %}
-              <span class="badge bg-danger px-2 py-1 fs-6">{{ unviewed_count }} قرار جديد</span>
+              <span class="badge bg-danger px-2.5 py-1.5 fs-6" id="top-unviewed-badge">
+                <i class="bi bi-bell-fill me-1"></i><span id="badge-unviewed-num">{{ unviewed_count }}</span> وارد جديد
+              </span>
+            {% else %}
+              <span class="badge bg-success-subtle text-success border border-success px-2.5 py-1.5 fs-6">
+                <i class="bi bi-check2-all me-1"></i>جميع المراسلات مطّلع عليها
+              </span>
             {% endif %}
           </div>
           <h3 class="fw-bold mb-1" style="color: #1B365D;">
@@ -31,125 +37,229 @@
           </div>
         </div>
 
-        <!-- فلتر التبديل بين الكليات (للإدارة والأمانة فقط) -->
-        {% if is_manager and all_seats %}
-          <div class="d-flex align-items-center gap-2">
-            <label class="form-label small mb-0 fw-bold text-muted">عرض جهة أخرى:</label>
-            <select class="form-select form-select-sm" style="min-width: 220px;" onchange="if(this.value) location.href='/council/correspondence/' + this.value + '/';">
-              {% for s in all_seats %}
-                <option value="{{ s.pk }}" {% if s.pk == seat.pk %}selected{% endif %}>
-                  {{ s.name }}
-                </option>
-              {% endfor %}
-            </select>
-          </div>
-        {% endif %}
+        <!-- أزرار الإدارة وفلتر التبديل بين الكليات -->
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          {% if request.user.is_super or request.user.can_export_dispatch_manifest %}
+            <a href="{% url 'council:export_dispatch_manifest' %}" class="btn btn-success btn-sm px-3 fw-bold shadow-sm d-flex align-items-center gap-1" title="تصدير كشف Excel بعناوين وتواريخ كافة المراسلات لجميع الأعضاء دون الملفات المرفقة">
+              <i class="bi bi-file-earmark-excel-fill"></i>
+              <span>تصدير عناوين الرسائل</span>
+            </a>
+          {% endif %}
+
+          {% if request.user.is_super or request.user.can_reset_dispatches %}
+            <button type="button" class="btn btn-outline-danger btn-sm px-3 fw-bold shadow-sm d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#resetDispatchesModalCorrespondence" title="تصفير وتفريغ جداول مراسلات جميع الأعضاء">
+              <i class="bi bi-trash3-fill"></i>
+              <span>تصفير جميع الرسائل</span>
+            </button>
+          {% endif %}
+
+          {% if is_manager and all_seats %}
+            <div class="d-flex align-items-center gap-1 ms-lg-2">
+              <label class="form-label small mb-0 fw-bold text-muted text-nowrap">عرض جهة أخرى:</label>
+              <select class="form-select form-select-sm" style="min-width: 180px;" onchange="if(this.value) location.href='/council/correspondence/' + this.value + '/';">
+                {% for s in all_seats %}
+                  <option value="{{ s.pk }}" {% if s.pk == seat.pk %}selected{% endif %}>
+                    {{ s.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+        </div>
       </div>
     </div>
   </div>
 
   <!-- =========================================================================
-       2. بطاقات المؤشرات الإحصائية السريعة للقرارات
+       2. بطاقات المؤشرات الإحصائية الدقيقة للوثائق والمراسلات
        ========================================================================= -->
   <div class="row g-3 mb-4">
     <div class="col-md-4">
       <div class="card shadow-sm border-0 border-start border-primary border-4 bg-white p-3">
-        <div class="text-muted small fw-bold mb-1">إجمالي القرارات الواردة للجهة</div>
-        <div class="fs-2 fw-bold text-navy" style="color: #1B365D;">{{ total_count }}</div>
-        <div class="text-muted small mt-1">قرارات رسمية معتمدة من مجلس الجامعة</div>
+        <div class="text-muted small fw-bold mb-1">إجمالي الوثائق والمراسلات الواردة</div>
+        <div class="fs-2 fw-bold" style="color: #1B365D;" id="stat-total-count">{{ total_count }}</div>
+        <div class="text-muted small mt-1">وثائق ومحاضر وقرارات معتمدة من مجلس الجامعة</div>
       </div>
     </div>
     <div class="col-md-4">
       <div class="card shadow-sm border-0 border-start border-success border-4 bg-white p-3">
-        <div class="text-muted small fw-bold mb-1">قرارات تم الاطلاع عليها</div>
-        <div class="fs-2 fw-bold text-success">{{ viewed_count }}</div>
-        <div class="text-muted small mt-1">موثقة ومثبتة بتاريخ وتوقيت الاستلام</div>
+        <div class="text-muted small fw-bold mb-1">مراسلات تم الاطلاع عليها وتوثيقها</div>
+        <div class="fs-2 fw-bold text-success" id="stat-viewed-count">{{ viewed_count }}</div>
+        <div class="text-muted small mt-1">موثقة ومثبتة بتاريخ وتوقيت الاستلام الرسمي</div>
       </div>
     </div>
     <div class="col-md-4">
       <div class="card shadow-sm border-0 border-start border-warning border-4 bg-white p-3">
-        <div class="text-muted small fw-bold mb-1">قرارات جديدة قيد الاطلاع</div>
-        <div class="fs-2 fw-bold text-warning">{{ unviewed_count }}</div>
-        <div class="text-muted small mt-1">تحتاج فتح وتحميل النسخة الموقعة</div>
+        <div class="text-muted small fw-bold mb-1">وثائق جديدة بانتظار الاطلاع</div>
+        <div class="fs-2 fw-bold text-warning" id="stat-unviewed-count">{{ unviewed_count }}</div>
+        <div class="text-muted small mt-1">تحتاج فتح وتحميل النسخة الرسمية المعتمدة</div>
       </div>
     </div>
   </div>
 
   <!-- =========================================================================
-       3. جدول القرارات والمراسلات الواردة للجهة
+       3. جدول الوارد الموحد والشامل (Single Unified Inbox)
        ========================================================================= -->
-  <div class="card shadow-sm border-0 bg-white">
-    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-      <h5 class="mb-0 fw-bold" style="color: #1B365D;">
-        📜 سجل القرارات الموقعة الموجهة رسمياً إلى {{ seat.name }}
-      </h5>
-      <span class="text-muted small">تحديث فوري لبيانات المراسلات</span>
+  <div class="card shadow-sm border-0 bg-white mb-4">
+    <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <h5 class="mb-0 fw-bold" style="color: #1B365D;">
+          📬 الوثائق والمحاضر والقرارات الرسمية الواردة إلى {{ seat.name }}
+        </h5>
+      </div>
+      <span class="badge bg-gold text-dark px-3 py-1.5 fw-bold">مركز المراسلات المعتمدة</span>
     </div>
 
-    <div class="card-body p-0">
-      {% if dispatches %}
+    <!-- شريط الفلاتر الذكية والبحث الفوري -->
+    <div class="card-body bg-light border-bottom py-2 px-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <!-- أزرار الفلترة السريعة (Filter Chips) -->
+        <div class="btn-group btn-group-sm flex-wrap" role="group" id="filter-chips-group">
+          <button type="button" class="btn btn-outline-navy active fw-bold px-3" onclick="applyCorrespondenceFilter('all', this)">
+            الكل <span class="badge bg-navy ms-1">{{ total_count }}</span>
+          </button>
+          <button type="button" class="btn btn-outline-warning text-dark fw-bold px-3" onclick="applyCorrespondenceFilter('unviewed', this)">
+            جديد قيد الاطلاع <span class="badge bg-warning text-dark ms-1" id="filter-unviewed-num">{{ unviewed_count }}</span>
+          </button>
+          <button type="button" class="btn btn-outline-primary fw-bold px-3" onclick="applyCorrespondenceFilter('minutes', this)">
+            محاضر الجلسات <span class="badge bg-primary ms-1">{{ count_minutes }}</span>
+          </button>
+          <button type="button" class="btn btn-outline-success fw-bold px-3" onclick="applyCorrespondenceFilter('single_topic', this)">
+            قرارات الموضوعات <span class="badge bg-success ms-1">{{ count_single_topic }}</span>
+          </button>
+          <button type="button" class="btn btn-outline-info text-dark fw-bold px-3" onclick="applyCorrespondenceFilter('category', this)">
+            قرارات المحاور <span class="badge bg-info text-dark ms-1">{{ count_category }}</span>
+          </button>
+          <button type="button" class="btn btn-outline-secondary fw-bold px-3" onclick="applyCorrespondenceFilter('free', this)">
+            التعميمات العامة <span class="badge bg-secondary ms-1">{{ count_free }}</span>
+          </button>
+        </div>
+
+        <!-- حقل البحث السريع بالكلمة المفتاحية -->
+        <div class="input-group input-group-sm" style="max-width: 280px;">
+          <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" id="table-search-input" class="form-control border-start-0" placeholder="بحث بالعنوان، الرقم، أو الراسل..." oninput="filterCorrespondenceTable()">
+        </div>
+      </div>
+    </div>
+
+    <!-- جدول المراسلات الموحد -->
+    <div class="p-0">
+      {% if circular_dispatches %}
         <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0 text-center">
+          <table class="table table-hover align-middle mb-0 text-center" id="correspondence-main-table">
             <thead class="table-light text-muted small">
               <tr>
-                <th style="width: 5%;">#</th>
-                <th class="text-end" style="width: 30%;">الموضوع والقرار الإداري</th>
-                <th style="width: 15%;">الجلسة المنعقدة</th>
+                <th style="width: 4%;">#</th>
+                <th class="text-end" style="width: 34%;">عنوان الوثيقة / المراسلة</th>
+                <th style="width: 15%;">نوع الوارد</th>
                 <th style="width: 15%;">تاريخ الإرسال</th>
                 <th style="width: 15%;">حالة الاطلاع الرسمي</th>
-                <th style="width: 20%;">المستند الموقّع والإجراء</th>
+                <th style="width: 17%;">المستند المعتمد والإجراء</th>
               </tr>
             </thead>
             <tbody>
-              {% for d in dispatches %}
-                <tr class="{% if not d.is_viewed %}table-warning bg-opacity-25{% endif %}">
-                  <td class="text-muted">{{ forloop.counter }}</td>
+              {% for cd in circular_dispatches %}
+                <tr class="correspondence-row {% if not cd.is_viewed %}table-warning bg-opacity-25 unviewed-row{% else %}viewed-row{% endif %}"
+                    id="dispatch-row-{{ cd.pk }}"
+                    data-type="{{ cd.circular.dispatch_type }}"
+                    data-viewed="{{ cd.is_viewed|yesno:'1,0' }}">
+                  
+                  <td class="text-muted fw-bold">{{ forloop.counter }}</td>
+                  
+                  <!-- العنوان والتفاصيل -->
                   <td class="text-end">
-                    <a href="{% url 'council:topic_detail' d.signed_decision.topic.pk %}" class="fw-bold text-decoration-none text-dark d-block">
-                      {{ d.signed_decision.topic.title }}
-                    </a>
-                    {% if d.signed_decision.decision_number %}
-                      <span class="badge bg-light text-dark border mt-1">
-                        رقم القرار: {{ d.signed_decision.decision_number }}
+                    <div class="fw-bold fs-6 mb-1 item-title" style="color: #1B365D;">
+                      {{ cd.circular.title }}
+                    </div>
+                    
+                    <div class="d-flex flex-wrap align-items-center gap-1.5 item-meta">
+                      {% if cd.circular.circular_number %}
+                        <span class="badge bg-light text-dark border">
+                          رقم: {{ cd.circular.circular_number }}
+                        </span>
+                      {% endif %}
+                      {% if cd.circular.circular_date %}
+                        <small class="text-muted">بتاريخ {{ cd.circular.circular_date|date:"Y-m-d" }}</small>
+                      {% endif %}
+                      {% if cd.circular.session %}
+                        <span class="badge bg-navy-subtle text-navy border border-navy-subtle">
+                          جلسة ({{ cd.circular.session.session_number }})
+                        </span>
+                      {% endif %}
+                    </div>
+
+                    {% if cd.circular.notes %}
+                      <div class="text-muted small mt-1 item-notes" style="font-size: 0.8rem;">
+                        <i class="bi bi-info-circle me-1 text-primary"></i><em>توجيه: {{ cd.circular.notes|truncatechars:85 }}</em>
+                      </div>
+                    {% endif %}
+                  </td>
+
+                  <!-- نوع الوارد -->
+                  <td>
+                    {% if cd.circular.dispatch_type == 'session_minutes' %}
+                      <span class="badge bg-primary px-2.5 py-1.5 fs-7">
+                        <i class="bi bi-journal-text me-1"></i>محضر جلسة كامل
+                      </span>
+                    {% elif cd.circular.dispatch_type == 'single_topic' %}
+                      <span class="badge bg-success px-2.5 py-1.5 fs-7">
+                        <i class="bi bi-file-earmark-check me-1"></i>قرار مجلس الجامعة
+                      </span>
+                    {% elif cd.circular.dispatch_type == 'category_topics' %}
+                      <span class="badge bg-info text-dark px-2.5 py-1.5 fs-7">
+                        <i class="bi bi-folder2-open me-1"></i>قرارات محور رئيسي
+                      </span>
+                    {% else %}
+                      <span class="badge bg-secondary px-2.5 py-1.5 fs-7">
+                        <i class="bi bi-envelope-paper me-1"></i>تعميم إداري رسمي
                       </span>
                     {% endif %}
-                    {% if d.signed_decision.decision_date %}
-                      <small class="text-muted ms-2">بتاريخ {{ d.signed_decision.decision_date|date:"Y-m-d" }}</small>
+                    {% if cd.circular.session %}
+                      <small class="d-block text-muted mt-1">جلسة {{ cd.circular.session.date|date:"Y-m-d" }}</small>
                     {% endif %}
                   </td>
-                  <td>
-                    <span class="fw-bold text-navy">الجلسة رقم {{ d.signed_decision.session.session_number }}</span>
-                    <small class="d-block text-muted">{{ d.signed_decision.session.date|date:"Y-m-d" }}</small>
+
+                  <!-- تاريخ الإرسال -->
+                  <td class="item-sender">
+                    <span class="fw-semibold small d-block">{{ cd.sent_at|date:"Y-m-d" }}</span>
+                    <small class="text-muted d-block">{{ cd.sent_at|date:"H:i" }}</small>
+                    <small class="text-muted d-block mt-0.5">بواسطة: {{ cd.sent_by.full_name|default:"الأمانة العامة" }}</small>
                   </td>
-                  <td>
-                    <span class="small">{{ d.sent_at|date:"Y-m-d" }}</span>
-                    <small class="d-block text-muted">{{ d.sent_at|date:"H:i" }}</small>
-                    <small class="text-muted d-block">بواسطة: {{ d.sent_by.full_name|default:"الأمانة العامة" }}</small>
-                  </td>
-                  <td>
-                    {% if d.is_viewed %}
-                      <span class="badge bg-success-subtle text-success border border-success px-2 py-1 mb-1">
-                        تم الاطلاع
+
+                  <!-- حالة الاطلاع -->
+                  <td id="receipt-container-{{ cd.pk }}">
+                    {% if cd.is_viewed %}
+                      <span class="badge bg-success-subtle text-success border border-success px-2.5 py-1 mb-1">
+                        <i class="bi bi-check2-circle me-1"></i>تم الاطلاع
                       </span>
-                      <small class="d-block text-muted">{{ d.viewed_at|date:"Y-m-d H:i" }}</small>
-                      <small class="d-block text-muted">المطّلع: {{ d.viewed_by.full_name }}</small>
-                      {% if d.view_count > 1 %}
-                        <span class="badge bg-secondary-subtle text-secondary small">مشاهدات: {{ d.view_count }}</span>
+                      <small class="d-block text-muted">{{ cd.viewed_at|date:"Y-m-d H:i" }}</small>
+                      <small class="d-block text-muted">المطّلع: {{ cd.viewed_by.full_name|default:user.full_name }}</small>
+                      {% if cd.view_count > 1 %}
+                        <span class="badge bg-secondary-subtle text-secondary small mt-0.5">مشاهدات: {{ cd.view_count }}</span>
                       {% endif %}
                     {% else %}
-                      <span class="badge bg-warning text-dark px-2 py-1 pulse-warning">
-                        جديد • لم يُطّلع عليه
+                      <span class="badge bg-warning text-dark px-2.5 py-1.5 pulse-warning shadow-2xs fw-bold status-pill">
+                        <i class="bi bi-bell-fill me-1"></i>جديد • لم يُطّلع عليه
                       </span>
                     {% endif %}
                   </td>
+
+                  <!-- المستند المعتمد والإجراء -->
                   <td>
-                    <div class="d-flex justify-content-center gap-1">
-                      <a href="{% url 'council:view_signed_decision_file' d.pk %}" target="_blank" class="btn btn-sm btn-primary fw-bold px-3">
-                        معاينة / تنزيل القرار الموقّع
+                    <div class="d-flex flex-column align-items-center gap-1">
+                      <a href="{% url 'council:view_circular_file' cd.pk %}" 
+                         target="_blank" 
+                         class="btn btn-sm btn-primary fw-bold px-3 shadow-2xs w-100"
+                         onclick="recordInstantReceipt('{{ cd.pk }}', '{% url 'council:view_circular_file' cd.pk %}')">
+                        <i class="bi bi-file-earmark-pdf-fill me-1"></i>معاينة / تنزيل (PDF)
                       </a>
-                      <a href="{% url 'council:topic_detail' d.signed_decision.topic.pk %}" class="btn btn-sm btn-outline-secondary">
-                        تفاصيل
-                      </a>
+                      
+                      {% if cd.circular.topic %}
+                        <a href="{% url 'council:topic_detail' cd.circular.topic.pk %}" class="btn btn-xs btn-outline-secondary w-100 mt-1" style="font-size: 0.78rem;">
+                          <i class="bi bi-eye me-1"></i>تفاصيل الموضوع
+                        </a>
+                      {% endif %}
                     </div>
                   </td>
                 </tr>
@@ -158,14 +268,188 @@
           </table>
         </div>
       {% else %}
-        <div class="text-center py-5">
-          <div class="text-muted fs-1 mb-3">📭</div>
-          <h5 class="text-muted fw-bold">لا توجد قرارات رسمية مرسلة لهذه الكلية حالياً</h5>
-          <p class="text-muted small">عند اعتماد وتوقيع أي قرارات تخص {{ seat.name }} وتوزيعها من قِبل الأمانة العامة، ستظهر هنا فوراً.</p>
+        <div class="text-center py-5 text-muted">
+          <div class="fs-1 mb-2">📜</div>
+          <h6 class="fw-bold">لا توجد وثائق أو مراسلات رسمية واردة حتى الآن</h6>
+          <p class="small">التعميمات الصادرة من الأمانة العامة أو المحاضر المعممة ستظهر هنا فور إرسالها.</p>
         </div>
       {% endif %}
     </div>
   </div>
 
 </div>
+
+<!-- =========================================================================
+     4. سكريبت الفلترة الفورية والتحديث اللحظي لحالة الاستلام
+     ========================================================================= -->
+<script>
+let currentFilter = 'all';
+
+function applyCorrespondenceFilter(filterType, btnElement) {
+  currentFilter = filterType;
+  
+  // Highlight active button
+  const buttons = document.querySelectorAll('#filter-chips-group button');
+  buttons.forEach(btn => btn.classList.remove('active'));
+  if (btnElement) {
+    btnElement.classList.add('active');
+  }
+  
+  filterCorrespondenceTable();
+}
+
+function filterCorrespondenceTable() {
+  const query = (document.getElementById('table-search-input')?.value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('#correspondence-main-table tbody tr.correspondence-row');
+
+  rows.forEach(row => {
+    const type = row.getAttribute('data-type');
+    const isViewed = row.getAttribute('data-viewed') === '1';
+    
+    // Check type match
+    let matchesType = false;
+    if (currentFilter === 'all') {
+      matchesType = true;
+    } else if (currentFilter === 'unviewed') {
+      matchesType = !isViewed;
+    } else if (currentFilter === 'minutes') {
+      matchesType = (type === 'session_minutes');
+    } else if (currentFilter === 'single_topic') {
+      matchesType = (type === 'single_topic');
+    } else if (currentFilter === 'category') {
+      matchesType = (type === 'category_topics');
+    } else if (currentFilter === 'free') {
+      matchesType = (type === 'free_document');
+    }
+
+    // Check search query match
+    let matchesQuery = true;
+    if (query) {
+      const text = row.innerText.toLowerCase();
+      matchesQuery = text.includes(query);
+    }
+
+    if (matchesType && matchesQuery) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+
+function recordInstantReceipt(dispatchPk, url) {
+  // Call AJAX endpoint in background to update receipt timestamp
+  fetch(url + '?ajax=1', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.ok) {
+      const row = document.getElementById('dispatch-row-' + dispatchPk);
+      if (row && row.getAttribute('data-viewed') === '0') {
+        row.setAttribute('data-viewed', '1');
+        row.classList.remove('table-warning', 'bg-opacity-25', 'unviewed-row');
+        row.classList.add('viewed-row');
+
+        const container = document.getElementById('receipt-container-' + dispatchPk);
+        if (container) {
+          container.innerHTML = `
+            <span class="badge bg-success-subtle text-success border border-success px-2.5 py-1 mb-1">
+              <i class="bi bi-check2-circle me-1"></i>تم الاطلاع
+            </span>
+            <small class="d-block text-muted">${data.viewed_at || 'الآن'}</small>
+            <small class="d-block text-muted">المطّلع: ${data.viewed_by || ''}</small>
+          `;
+        }
+
+        // Decrement unviewed counts on KPIs
+        updateKpiCounters();
+      }
+    }
+  })
+  .catch(err => {
+    console.log('Receipt logged on file download:', err);
+  });
+}
+
+function updateKpiCounters() {
+  const unviewedRows = document.querySelectorAll('#correspondence-main-table tbody tr.correspondence-row[data-viewed="0"]');
+  const newCount = unviewedRows.length;
+  
+  const statUnviewed = document.getElementById('stat-unviewed-count');
+  if (statUnviewed) statUnviewed.textContent = newCount;
+  
+  const filterUnviewedNum = document.getElementById('filter-unviewed-num');
+  if (filterUnviewedNum) filterUnviewedNum.textContent = newCount;
+  
+  const badgeUnviewed = document.getElementById('badge-unviewed-num');
+  if (badgeUnviewed) badgeUnviewed.textContent = newCount;
+  
+  const topBadge = document.getElementById('top-unviewed-badge');
+  if (topBadge && newCount === 0) {
+    topBadge.className = 'badge bg-success-subtle text-success border border-success px-2.5 py-1.5 fs-6';
+    topBadge.innerHTML = '<i class="bi bi-check2-all me-1"></i>جميع المراسلات مطّلع عليها';
+  }
+}
+</script>
+
+<style>
+.bg-navy { background-color: #1B365D !important; color: #fff !important; }
+.text-navy { color: #1B365D !important; }
+.btn-outline-navy {
+  color: #1B365D;
+  border-color: #1B365D;
+}
+.btn-outline-navy:hover, .btn-outline-navy.active {
+  background-color: #1B365D;
+  color: #fff;
+}
+.pulse-warning {
+  animation: pulseWarning 2s infinite;
+}
+@keyframes pulseWarning {
+  0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.5); }
+  70% { box-shadow: 0 0 0 7px rgba(255, 193, 7, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+</style>
+
+<!-- =========================================================================
+     مودال تأكيد تصفير كافة الرسائل (لأصحاب الصلاحية فقط)
+     ========================================================================= -->
+{% if request.user.is_super or request.user.can_reset_dispatches %}
+<div class="modal fade" id="resetDispatchesModalCorrespondence" tabindex="-1" aria-labelledby="resetDispatchesModalCorrespondenceLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title fw-bold" id="resetDispatchesModalCorrespondenceLabel">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>تحذير أمني: تصفير جميع المراسلات والقرارات
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <form method="post" action="{% url 'council:reset_all_dispatches' %}">
+        {% csrf_token %}
+        <div class="modal-body p-4 text-end">
+          <div class="alert alert-warning border-0 small mb-3">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            هذا الإجراء سيقوم بمسح وتفريغ <strong>كافة جداول وصناديق الوارد لدى جميع الأعضاء والكليات</strong> وتصفير سجلات الاستلام والاطلاع بالكامل.
+            <br>
+            <strong>ملاحظة هامة:</strong> لن يتم حذف الموضوعات أو الجلسات أو المحاضر الأصلية من النظام.
+          </div>
+          <p class="fw-bold text-navy mb-2">
+            لتأكيد هذا الإجراء الاستثنائي، يرجى كتابة عبارة <span class="badge bg-danger px-2 py-1">تأكيد التصفير</span> في الحقل أدناه:
+          </p>
+          <input type="text" name="confirm_text" class="form-control text-center fw-bold form-control-lg border-danger mb-2" placeholder="تأكيد التصفير" required autocomplete="off">
+          <small class="text-muted d-block">سيتم توثيق هذه العملية الإدارية الحساسة في سجل التدقيق الأمني (Audit Log).</small>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">إلغاء وتراجع</button>
+          <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold">تأكيد التصفير النهائي</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}

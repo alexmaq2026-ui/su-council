@@ -375,9 +375,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def can_send_decisions(self):          return self._has_perm('can_send_decisions')
     @property
+    def can_manage_dispatch_center(self):  return self._has_perm('can_manage_dispatch_center')
+    @property
     def can_view_correspondence(self):     return self._has_perm('can_view_correspondence')
     @property
     def can_view_dispatch_log(self):       return self._has_perm('can_view_dispatch_log')
+    @property
+    def can_export_dispatch_manifest(self): return self._has_perm('can_export_dispatch_manifest')
+    @property
+    def can_reset_dispatches(self):         return self._has_perm('can_reset_dispatches')
 
     # 8. Users, Delegation & Account
     @property
@@ -518,8 +524,9 @@ class CouncilPermission(models.Model):
         'can_vote', 'can_view_vote_details',
         # 7. Decisions & Correspondence
         'can_draft_decision', 'can_delete_decision',
-        'can_upload_signed_decision', 'can_send_decisions',
+        'can_upload_signed_decision', 'can_send_decisions', 'can_manage_dispatch_center',
         'can_view_correspondence', 'can_view_dispatch_log',
+        'can_export_dispatch_manifest', 'can_reset_dispatches',
         # 8. Users & Delegation
         'can_manage_users', 'can_delete_user', 'can_reset_user_password',
         'can_import_members', 'can_grant_permissions',
@@ -537,6 +544,8 @@ class CouncilPermission(models.Model):
         # 10. Search, Notifications, Smart Reader & Audit
         'can_search_minutes', 'can_search_person',
         'can_view_notifications', 'can_view_notification_log',
+        'can_toggle_sms', 'can_toggle_inapp',
+        'can_clear_notification_log', 'can_manual_backup_notifications',
         'can_manage_sms_template', 'can_use_smart_reader',
         'can_manage_smart_reader', 'can_view_audit_log',
         'can_toggle_audit_backup', 'can_clear_audit_log',
@@ -610,8 +619,18 @@ class CouncilPermission(models.Model):
     can_delete_decision         = models.BooleanField('حذف أو تعديل القرارات المعتمدة', default=False)
     can_upload_signed_decision  = models.BooleanField('رفع مستند القرار الموقّع رسمياً', default=False)
     can_send_decisions          = models.BooleanField('إرسال القرارات الموقَّعة إلى الجهات', default=False)
+    can_manage_dispatch_center  = models.BooleanField('إدارة مركز تعميم القرارات والمراسلات الرسمية', default=False,
+                                                     help_text='الوصول للمركز الرئيسي لتعميم المحاضر والقرارات والوثائق الملحقة الحرة على الكليات')
     can_view_correspondence     = models.BooleanField('عرض شاشة مراسلات الكلية وتحميل القرارات الواردة', default=False)
     can_view_dispatch_log       = models.BooleanField('عرض ومتابعة سجل إرسال واستلام القرارات', default=False)
+    can_export_dispatch_manifest = models.BooleanField(
+        'تصدير كشف وفهرس المراسلات (Excel)', default=False,
+        help_text='تصدير كشف شامل بعناوين وتواريخ وبيانات استلام كافة المراسلات لجميع الكليات بصيغة Excel'
+    )
+    can_reset_dispatches         = models.BooleanField(
+        'تصفير وتطهير سجلات مراسلات الكليات', default=False,
+        help_text='صلاحية حساسة لتصفير وإفراغ جميع المراسلات وصناديق الوارد لدى كافة الكليات والأعضاء'
+    )
 
     # 8. Users, Delegation & Account Operations
     can_manage_users          = models.BooleanField('إضافة وتعديل بيانات المستخدمين', default=False)

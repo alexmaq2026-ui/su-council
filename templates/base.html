@@ -94,7 +94,7 @@
         <li class="nav-item">
           <a class="nav-link {% if request.path == '/dashboard/' or request.path == '/' %}active{% endif %}"
              href="/dashboard/">
-            <i class="bi bi-house-door me-1"></i>الرئيسية
+            الرئيسية
           </a>
         </li>
         {% endif %}
@@ -102,7 +102,7 @@
         <li class="nav-item">
           <a class="nav-link {% if '/sessions' in request.path and not is_on_live_page %}active{% endif %}"
              href="/sessions/">
-            <i class="bi bi-calendar3 me-1"></i>الجلسات
+            الجلسات
           </a>
         </li>
         {% endif %}
@@ -110,7 +110,7 @@
         <li class="nav-item">
           <a class="nav-link {% if '/search' in request.path %}active{% endif %}"
              href="/search/">
-            <i class="bi bi-search me-1"></i>البحث الشامل
+            البحث الشامل
           </a>
         </li>
         {% endif %}
@@ -118,7 +118,15 @@
         <li class="nav-item">
           <a class="nav-link {% if '/users' in request.path %}active{% endif %}"
              href="/users/">
-            <i class="bi bi-people me-1"></i>المستخدمون
+            المستخدمون
+          </a>
+        </li>
+        {% endif %}
+        {% if user.is_super or user.can_manage_dispatch_center %}
+        <li class="nav-item">
+          <a class="nav-link {% if '/dispatch-center' in request.path %}active{% endif %}"
+             href="{% url 'council:dispatch_center' %}">
+            مركز التعميمات والمراسلات
           </a>
         </li>
         {% endif %}
@@ -126,7 +134,7 @@
         <li class="nav-item">
           <a class="nav-link {% if '/correspondence' in request.path %}active{% endif %}"
              href="{% url 'council:entity_correspondence' %}">
-            <i class="bi bi-inbox-fill me-1"></i>مراسلات الكليات
+            مراسلات الكليات
           </a>
         </li>
         {% endif %}
@@ -134,27 +142,27 @@
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle {% if '/dispatches/log' in request.path or '/notifications/log' in request.path or '/audit-log' in request.path %}active{% endif %}"
              href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-journal-text me-1"></i>السجلات والمتابعة
+            السجلات والمتابعة
           </a>
           <ul class="dropdown-menu dropdown-menu-end uc-dropdown shadow">
             {% if user.is_super or user.can_view_dispatch_log %}
             <li>
               <a class="dropdown-item {% if '/dispatches/log' in request.path %}active{% endif %}" href="{% url 'council:dispatch_log' %}">
-                <i class="bi bi-send-check me-2 text-primary"></i>سجل التعميم
+                سجل التعميم
               </a>
             </li>
             {% endif %}
             {% if user.is_super or user.can_view_notification_log %}
             <li>
               <a class="dropdown-item {% if '/notifications/log' in request.path %}active{% endif %}" href="{% url 'council:notification_log' %}">
-                <i class="bi bi-chat-left-dots me-2 text-warning"></i>سجل التنبيهات
+                سجل التنبيهات
               </a>
             </li>
             {% endif %}
             {% if user.is_super or user.can_view_audit_log %}
             <li>
               <a class="dropdown-item {% if '/audit-log' in request.path %}active{% endif %}" href="{% url 'council:audit_log' %}">
-                <i class="bi bi-shield-check me-2 text-info"></i>سجل الرقابة
+                سجل الرقابة
               </a>
             </li>
             {% endif %}
@@ -192,44 +200,10 @@
       {% endif %}
 
 
-      {% if user.is_super or user.can_view_notifications %}
-      <!-- Phase 5: Notification Bell Dropdown -->
-
-      <div class="dropdown me-2 position-relative">
-        <button class="btn btn-sm btn-outline-light position-relative rounded-pill px-2 py-1"
-                type="button" id="notificationBellBtn" data-bs-toggle="dropdown" aria-expanded="false" title="التنبيهات والإشعارات">
-          <i class="bi bi-bell-fill fs-6 text-gold"></i>
-          <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" style="font-size: 0.65rem;">
-            0
-          </span>
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end shadow-lg rounded-4 p-0 border-0 overflow-hidden" style="width: 320px; max-width: 90vw; z-index: 1050;" id="notifDropdownMenu">
-          <li class="p-3 bg-navy text-white d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 fw-bold fs-6"><i class="bi bi-bell me-1 text-gold"></i>التنبيهات والإشعارات</h6>
-            <button class="btn btn-link text-white text-decoration-none p-0 small" style="font-size: 0.75rem;" onclick="markAllNotifsAsRead(event)">
-              تحديد الكل كمقروء
-            </button>
-          </li>
-          <li id="notifListContainer" style="max-height: 320px; overflow-y: auto;">
-            <div class="text-center py-4 text-muted small">
-              <div class="spinner-border spinner-border-sm text-navy" role="status"></div>
-              <span class="ms-2">جاري التحميل...</span>
-            </div>
-          </li>
-          <li class="p-2 text-center bg-light border-top">
-            <a href="{% url 'council:notification_list' %}" class="small text-navy fw-bold text-decoration-none">
-              استعراض كافة التنبيهات ←
-            </a>
-          </li>
-        </ul>
-      </div>
-      {% endif %}
-
       <!-- User Menu -->
       <div class="dropdown">
-        <button class="btn btn-sm user-menu-btn dropdown-toggle d-flex align-items-center gap-2"
+        <button class="btn btn-sm user-menu-btn dropdown-toggle d-flex align-items-center gap-1.5"
                 type="button" data-bs-toggle="dropdown">
-          <i class="bi bi-person-circle fs-5" style="color: var(--gold-bright);"></i>
           <span class="d-none d-md-inline">{{ user.full_name|truncatechars:20 }}</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end uc-dropdown shadow">
@@ -352,6 +326,11 @@
       {% if user.is_super or user.can_search_minutes or user.can_search_person %}
       <a href="/search/" class="sidebar-link {% if '/search' in request.path %}active{% endif %}">
         <i class="bi bi-search"></i><span>البحث الشامل</span>
+      </a>
+      {% endif %}
+      {% if user.is_super or user.can_manage_dispatch_center %}
+      <a href="{% url 'council:dispatch_center' %}" class="sidebar-link {% if '/dispatch-center' in request.path %}active{% endif %}">
+        <i class="bi bi-send-check-fill text-gold"></i><span>مركز التعميمات والمراسلات</span>
       </a>
       {% endif %}
       {% if user.is_super or user.can_view_correspondence or user.can_send_decisions or user.can_view_dispatch_log %}

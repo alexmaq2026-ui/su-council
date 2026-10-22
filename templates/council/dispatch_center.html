@@ -1,0 +1,616 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}مركز تعميم القرارات والمراسلات الرسمية | نظام مجلس الجامعة{% endblock %}
+
+{% block page_header %}
+<div class="page-header py-3">
+  <div class="page-header-inner d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div>
+      <h1 class="page-title mb-1 text-white fw-bold">
+        مركز تعميم القرارات والمراسلات الرسمية
+      </h1>
+      <p class="page-subtitle text-white-50 mb-0" style="font-size: 0.88rem;">
+        المنصة المركزية لإدارة وتعميم المحاضر، قرارات المحاور والموضوعات، وتوزيع التعميمات والوثائق الحرة على الكليات والمراكز.
+      </p>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+      {% if request.user.is_super or request.user.can_export_dispatch_manifest %}
+        <a href="{% url 'council:export_dispatch_manifest' %}" class="btn btn-success btn-sm px-3 fw-bold shadow-sm d-flex align-items-center gap-1" title="تصدير كشف Excel بعناوين وتواريخ واستلام كافة المراسلات لجميع الأعضاء دون الملفات المرفقة">
+          <i class="bi bi-file-earmark-excel-fill"></i>
+          <span>تصدير عناوين الرسائل (Excel)</span>
+        </a>
+      {% endif %}
+
+      {% if request.user.is_super or request.user.can_reset_dispatches %}
+        <button type="button" class="btn btn-danger btn-sm px-3 fw-bold shadow-sm d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#resetDispatchesModalCenter" title="تصفير وتفريغ جداول رسائل جميع الأعضاء">
+          <i class="bi bi-trash3-fill"></i>
+          <span>تصفير جميع الرسائل</span>
+        </button>
+      {% endif %}
+
+      <a href="{% url 'council:entity_correspondence' %}" class="btn btn-outline-light btn-sm px-3 shadow-sm">
+        صناديق مراسلات الكليات
+      </a>
+      <a href="{% url 'council:dispatch_log' %}" class="btn btn-light btn-sm px-3 fw-semibold shadow-sm">
+        سجل التعميم العام
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-lg-4" dir="rtl">
+
+  <!-- =========================================================================
+       نموذج إعداد وإرسال التعميم الرسمي
+       ========================================================================= -->
+  <div class="uc-card shadow-sm border mb-4 bg-white rounded-3">
+    <div class="uc-card-header bg-navy text-white d-flex justify-content-between align-items-center py-2.5 px-3">
+      <h6 class="mb-0 fw-bold">إعداد وتعميم مراسلة / قرار رسمي جديد</h6>
+      <span class="small opacity-75">إجراءات الأمانة العامة</span>
+    </div>
+
+    <div class="uc-card-body p-4">
+      <form method="post" action="{% url 'council:dispatch_center' %}" enctype="multipart/form-data" id="dispatch-form">
+        {% csrf_token %}
+
+        <!-- اختيار مصدر ونوع التعميم -->
+        <div class="mb-4">
+          <label class="form-label fw-bold text-navy mb-2 fs-6">
+            مصدر ونوع المراسلة أو التعميم:
+          </label>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="dispatch-source-card p-3 rounded-3 border d-flex align-items-start gap-3 cursor-pointer transition-all active" id="source-card-session" style="cursor: pointer;">
+                <input type="radio" name="source_type" value="session_based" class="form-check-input mt-1" checked onchange="switchSourceMode('session_based')">
+                <div>
+                  <div class="fw-bold text-navy fs-6 mb-1">
+                    من مخرجات مجالس وجلسات الجامعة
+                  </div>
+                  <div class="text-muted small">
+                    تعميم محضر جلسة كامل، أو قرارات باب رئيسي، أو قرار موضوع فردي بعينه.
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div class="col-md-6">
+              <label class="dispatch-source-card p-3 rounded-3 border d-flex align-items-start gap-3 cursor-pointer transition-all" id="source-card-free" style="cursor: pointer;">
+                <input type="radio" name="source_type" value="free_document" class="form-check-input mt-1" onchange="switchSourceMode('free_document')">
+                <div>
+                  <div class="fw-bold text-navy fs-6 mb-1">
+                    تعميم حر / وثيقة ملحقة من الجهاز
+                  </div>
+                  <div class="text-muted small">
+                    رفع أي تعميم إداري، توجيه رسمي، أو قرار خارجي ملحق مباشرة من الكمبيوتر وتعميمه فوراً.
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================================
+             القسم الأول: التدرج الهرمي لمخرجات الجلسات
+             =================================================================== -->
+        <div id="session-based-section" class="p-3.5 rounded-3 bg-light border mb-4">
+          <div class="fw-bold text-navy mb-3 pb-1 border-bottom">
+            بيانات الجلسة والتدرج الهرمي للموضوعات:
+          </div>
+
+          <div class="row g-3 mb-3">
+            <!-- 1. اختيار الجلسة -->
+            <div class="col-12 col-md-6">
+              <label class="form-label small fw-bold text-navy mb-1">
+                1. اختيار المجلس / الجلسة:
+              </label>
+              <select name="session_id" id="session-select" class="form-select form-select-sm bg-white" onchange="loadSessionData(this.value)">
+                <option value="">-- اختر الجلسة من القائمة --</option>
+                {% for s in sessions %}
+                  <option value="{{ s.pk }}" data-status="{{ s.status }}">
+                    الجلسة رقم ({{ s.session_number }}) — {{ s.date|date:"Y-m-d" }} — {{ s.title|truncatechars:45 }} ({{ s.get_status_display }})
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- 2. تحديد نطاق التعميم -->
+            <div class="col-12 col-md-6">
+              <label class="form-label small fw-bold text-navy mb-1">
+                2. نطاق ومستوى التعميم:
+              </label>
+              <select name="dispatch_mode" id="dispatch-mode-select" class="form-select form-select-sm bg-white fw-semibold" onchange="handleDispatchModeChange(this.value)">
+                <option value="session_minutes">تعميم المحضر كاملاً (Full Minutes)</option>
+                <option value="category_topics">تعميم قرارات باب / محور رئيسي (Category)</option>
+                <option value="single_topic" selected>تعميم قرار موضوع فردي بعينه (Single Topic)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- تفريعات الأبواب والمواضيع -->
+          <div class="row g-3" id="hierarchy-sub-selectors">
+            <!-- اختيار الباب الرئيسي -->
+            <div class="col-12 col-md-6" id="category-selector-wrapper">
+              <label class="form-label small fw-bold text-navy mb-1">
+                3. الباب / المحور الرئيسي:
+              </label>
+              <select name="category" id="category-select" class="form-select form-select-sm bg-white" onchange="filterTopicsByCategory(this.value)">
+                <option value="">-- اختر الباب الرئيسي --</option>
+              </select>
+            </div>
+
+            <!-- اختيار الموضوع الفرعي -->
+            <div class="col-12 col-md-6" id="topic-selector-wrapper">
+              <label class="form-label small fw-bold text-navy mb-1">
+                4. الموضوع الفرعي / القرار:
+              </label>
+              <select name="topic_id" id="topic-select" class="form-select form-select-sm bg-white" onchange="handleTopicSelect(this)">
+                <option value="">-- اختر الموضوع من القائمة --</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- بطاقة معاينة الموضوع المختار -->
+          <div class="mt-3 p-3 bg-white rounded-3 border" id="topic-preview-card" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="badge bg-secondary px-2.5 py-1" id="preview-category-badge"></span>
+              <span class="badge" id="preview-signed-badge"></span>
+            </div>
+            <div class="fw-bold text-navy fs-6 mb-1" id="preview-title"></div>
+            <div class="text-muted small" id="preview-decision"></div>
+          </div>
+        </div>
+
+        <!-- ===================================================================
+             القسم الثاني: تفاصيل المراسلة والملف الملحق
+             =================================================================== -->
+        <div class="p-3.5 rounded-3 bg-light border mb-4">
+          <div class="fw-bold text-navy mb-3 pb-1 border-bottom">
+            بيانات المستند والملف الملحق:
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-12 col-md-6">
+              <label class="form-label small fw-bold text-navy mb-1">
+                عنوان المراسلة أو التعميم:
+              </label>
+              <input type="text" name="title" id="circular-title-input" class="form-control form-control-sm bg-white" placeholder="اكتب عنوان التعميم أو اتركه فارغاً للإنشاء التلقائي...">
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-3">
+              <label class="form-label small fw-bold text-navy mb-1">رقم القرار / التعميم الإداري:</label>
+              <input type="text" name="circular_number" id="circular-number-input" class="form-control form-control-sm bg-white" placeholder="مثال: ق/2026/18 أو ت/14">
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-3">
+              <label class="form-label small fw-bold text-navy mb-1">تاريخ التعميم أو التوقيع:</label>
+              <input type="date" name="circular_date" id="circular-date-input" class="form-control form-control-sm bg-white">
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <!-- رفع الملف من الكمبيوتر -->
+            <div class="col-12 col-md-6">
+              <label class="form-label small fw-bold text-navy mb-1 d-flex justify-content-between">
+                <span>ملف التعميم أو الوثيقة الملحقة (PDF أو صورة):</span>
+                <span class="text-muted fw-normal" id="file-optional-note"></span>
+              </label>
+              <input type="file" name="attachment_file" id="attachment-file-input" class="form-control form-control-sm bg-white">
+              <div class="form-text small" id="existing-file-alert" style="display: none;"></div>
+            </div>
+
+            <!-- ملاحظات وتوجيهات الأمانة العامة -->
+            <div class="col-12 col-md-6">
+              <label class="form-label small fw-bold text-navy mb-1">
+                توجيهات أو ملاحظات الأمانة العامة المرفقة (اختياري):
+              </label>
+              <input type="text" name="notes" class="form-control form-control-sm bg-white" placeholder="مثال: للتنفيذ والعمل بموجبه وإفادة الأمانة العامة...">
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================================
+             القسم الثالث: الكليات والجهات المستلمة
+             =================================================================== -->
+        <div class="p-3.5 rounded-3 bg-light border mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-1 border-bottom">
+            <div class="fw-bold text-navy">
+              تحديد الكليات والجهات المستلمة للتعميم:
+            </div>
+
+            <!-- أزرار الاختيار السريع (بدون أيقونات) -->
+            <div class="d-flex flex-wrap gap-1.5 align-items-center">
+              <span class="badge bg-secondary px-3 py-1.5" id="selected-seats-counter">0 جهة محددة</span>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-3" onclick="selectSeatsMode('all')">
+                تحديد الكل
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-3" onclick="selectSeatsMode('none')">
+                إلغاء التحديد
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-3" onclick="selectSeatsMode('faculties')">
+                الكليات فقط
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-3" onclick="selectSeatsMode('rectorate')">
+                الرئاسة والنيابات
+              </button>
+            </div>
+          </div>
+
+          <!-- شبكة بطاقات الكليات ومربعات الاختيار -->
+          <div class="p-3 bg-white rounded-3 border" style="max-height: 280px; overflow-y: auto;">
+            <div class="row g-2">
+              {% for s in seats %}
+                <div class="col-12 col-sm-6 col-md-4 col-xl-3">
+                  <label class="p-2 rounded border bg-light bg-opacity-50 d-flex align-items-center gap-2 cursor-pointer h-100 hover-shadow transition-all seat-checkbox-label" for="seat_check_{{ s.pk }}" style="cursor: pointer;">
+                    <input class="form-check-input target-seat-check mt-0" type="checkbox" name="target_seats" value="{{ s.pk }}" id="seat_check_{{ s.pk }}" data-name="{{ s.name }}" onchange="updateSelectedCount()">
+                    <span class="small fw-semibold text-dark text-truncate" title="{{ s.name }}">
+                      {{ s.name }}
+                    </span>
+                  </label>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- زر الإرسال والتعميم الرسمي (بدون أيقونات) -->
+        <div class="d-flex justify-content-between align-items-center pt-2">
+          <div class="text-muted small">
+            يصل التعميم فوراً إلى صناديق مراسلات ممثلي الكليات المحددة داخل النظام.
+          </div>
+          <button type="submit" class="btn btn-navy px-5 py-2.5 fw-bold fs-6 shadow-sm" id="submit-dispatch-btn">
+            اعتماد وتعميم المراسلة الآن
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       سجل التعميمات والمراسلات الأخيرة
+       ========================================================================= -->
+  <div class="uc-card shadow-sm border mb-4 bg-white rounded-3">
+    <div class="uc-card-header bg-white border-bottom py-2.5 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <h6 class="mb-0 fw-bold text-navy">سجل التعميمات والمراسلات الصادرة</h6>
+      <span class="small text-muted">إجمالي التعميمات: {{ recent_circulars.count }}</span>
+    </div>
+
+    <div class="uc-card-body p-0">
+      {% if recent_circulars %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0 text-center">
+            <thead class="table-light text-muted small">
+              <tr>
+                <th style="width: 4%;">#</th>
+                <th class="text-end" style="width: 28%;">عنوان التعميم / المراسلة</th>
+                <th style="width: 14%;">نوع التعميم</th>
+                <th style="width: 14%;">تاريخ الإرسال</th>
+                <th style="width: 18%;">ملخص الوصول والاطلاع</th>
+                <th style="width: 22%;">المستند والإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in recent_circulars %}
+                {% with s=c.get_summary %}
+                <tr>
+                  <td class="text-muted">{{ forloop.counter }}</td>
+                  <td class="text-end">
+                    <div class="fw-bold text-navy fs-6">{{ c.title }}</div>
+                    {% if c.circular_number %}
+                      <span class="badge bg-light text-dark border mt-1">رقم: {{ c.circular_number }}</span>
+                    {% endif %}
+                    {% if c.circular_date %}
+                      <small class="text-muted ms-2">بتاريخ {{ c.circular_date|date:"Y-m-d" }}</small>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge rounded-pill px-2.5 py-1
+                      {% if c.dispatch_type == 'session_minutes' %}bg-primary
+                      {% elif c.dispatch_type == 'category_topics' %}bg-info text-dark
+                      {% elif c.dispatch_type == 'single_topic' %}bg-success
+                      {% else %}bg-secondary{% endif %}">
+                      {{ c.get_dispatch_type_display }}
+                    </span>
+                    {% if c.session %}
+                      <small class="d-block text-muted mt-1">جلسة ({{ c.session.session_number }})</small>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="small">{{ c.created_at|date:"Y-m-d" }}</span>
+                    <small class="d-block text-muted">{{ c.created_at|date:"H:i" }}</small>
+                    <small class="d-block text-muted">بواسطة: {{ c.created_by.full_name|default:"الأمانة العامة" }}</small>
+                  </td>
+                  <td>
+                    <div class="d-flex flex-column align-items-center">
+                      <div class="d-flex align-items-center gap-1.5 mb-1">
+                        <span class="badge bg-success-subtle text-success border border-success">{{ s.viewed }} تم الاطلاع</span>
+                        <span class="badge bg-warning-subtle text-warning border border-warning">{{ s.pending }} قيد الانتظار</span>
+                      </div>
+                      <div class="progress w-100" style="height: 5px;">
+                        <div class="progress-bar bg-success" style="width: {% if s.total %}{% widthratio s.viewed s.total 100 %}{% else %}0{% endif %}%;"></div>
+                      </div>
+                      <small class="text-muted mt-1" style="font-size: 0.75rem;">من إجمالي {{ s.total }} جهة</small>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="d-flex justify-content-center gap-1.5 flex-wrap">
+                      {% if c.attachment_file %}
+                        <a href="{{ c.attachment_file.url }}" target="_blank" class="btn btn-sm btn-outline-primary px-3">
+                          معاينة الملف
+                        </a>
+                      {% endif %}
+                      <button type="button" class="btn btn-sm btn-outline-secondary px-2.5" data-bs-toggle="collapse" data-bs-target="#circular-details-{{ c.pk }}">
+                        الجهات المستلمة
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr class="collapse bg-light" id="circular-details-{{ c.pk }}">
+                  <td colspan="6" class="p-3 text-end">
+                    <div class="fw-bold text-navy small mb-2">حالة وصول هذا التعميم للجهات المحددة:</div>
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for disp in c.dispatches.all %}
+                        <span class="badge p-2 border {% if disp.is_viewed %}bg-white text-success border-success{% else %}bg-white text-muted border-secondary{% endif %}">
+                          {% if disp.is_viewed %}
+                            {{ disp.seat.name }} (اطّلع: {{ disp.viewed_at|date:"Y-m-d H:i" }})
+                          {% else %}
+                            {{ disp.seat.name }} (قيد الاطلاع)
+                          {% endif %}
+                        </span>
+                      {% endfor %}
+                    </div>
+                  </td>
+                </tr>
+                {% endwith %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center py-4 text-muted">
+          <h6 class="fw-bold mb-1">لم يتم تسجيل أي تعميمات سابقة بعد</h6>
+          <p class="small mb-0">استخدم النموذج بالأعلى للبدء في تعميم المحاضر والقرارات الرسمية على الكليات.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- =========================================================================
+     JavaScript logic
+     ========================================================================= -->
+<script>
+let currentSessionData = null;
+
+function switchSourceMode(mode) {
+  const isSession = mode === 'session_based';
+  document.getElementById('session-based-section').style.display = isSession ? 'block' : 'none';
+  document.getElementById('source-card-session').classList.toggle('active', isSession);
+  document.getElementById('source-card-free').classList.toggle('active', !isSession);
+
+  const modeSelect = document.getElementById('dispatch-mode-select');
+  if (!isSession) {
+    modeSelect.value = 'free_document';
+    document.getElementById('file-optional-note').innerText = '(مطلوب)';
+    document.getElementById('circular-title-input').placeholder = 'اكتب عنوان التعميم أو الوثيقة الرسمية...';
+  } else {
+    modeSelect.value = 'single_topic';
+    handleDispatchModeChange('single_topic');
+  }
+}
+
+function handleDispatchModeChange(mode) {
+  const catWrapper = document.getElementById('category-selector-wrapper');
+  const topicWrapper = document.getElementById('topic-selector-wrapper');
+  const previewCard = document.getElementById('topic-preview-card');
+
+  if (mode === 'session_minutes') {
+    catWrapper.style.display = 'none';
+    topicWrapper.style.display = 'none';
+    previewCard.style.display = 'none';
+    document.getElementById('file-optional-note').innerText = '(اختياري في حال وجود محضر مؤرشف)';
+  } else if (mode === 'category_topics') {
+    catWrapper.style.display = 'block';
+    topicWrapper.style.display = 'none';
+    previewCard.style.display = 'none';
+    document.getElementById('file-optional-note').innerText = '(ملف القرارات المجمّعة)';
+  } else if (mode === 'single_topic') {
+    catWrapper.style.display = 'block';
+    topicWrapper.style.display = 'block';
+    document.getElementById('file-optional-note').innerText = '(يُعتمد الملف الموقّع السابق إن وُجد)';
+  }
+}
+
+function loadSessionData(sessionId) {
+  if (!sessionId) {
+    currentSessionData = null;
+    document.getElementById('category-select').innerHTML = '<option value="">-- اختر الباب الرئيسي --</option>';
+    document.getElementById('topic-select').innerHTML = '<option value="">-- اختر الموضوع من القائمة --</option>';
+    document.getElementById('topic-preview-card').style.display = 'none';
+    return;
+  }
+
+  fetch('/api/dispatch-center/session-data/' + sessionId + '/')
+    .then(res => res.json())
+    .then(data => {
+      if (!data.ok) return;
+      currentSessionData = data;
+
+      const catSelect = document.getElementById('category-select');
+      catSelect.innerHTML = '<option value="">-- اختر الباب الرئيسي --</option>';
+
+      data.categories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat.key;
+        opt.innerText = cat.label + ' (' + cat.topics.length + ' موضوع)';
+        catSelect.appendChild(opt);
+      });
+
+      // Clear topics
+      document.getElementById('topic-select').innerHTML = '<option value="">-- اختر الموضوع من القائمة --</option>';
+      document.getElementById('topic-preview-card').style.display = 'none';
+
+      // Pre-fill session title
+      document.getElementById('circular-title-input').value = 'تعميم مخرجات الجلسة رقم (' + data.session.number + ') — ' + data.session.title;
+      document.getElementById('circular-date-input').value = data.session.date || '';
+    })
+    .catch(err => console.error('Error fetching session data:', err));
+}
+
+function filterTopicsByCategory(catKey) {
+  const topicSelect = document.getElementById('topic-select');
+  topicSelect.innerHTML = '<option value="">-- اختر الموضوع من القائمة --</option>';
+  document.getElementById('topic-preview-card').style.display = 'none';
+
+  if (!currentSessionData || !catKey) return;
+
+  const categoryObj = currentSessionData.categories.find(c => c.key === catKey);
+  if (!categoryObj) return;
+
+  categoryObj.topics.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.innerText = t.ordinal_label + ' — ' + t.title.substring(0, 50);
+    opt.dataset.topicJson = JSON.stringify(t);
+    topicSelect.appendChild(opt);
+  });
+}
+
+function handleTopicSelect(selectElem) {
+  const previewCard = document.getElementById('topic-preview-card');
+  const selectedOption = selectElem.options[selectElem.selectedIndex];
+
+  if (!selectedOption || !selectedOption.dataset.topicJson) {
+    previewCard.style.display = 'none';
+    return;
+  }
+
+  const topic = JSON.parse(selectedOption.dataset.topicJson);
+  previewCard.style.display = 'block';
+
+  document.getElementById('preview-category-badge').innerText = topic.ordinal_label + ' · ' + topic.status_label;
+  document.getElementById('preview-title').innerText = topic.title;
+  document.getElementById('preview-decision').innerText = topic.decision_text ? 'نص القرار: ' + topic.decision_text : 'لم تتم صياغة نص القرار بعد.';
+
+  const signedBadge = document.getElementById('preview-signed-badge');
+  const alertExisting = document.getElementById('existing-file-alert');
+
+  if (topic.has_signed_file) {
+    signedBadge.className = 'badge bg-success';
+    signedBadge.innerText = 'يوجد قرار موقّع مرفوع';
+    alertExisting.style.display = 'block';
+    alertExisting.className = 'form-text text-success fw-semibold';
+    alertExisting.innerHTML = 'يوجد مستند قرار موقع سابقاً (رقم: ' + (topic.decision_number || 'غير مرقم') + ') — <a href="' + topic.signed_file_url + '" target="_blank" class="text-decoration-underline">معاينة الملف</a> (سيُستخدم تلقائياً إن لم ترفع ملفاً جديداً).';
+  } else {
+    signedBadge.className = 'badge bg-warning text-dark';
+    signedBadge.innerText = 'بانتظار رفع الملف الموقّع';
+    alertExisting.style.display = 'none';
+  }
+
+  if (topic.decision_number) {
+    document.getElementById('circular-number-input').value = topic.decision_number;
+  }
+  if (topic.decision_date) {
+    document.getElementById('circular-date-input').value = topic.decision_date;
+  }
+  document.getElementById('circular-title-input').value = 'قرار موضوع: ' + topic.title;
+
+  // Pre-check target seats if specified on topic
+  if (topic.target_seat_ids && topic.target_seat_ids.length > 0) {
+    document.querySelectorAll('.target-seat-check').forEach(chk => {
+      chk.checked = topic.target_seat_ids.includes(parseInt(chk.value));
+    });
+    updateSelectedCount();
+  }
+}
+
+function selectSeatsMode(mode) {
+  const checkboxes = document.querySelectorAll('.target-seat-check');
+  checkboxes.forEach(chk => {
+    const label = chk.dataset.name || '';
+    if (mode === 'all') {
+      chk.checked = true;
+    } else if (mode === 'none') {
+      chk.checked = false;
+    } else if (mode === 'faculties') {
+      chk.checked = label.includes('كلية') || label.includes('الكلية');
+    } else if (mode === 'rectorate') {
+      chk.checked = label.includes('رئاسة') || label.includes('نيابة') || label.includes('مساعد') || label.includes('أمانة') || label.includes('مستشار');
+    }
+  });
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const checked = document.querySelectorAll('.target-seat-check:checked').length;
+  document.getElementById('selected-seats-counter').innerText = checked + ' جهة محددة';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  updateSelectedCount();
+});
+</script>
+
+<style>
+.cursor-pointer { cursor: pointer; }
+.dispatch-source-card {
+  background-color: #f8fafc;
+  border-color: #e2e8f0 !important;
+}
+.dispatch-source-card:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1 !important;
+}
+.dispatch-source-card.active {
+  background-color: #ffffff !important;
+  border-color: #0b1a30 !important;
+  box-shadow: 0 2px 8px rgba(11, 26, 48, 0.06);
+}
+.seat-checkbox-label:hover {
+  background-color: #e2e8f0 !important;
+}
+</style>
+<!-- =========================================================================
+     مودال تأكيد تصفير كافة الرسائل (لأصحاب الصلاحية فقط)
+     ========================================================================= -->
+{% if request.user.is_super or request.user.can_reset_dispatches %}
+<div class="modal fade" id="resetDispatchesModalCenter" tabindex="-1" aria-labelledby="resetDispatchesModalCenterLabel" aria-hidden="true" dir="rtl">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title fw-bold" id="resetDispatchesModalCenterLabel">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>تحذير أمني: تصفير جميع المراسلات والقرارات
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <form method="post" action="{% url 'council:reset_all_dispatches' %}">
+        {% csrf_token %}
+        <div class="modal-body p-4 text-end">
+          <div class="alert alert-warning border-0 small mb-3">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            هذا الإجراء سيقوم بمسح وتفريغ <strong>كافة جداول وصناديق الوارد لدى جميع الأعضاء والكليات</strong> وتصفير سجلات الاستلام والاطلاع بالكامل.
+            <br>
+            <strong>ملاحظة هامة:</strong> لن يتم حذف الموضوعات أو الجلسات أو المحاضر الأصلية من النظام.
+          </div>
+          <p class="fw-bold text-navy mb-2">
+            لتأكيد هذا الإجراء الاستثنائي، يرجى كتابة عبارة <span class="badge bg-danger px-2 py-1">تأكيد التصفير</span> في الحقل أدناه:
+          </p>
+          <input type="text" name="confirm_text" class="form-control text-center fw-bold form-control-lg border-danger mb-2" placeholder="تأكيد التصفير" required autocomplete="off">
+          <small class="text-muted d-block">سيتم توثيق هذه العملية الإدارية الحساسة في سجل التدقيق الأمني (Audit Log).</small>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">إلغاء وتراجع</button>
+          <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold">تأكيد التصفير النهائي</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

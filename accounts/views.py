@@ -695,6 +695,7 @@ def user_permissions_view(request, pk):
         )
         return redirect('accounts:user_list')
 
+    granted_fields = [f for f in CouncilPermission.ALL_PERMISSION_FIELDS if getattr(permission_obj, f, False)]
     context = {
         'title': f'لوحة الصلاحيات الذكية: {target_user.full_name}',
         'form': form,
@@ -702,6 +703,9 @@ def user_permissions_view(request, pk):
         'permission_obj': permission_obj,
         'is_new': created,
         'permission_groups': PermissionForm.PERMISSION_GROUPS,
+        'granted_fields': set(granted_fields),
+        'granted_fields_count': len(granted_fields),
+        'total_permissions_count': len(CouncilPermission.ALL_PERMISSION_FIELDS),
     }
     return render(request, 'accounts/user_permissions.html', context)
 

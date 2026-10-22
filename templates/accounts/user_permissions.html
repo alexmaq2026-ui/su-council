@@ -53,7 +53,7 @@
         <div class="p-3 bg-light rounded-3 border d-flex align-items-center justify-content-between">
           <div>
             <div class="small text-muted fw-bold">إجمالي الصلاحيات الممنوحة:</div>
-            <div class="fs-4 fw-bold text-navy" id="live-granted-count">0 / 60</div>
+            <div class="fs-4 fw-bold text-navy" id="live-granted-count" dir="ltr" style="display: inline-block;">{{ granted_fields_count }} / {{ total_permissions_count }}</div>
           </div>
           <div id="granted-status-badge">
             <span class="badge bg-secondary p-2">لا توجد صلاحيات</span>
@@ -132,7 +132,7 @@
                         {{ field_help }}
                       </div>
                     </div>
-                    <input class="form-check-input perm-checkbox group-{{ group.id }} ms-0" type="checkbox" name="{{ field_name }}" id="id_{{ field_name }}" style="cursor: pointer; width: 2.4em; height: 1.25em; flex-shrink: 0;">
+                    <input class="form-check-input perm-checkbox group-{{ group.id }} ms-0" type="checkbox" name="{{ field_name }}" id="id_{{ field_name }}" {% if field_name in granted_fields %}checked{% endif %} style="cursor: pointer; width: 2.4em; height: 1.25em; flex-shrink: 0;">
                   </div>
                 </div>
               {% endfor %}
@@ -178,88 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusBadge = document.getElementById('granted-status-badge');
   const totalCount = allCheckboxes.length;
 
-  // Direct boolean injection for guaranteed state accuracy across all 58 permissions
-  const activeFields = [
-    {% if permission_obj.can_view_sessions %}'can_view_sessions',{% endif %}
-    {% if permission_obj.can_view_draft_sessions %}'can_view_draft_sessions',{% endif %}
-    {% if permission_obj.can_view_past_sessions %}'can_view_past_sessions',{% endif %}
-    {% if permission_obj.can_add_session %}'can_add_session',{% endif %}
-    {% if permission_obj.can_prepare_agenda %}'can_prepare_agenda',{% endif %}
-    {% if permission_obj.can_edit_session %}'can_edit_session',{% endif %}
-    {% if permission_obj.can_delete_session %}'can_delete_session',{% endif %}
-    {% if permission_obj.can_view_attendance %}'can_view_attendance',{% endif %}
-    {% if permission_obj.can_manage_attendance %}'can_manage_attendance',{% endif %}
-    {% if permission_obj.can_export_minutes %}'can_export_minutes',{% endif %}
-    {% if permission_obj.can_verify_integrity %}'can_verify_integrity',{% endif %}
-    {% if permission_obj.can_view_topics %}'can_view_topics',{% endif %}
-    {% if permission_obj.can_add_topic %}'can_add_topic',{% endif %}
-    {% if permission_obj.can_edit_topic %}'can_edit_topic',{% endif %}
-    {% if permission_obj.can_delete_topic %}'can_delete_topic',{% endif %}
-    {% if permission_obj.can_change_topic_status %}'can_change_topic_status',{% endif %}
-    {% if permission_obj.can_import_topics %}'can_import_topics',{% endif %}
-    {% if permission_obj.can_postpone_suspend_topic %}'can_postpone_suspend_topic',{% endif %}
-    {% if permission_obj.can_add_table %}'can_add_table',{% endif %}
-    {% if permission_obj.can_edit_table %}'can_edit_table',{% endif %}
-    {% if permission_obj.can_delete_table %}'can_delete_table',{% endif %}
-    {% if permission_obj.can_view_attachments %}'can_view_attachments',{% endif %}
-    {% if permission_obj.can_upload_attachments %}'can_upload_attachments',{% endif %}
-    {% if permission_obj.can_delete_attachments %}'can_delete_attachments',{% endif %}
-    {% if permission_obj.can_listen_audio %}'can_listen_audio',{% endif %}
-    {% if permission_obj.can_record_audio %}'can_record_audio',{% endif %}
-    {% if permission_obj.can_delete_audio %}'can_delete_audio',{% endif %}
-    {% if permission_obj.can_vote %}'can_vote',{% endif %}
-    {% if permission_obj.can_view_vote_details %}'can_view_vote_details',{% endif %}
-    {% if permission_obj.can_draft_decision %}'can_draft_decision',{% endif %}
-    {% if permission_obj.can_delete_decision %}'can_delete_decision',{% endif %}
-    {% if permission_obj.can_upload_signed_decision %}'can_upload_signed_decision',{% endif %}
-    {% if permission_obj.can_send_decisions %}'can_send_decisions',{% endif %}
-    {% if permission_obj.can_view_correspondence %}'can_view_correspondence',{% endif %}
-    {% if permission_obj.can_view_dispatch_log %}'can_view_dispatch_log',{% endif %}
-    {% if permission_obj.can_manage_users %}'can_manage_users',{% endif %}
-    {% if permission_obj.can_delete_user %}'can_delete_user',{% endif %}
-    {% if permission_obj.can_reset_user_password %}'can_reset_user_password',{% endif %}
-    {% if permission_obj.can_import_members %}'can_import_members',{% endif %}
-    {% if permission_obj.can_grant_permissions %}'can_grant_permissions',{% endif %}
-    {% if permission_obj.can_manage_delegates %}'can_manage_delegates',{% endif %}
-    {% if permission_obj.can_change_password %}'can_change_password',{% endif %}
-    {% if permission_obj.can_advance_session_stage %}'can_advance_session_stage',{% endif %}
-    {% if permission_obj.can_reopen_frozen_session %}'can_reopen_frozen_session',{% endif %}
-    {% if permission_obj.can_approve_new_session %}'can_approve_new_session',{% endif %}
-    {% if permission_obj.can_view_live_session %}'can_view_live_session',{% endif %}
-    {% if permission_obj.can_start_session_live %}'can_start_session_live',{% endif %}
-    {% if permission_obj.can_reopen_topic_live %}'can_reopen_topic_live',{% endif %}
-    {% if permission_obj.can_suspend_resume_session %}'can_suspend_resume_session',{% endif %}
-    {% if permission_obj.can_set_topic_timer %}'can_set_topic_timer',{% endif %}
-    {% if permission_obj.can_manage_speak_requests %}'can_manage_speak_requests',{% endif %}
-    {% if permission_obj.can_request_speak %}'can_request_speak',{% endif %}
-    {% if permission_obj.can_control_recording %}'can_control_recording',{% endif %}
-    {% if permission_obj.can_request_exit_permit %}'can_request_exit_permit',{% endif %}
-    {% if permission_obj.can_approve_exit_permit %}'can_approve_exit_permit',{% endif %}
-    {% if permission_obj.can_view_projector %}'can_view_projector',{% endif %}
-    {% if permission_obj.can_view_analytics %}'can_view_analytics',{% endif %}
-    {% if permission_obj.can_open_previous_minutes %}'can_open_previous_minutes',{% endif %}
-    {% if permission_obj.can_broadcast_previous_minutes %}'can_broadcast_previous_minutes',{% endif %}
-    {% if permission_obj.enforce_force_majeure %}'enforce_force_majeure',{% endif %}
-    {% if permission_obj.can_search_minutes %}'can_search_minutes',{% endif %}
-    {% if permission_obj.can_search_person %}'can_search_person',{% endif %}
-    {% if permission_obj.can_view_notifications %}'can_view_notifications',{% endif %}
-    {% if permission_obj.can_view_notification_log %}'can_view_notification_log',{% endif %}
-    {% if permission_obj.can_toggle_sms %}'can_toggle_sms',{% endif %}
-    {% if permission_obj.can_toggle_inapp %}'can_toggle_inapp',{% endif %}
-    {% if permission_obj.can_clear_notification_log %}'can_clear_notification_log',{% endif %}
-    {% if permission_obj.can_manual_backup_notifications %}'can_manual_backup_notifications',{% endif %}
-    {% if permission_obj.can_manage_sms_template %}'can_manage_sms_template',{% endif %}
-    {% if permission_obj.can_use_smart_reader %}'can_use_smart_reader',{% endif %}
-    {% if permission_obj.can_manage_smart_reader %}'can_manage_smart_reader',{% endif %}
-    {% if permission_obj.can_view_audit_log %}'can_view_audit_log',{% endif %}
-    {% if permission_obj.can_toggle_audit_backup %}'can_toggle_audit_backup',{% endif %}
-    {% if permission_obj.can_clear_audit_log %}'can_clear_audit_log',{% endif %}
-  ];
-
-  activeFields.forEach(f => {
-    const el = document.getElementById('id_' + f);
-    if (el) el.checked = true;
-  });
+  // Checkboxes are dynamically initialized server-side via {% if field_name in granted_fields %}checked{% endif %}
 
   function updateCounters() {
     let checkedCount = 0;
@@ -269,11 +188,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     liveCountEl.textContent = `${checkedCount} / ${totalCount}`;
 
+    const totalStandard = Array.from(allCheckboxes).filter(cb => cb.id !== 'id_enforce_force_majeure').length;
+    const isForceMajeureChecked = document.getElementById('id_enforce_force_majeure')?.checked;
+
     if (checkedCount === 0) {
       statusBadge.innerHTML = '<span class="badge bg-secondary p-2">لا توجد صلاحيات</span>';
       masterBox.checked = false;
       masterBox.indeterminate = false;
-    } else if (checkedCount === totalCount) {
+    } else if (checkedCount === totalCount || (checkedCount === totalStandard && !isForceMajeureChecked)) {
       statusBadge.innerHTML = '<span class="badge bg-success p-2">كافة الصلاحيات ممنوحة (شامل)</span>';
       masterBox.checked = true;
       masterBox.indeterminate = false;
@@ -355,13 +277,16 @@ document.addEventListener('DOMContentLoaded', () => {
       'can_view_attendance', 'can_manage_attendance', 'can_export_minutes',
       'can_verify_integrity', 'can_view_attachments', 'can_listen_audio',
       'can_vote', 'can_view_vote_details', 'can_draft_decision', 'can_delete_decision',
-      'can_upload_signed_decision', 'can_send_decisions', 'can_view_correspondence',
-      'can_view_dispatch_log', 'can_add_table', 'can_edit_table',
-      'can_advance_session_stage', 'can_view_live_session', 'can_start_session_live', 'can_reopen_topic_live',
+      'can_upload_signed_decision', 'can_send_decisions', 'can_manage_dispatch_center', 'can_view_correspondence',
+      'can_view_dispatch_log', 'can_export_dispatch_manifest', 'can_reset_dispatches', 'can_add_table', 'can_edit_table',
+      'can_advance_session_stage', 'can_view_stage_logs', 'can_view_live_session', 'can_start_session_live', 'can_reopen_topic_live',
       'can_set_topic_timer', 'can_manage_speak_requests', 'can_control_recording',
       'can_approve_exit_permit', 'can_view_projector', 'can_view_analytics',
+      'can_open_previous_minutes', 'can_broadcast_previous_minutes', 'can_moderate_live_session',
       'can_search_minutes', 'can_search_person', 'can_view_notifications',
-      'can_view_notification_log', 'can_use_smart_reader', 'can_view_audit_log',
+      'can_view_notification_log', 'can_toggle_sms', 'can_toggle_inapp',
+      'can_clear_notification_log', 'can_manual_backup_notifications',
+      'can_use_smart_reader', 'can_view_audit_log',
       'can_change_password'
     ],
     director: [
@@ -371,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'can_add_table', 'can_edit_table', 'can_delete_table',
       'can_view_attachments', 'can_upload_attachments',
       'can_listen_audio', 'can_record_audio', 'can_control_recording',
-      'can_upload_signed_decision', 'can_send_decisions', 'can_view_correspondence', 'can_view_dispatch_log',
+      'can_upload_signed_decision', 'can_send_decisions', 'can_manage_dispatch_center', 'can_view_correspondence', 'can_view_dispatch_log', 'can_export_dispatch_manifest',
       'can_manage_users', 'can_import_members', 'can_grant_permissions', 'can_manage_delegates',
       'can_advance_session_stage', 'can_view_live_session', 'can_view_projector', 'can_view_analytics',
       'can_search_minutes', 'can_search_person', 'can_view_notifications',

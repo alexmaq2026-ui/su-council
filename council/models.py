@@ -330,6 +330,7 @@ class CouncilSession(models.Model):
         1. President of the session ALWAYS has sovereign control.
         2. Delegated live_controller has active control granted by the President.
         3. Superuser has control only if no president is set/online and nobody is delegated.
+        4. Council Rapporteur / Secretary General (مقرر المجلس / أمين عام) with granted live control permissions.
         """
         if not user or not user.is_authenticated:
             return False
@@ -341,6 +342,10 @@ class CouncilSession(models.Model):
             chair = self.get_chair_user()
             if not chair or chair.pk == user.pk:
                 return True
+        if not self.live_controller_id:
+            if getattr(user, 'can_start_session_live', False) or getattr(user, 'can_moderate_live_session', False):
+                if getattr(user, 'title', '') == 'امين_عام' or getattr(user, 'login_category', '') == 'secretariat_admin':
+                    return True
         return False
 
     def get_chair_display_name(self):
@@ -1893,6 +1898,120 @@ class SignedDecisionDispatch(models.Model):
         if ip:
             self.ip_address = ip
         self.save(update_fields=['is_viewed', 'viewed_at', 'viewed_by', 'view_count', 'ip_address'])
+
+
+# ==============================================================================
+# PHASE 4B: CENTRAL OFFICIAL DISPATCH & CIRCULARS REPOSITORY
+# ==============================================================================
+
+class OfficialCircular(models.Model):
+    """
+    Central official dispatch entity supporting:
+    - session_minutes: تعميم محضر جلسة كامل
+    - category_topics: تعميم قرارات باب / محور رئيسي
+    - single_topic: تعميم قرار موضوع فردي
+    - free_document: تعميم أو وثيقة حرة ملحقة من الجهاز
+    """
+    DISPATCH_TYPES = [
+        ('session_minutes', 'محضر جلسة كامل'),
+        ('category_topics', 'قرارات محور / باب رئيسي'),
+        ('single_topic',    'قرار موضوع فردي'),
+        ('free_document',   'تعميم أو وثيقة حرة ملحقة'),
+    ]
+
+    title           = models.CharField('عنوان التعميم أو المراسلة', max_length=300)
+    dispatch_type   = models.CharField('نوع التعميم', max_length=30, choices=DISPATCH_TYPES, default='free_document')
+    session         = models.ForeignKey(
+        CouncilSession, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='official_circulars', verbose_name='الجلسة المعنية'
+    )
+    category        = models.CharField('الباب / المحور الرئيسي', max_length=50, blank=True)
+    category_label  = models.CharField('مسمى الباب الرئيسي', max_length=150, blank=True)
+    topic           = models.ForeignKey(
+        Topic, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='official_circulars', verbose_name='الموضوع المعني'
+    )
+    
+    circular_number = models.CharField('رقم التعميم / القرار الإداري', max_length=100, blank=True)
+    circular_date   = models.DateField('تاريخ التعميم أو الاعتماد', null=True, blank=True)
+    
+    attachment_file = models.FileField(
+        'ملف التعميم أو الوثيقة (PDF / صورة)',
+        upload_to='official_circulars/%Y/%m/',
+        null=True, blank=True
+    )
+    
+    notes           = models.TextField('ملاحظات وتوجيهات الأمانة العامة', blank=True)
+    created_by      = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_official_circulars', verbose_name='القائم بالتعميم'
+    )
+    created_at      = models.DateTimeField('وقت الإنشاء والتعميم', auto_now_add=True)
+    target_seats    = models.ManyToManyField(
+        EntitySeat, blank=True,
+        related_name='targeted_official_circulars', verbose_name='الكليات والجهات المستهدفة'
+    )
+
+    class Meta:
+        verbose_name = 'تعميم رسمي'
+        verbose_name_plural = 'مركز التعميمات والمراسلات الرسمية'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_dispatch_type_display()}: {self.title[:40]}'
+
+    def get_summary(self):
+        total = self.dispatches.count()
+        viewed = self.dispatches.filter(is_viewed=True).count()
+        return {'total': total, 'viewed': viewed, 'pending': total - viewed}
+
+
+class OfficialCircularDispatch(models.Model):
+    """
+    Delivery and read receipt tracking for each targeted faculty seat per official circular.
+    """
+    circular        = models.ForeignKey(
+        OfficialCircular, on_delete=models.CASCADE,
+        related_name='dispatches', verbose_name='التعميم الرسمي'
+    )
+    seat            = models.ForeignKey(
+        EntitySeat, on_delete=models.CASCADE,
+        related_name='received_circular_dispatches', verbose_name='الجهة المستلمة'
+    )
+    sent_by         = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='sent_circular_dispatches', verbose_name='المرسِل'
+    )
+    sent_at         = models.DateTimeField('وقت الإرسال', auto_now_add=True)
+    
+    is_viewed       = models.BooleanField('تم الاطلاع', default=False)
+    viewed_by       = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='viewed_circular_dispatches', verbose_name='المطّلع'
+    )
+    viewed_at       = models.DateTimeField('وقت أول اطلاع', null=True, blank=True)
+    view_count      = models.PositiveIntegerField('عدد مرات الاطلاع', default=0)
+    ip_address      = models.GenericIPAddressField('عنوان IP للاطلاع', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'سجل استلام تعميم رسمي'
+        verbose_name_plural = 'سجلات استلام التعميمات الرسمية'
+        unique_together = ('circular', 'seat')
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f'{self.circular.title[:30]} → {self.seat.name}'
+
+    def mark_as_viewed(self, user, ip=None):
+        if not self.is_viewed:
+            self.is_viewed = True
+            self.viewed_at = timezone.now()
+            self.viewed_by = user
+        self.view_count += 1
+        if ip:
+            self.ip_address = ip
+        self.save(update_fields=['is_viewed', 'viewed_at', 'viewed_by', 'view_count', 'ip_address'])
+
 
 
 # ── Phase 5: SMS Templates, In-App Notifications & Delivery Log ──────────────

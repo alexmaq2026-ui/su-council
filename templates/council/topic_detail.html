@@ -36,35 +36,35 @@
       <!-- 1. Live Session Launch / Direct Return Action -->
       {% if is_controller and session.status == 'active' %}
         {% if topic.display_state.display_status == 'shown' or topic.display_state.display_status == 'voting' %}
-          <a href="{% url 'council:session_live' session_pk=session.pk %}?topic={{ topic.pk }}#topic-row-{{ topic.pk }}" class="btn btn-danger btn-sm fw-bold shadow-sm d-inline-flex align-items-center gap-1">
-            <i class="bi bi-broadcast"></i> المعروض حالياً بالقاعة ← انتقال
+          <a href="{% url 'council:session_live' session_pk=session.pk %}?topic={{ topic.pk }}#topic-row-{{ topic.pk }}" class="btn btn-danger btn-sm fw-bold shadow-sm px-3">
+            المعروض حالياً بالقاعة ← انتقال
           </a>
         {% else %}
-          <button type="button" class="btn btn-danger btn-sm fw-bold shadow-sm d-inline-flex align-items-center gap-1" onclick="launchTopicFromDetail({{ topic.pk }}, '{% url 'council:session_live' session_pk=session.pk %}', this)">
-            <i class="bi bi-broadcast-pin"></i> طرح للجلسة الحية والتصويت ←
+          <button type="button" class="btn btn-danger btn-sm fw-bold shadow-sm px-3" onclick="launchTopicFromDetail({{ topic.pk }}, '{% url 'council:session_live' session_pk=session.pk %}', this)">
+            طرح للجلسة الحية والتصويت ←
           </button>
         {% endif %}
       {% endif %}
 
       <!-- 2. Smart Reader Widget -->
       {% if user_can_use_smart_reader %}
-        <button type="button" class="btn btn-warning text-dark btn-sm fw-bold shadow-sm d-inline-flex align-items-center gap-1" onclick="openSmartReader({topicId: {{ topic.pk }}})">
-          <i class="bi bi-mic-fill"></i> استماع بالقراءة الذكية
+        <button type="button" class="btn btn-warning text-dark btn-sm fw-bold shadow-sm px-3" onclick="openSmartReader({topicId: {{ topic.pk }}})">
+          استماع بالقراءة الذكية
         </button>
       {% endif %}
 
       <!-- 3. Return to Agenda -->
       {% if user.can_view_sessions %}
-        <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-light btn-sm d-inline-flex align-items-center gap-1">
-          <i class="bi bi-card-list"></i> جدول الأعمال
+        <a href="{% url 'council:session_detail' pk=session.pk %}" class="btn btn-outline-light btn-sm px-3">
+          جدول الأعمال
         </a>
       {% endif %}
 
       <!-- 4. Administrative Dropdown Menu [خيارات الموضوع] -->
       {% if user_can_edit_topic or user_can_add_table or user_can_delete_topic %}
         <div class="dropdown">
-          <button class="btn btn-outline-light btn-sm dropdown-toggle d-inline-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-sliders2"></i> خيارات الموضوع
+          <button class="btn btn-outline-light btn-sm dropdown-toggle px-3" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            خيارات الموضوع
           </button>
           <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 py-2" style="font-size: 0.88rem; min-width: 190px;">
             {% if user_can_edit_topic %}
@@ -592,177 +592,11 @@
       </div>
     </div>
 
-    <!-- 🏛️ SIGNED DECISION & FACULTY DISPATCH PANEL (Phase 4) -->
-    <div class="uc-card shadow-sm mb-4 border-2 border-primary border-opacity-50">
-      <div class="uc-card-header bg-navy text-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0 fw-bold">📜 مستند القرار الموقّع رسميًا وتعميمه على الكليات (المرحلة الرابعة)</h5>
-        {% if topic.signed_decision %}
-          <span class="badge bg-success">تم رفع النسخة الموقّعة</span>
-        {% else %}
-          <span class="badge bg-secondary">بانتظار الرفع بعد التوقيع</span>
-        {% endif %}
-      </div>
+  </div>
+</div>
 
-      <div class="uc-card-body p-4">
-        {% if topic.signed_decision %}
-          <div class="p-3 bg-light rounded-3 border mb-3">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom">
-              <div>
-                <span class="fw-bold text-navy fs-6">
-                  القرار الإداري رقم: {{ topic.signed_decision.decision_number|default:"غير مرقم" }}
-                </span>
-                {% if topic.signed_decision.decision_date %}
-                  <span class="text-muted small ms-2">بتاريخ {{ topic.signed_decision.decision_date|date:"Y-m-d" }}</span>
-                {% endif %}
-              </div>
-              {% if user_can_view_attachments or user_can_send_decisions or user_can_upload_signed %}
-              <div class="d-flex gap-2">
-                <a href="{{ topic.signed_decision.signed_file.url }}" target="_blank" class="btn btn-sm btn-primary fw-bold px-3">
-                  معاينة وتحميل القرار الموقّع
-                </a>
-              </div>
-              {% endif %}
-            </div>
-
-            <div class="small text-muted mb-2">
-              <span>القائم بالرفع: <strong>{{ topic.signed_decision.uploaded_by.full_name|default:"الأمانة العامة" }}</strong></span>
-              • <span>تاريخ الرفع: {{ topic.signed_decision.uploaded_at|date:"Y-m-d H:i" }}</span>
-              {% if topic.signed_decision.notes %}
-                <div class="mt-1">ملاحظات الأمانة: <em>{{ topic.signed_decision.notes }}</em></div>
-              {% endif %}
-            </div>
-
-            <!-- الكليات والجهات المعنية وحالة الإرسال -->
-            <div class="mt-3">
-              <h6 class="fw-bold text-navy small mb-2">حالة تعميم القرار على الكليات المعنية:</h6>
-              {% if topic.target_seats.all %}
-                <div class="row g-2">
-                  {% for seat in topic.target_seats.all %}
-                    <div class="col-md-6">
-                      <div class="p-2 rounded border bg-white d-flex justify-content-between align-items-center small">
-                        <span class="fw-bold">{{ seat.name }}</span>
-                        {% if topic.signed_decision.dispatches.all %}
-                          <span class="badge bg-success-subtle text-success border border-success">تم التعميم</span>
-                        {% else %}
-                          <span class="badge bg-warning text-dark">بانتظار التعميم</span>
-                        {% endif %}
-                      </div>
-                    </div>
-                  {% endfor %}
-                </div>
-              {% else %}
-                <p class="text-muted small mb-0">لم تُحدد كليات معنية بهذا الموضوع بعد.</p>
-              {% endif %}
-            </div>
-
-            <!-- زر إرسال القرار للأمانة العامة -->
-            {% if user_can_send_decisions %}
-              <div class="mt-3 pt-3 border-top d-flex justify-content-between align-items-center">
-                <button type="button" class="btn btn-sm btn-success fw-bold px-4" onclick="dispatchDecision({{ topic.pk }})">
-                  إرسال وتعميم القرار الآن للكليات المعنية
-                </button>
-                <span class="small text-muted">
-                  ملخص الوصول: {{ topic.signed_decision.get_dispatches_summary.viewed }} من {{ topic.signed_decision.get_dispatches_summary.total }} جهة اطّلعت عليه
-                </span>
-              </div>
-            {% endif %}
-          </div>
-        {% else %}
-          <div class="text-center py-3 text-muted">
-            <p class="small mb-3">بعد اعتماد القرار النهائي وتوقيعه وختمه رسمياً، تقوم الأمانة العامة بسحبه ضوئياً ورفعه هنا ليتم تعميمه تلقائياً على الكليات المعنية.</p>
-          </div>
-        {% endif %}
-
-        <!-- نموذج رفع أو تحديث القرار الموقّع للمخوّلين -->
-        {% if user_can_upload_signed %}
-          <div class="p-3 bg-white rounded-3 border mt-3 shadow-2xs">
-            <h6 class="fw-bold text-navy mb-2.5 d-flex align-items-center gap-1.5" style="font-size: 0.9rem;">
-              <i class="bi bi-file-earmark-arrow-up-fill text-primary"></i>
-              <span>{% if topic.signed_decision %}تحديث مستند القرار الموقّع أو تعديل الكليات المعنية{% else %}رفع مستند القرار الموقّع رسميًا وتحديد الكليات المستلمة{% endif %}</span>
-            </h6>
-            <form method="post" action="{% url 'council:upload_signed_decision' topic_pk=topic.pk %}" enctype="multipart/form-data">
-              {% csrf_token %}
-              <div class="mb-2.5">
-                <label class="form-label small text-muted mb-1 fw-semibold">ملف القرار الموقّع رسميًا (PDF أو صورة عالية الجودة):</label>
-                <input type="file" name="signed_file" class="form-control form-control-sm bg-white" {% if not topic.signed_decision %}required{% endif %}>
-              </div>
-
-              <div class="row g-2 mb-2.5">
-                <div class="col-12 col-sm-6">
-                  <label class="form-label small text-muted mb-1 fw-semibold">رقم القرار الإداري:</label>
-                  <input type="text" name="decision_number" class="form-control form-control-sm bg-white" value="{{ topic.signed_decision.decision_number|default:'' }}" placeholder="مثال: ق/2026/14">
-                </div>
-                <div class="col-12 col-sm-6">
-                  <label class="form-label small text-muted mb-1 fw-semibold">تاريخ التوقيع والاعتماد:</label>
-                  <input type="date" name="decision_date" class="form-control form-control-sm bg-white" value="{{ topic.signed_decision.decision_date|date:'Y-m-d'|default:'' }}">
-                </div>
-              </div>
-
-              <!-- اختيار الكليات والجهات المعنية -->
-              <div class="mb-3">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                  <label class="form-label small text-muted mb-0 fw-semibold">الكليات والجهات المعنية بالقرار (ستصل المراسلة لها وحدها):</label>
-                  <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" style="font-size: 0.75rem;" onclick="toggleAllSeats(this)">تحديد الكل / إلغاء</button>
-                </div>
-                <div class="p-2.5 border rounded-3 bg-light" style="max-height: 160px; overflow-y: auto;">
-                  <div class="row g-2">
-                    {% for s in all_seats %}
-                      <div class="col-12 col-sm-6">
-                        <div class="form-check small p-1 ps-4 rounded bg-white border border-light">
-                          <input class="form-check-input target-seat-check" type="checkbox" name="target_seats" value="{{ s.pk }}" id="seat_check_{{ s.pk }}" {% if s in topic.target_seats.all %}checked{% endif %}>
-                          <label class="form-check-label text-dark fw-medium" for="seat_check_{{ s.pk }}" style="font-size: 0.78rem;">
-                            {{ s.name }}
-                          </label>
-                        </div>
-                      </div>
-                    {% endfor %}
-                  </div>
-                </div>
-              </div>
-
-              <div class="d-flex justify-content-end">
-                <button type="submit" class="btn btn-navy btn-sm px-4 fw-bold shadow-sm d-inline-flex align-items-center gap-1">
-                  <i class="bi bi-check-circle"></i>
-                  <span>{% if topic.signed_decision %}حفظ وتحديث المستند والكليات{% else %}اعتماد ورفع القرار الرسمي{% endif %}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        {% endif %}
-      </div>
-    </div>
-
-    <script>
-    function toggleAllSeats(btn) {
-      const checkboxes = document.querySelectorAll('.target-seat-check');
-      const allChecked = Array.from(checkboxes).every(c => c.checked);
-      checkboxes.forEach(c => c.checked = !allChecked);
-      if (btn) btn.innerText = allChecked ? 'تحديد الكل' : 'إلغاء التحديد';
-    }
-
-    function dispatchDecision(topicPk) {
-      if (!confirm('هل أنت متأكد من رغبتك في إرسال وتعميم القرار الموقّع رسميًا على كافة الكليات والجهات المعنية؟')) return;
-      fetch('/council/topics/' + topicPk + '/signed-decision/dispatch/', {
-        method: 'POST',
-        headers: {
-          'X-CSRFToken': '{{ csrf_token }}',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: ''
-      })
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok) {
-          alert(data.message);
-          location.reload();
-        } else {
-          alert(data.error || 'حدث خطأ أثناء الإرسال.');
-        }
-      })
-      .catch(err => alert('تعذر الاتصال بالخادم.'));
-    }
-
-    function launchTopicFromDetail(topicId, liveUrl, btnEl) {
+<script>
+function launchTopicFromDetail(topicId, liveUrl, btnEl) {
       const btn = btnEl || (window.event ? window.event.currentTarget : null) || document.activeElement;
       const originalHtml = btn ? btn.innerHTML : '<i class="bi bi-broadcast-pin me-1"></i> طرح للجلسة الحية والتصويت ←';
       if (btn) {
