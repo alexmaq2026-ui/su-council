@@ -8,6 +8,8 @@
 
   <!-- Bootstrap 5 RTL -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <!-- Google Fonts - Cairo -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -25,6 +27,168 @@
       --gold-pale:    #FFFDF5;
       --surface-bg:   #F4F7FB;
       --border-soft:  #D8E2EE;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════════
+       CATEGORY VISUAL IDENTITIES (Pure text, distinct dignified color per category)
+       ══════════════════════════════════════════════════════════════════════════ */
+    :root {
+      /* 1. مكتب رئيس الجامعة والمستشارون والمساعدون (الذهبي الملكي الفاخر) */
+      --cat-pres-color:  #8C670D;
+      --cat-pres-bg:     #FFFDF7;
+      --cat-pres-border: #D4AF37;
+      --cat-pres-pill:   #B8860B;
+      --cat-pres-grad:   linear-gradient(135deg, #785807 0%, #B8860B 100%);
+
+      /* 2. نواب رئيس الجامعة (الأزرق النيلي الملكي) */
+      --cat-vp-color:    #1E3A8A;
+      --cat-vp-bg:       #F8FAFF;
+      --cat-vp-border:   #3B82F6;
+      --cat-vp-pill:     #1E40AF;
+      --cat-vp-grad:     linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%);
+
+      /* 3. عمداء الكليات (الأخضر الزمردي الأكاديمي) */
+      --cat-dean-color:  #065F46;
+      --cat-dean-bg:     #F6FDF9;
+      --cat-dean-border: #10B981;
+      --cat-dean-pill:   #047857;
+      --cat-dean-grad:   linear-gradient(135deg, #064E3B 0%, #059669 100%);
+
+      /* 4. الأمانة العامة وإدارة المجلس (العنابي الوقور / البرغندي) */
+      --cat-sec-color:   #831843;
+      --cat-sec-bg:      #FDF7FA;
+      --cat-sec-border:  #DB2777;
+      --cat-sec-pill:    #9D174D;
+      --cat-sec-grad:    linear-gradient(135deg, #500724 0%, #9D174D 100%);
+
+      /* 5. ممثلو النقابة وأعضاء هيئة التدريس (البترولي الراقي) */
+      --cat-rep-color:   #0F766E;
+      --cat-rep-bg:      #F4FBFB;
+      --cat-rep-border:  #14B8A6;
+      --cat-rep-pill:    #0D9488;
+      --cat-rep-grad:    linear-gradient(135deg, #134E4A 0%, #0D9488 100%);
+    }
+
+    /* ── Gateways Styling by Category (Pure Text Dignity & Distinct Category Font Colors) ── */
+    /* 1. مكتب رئيس الجامعة والمستشارون والمساعدون (الذهبي الملكي الأكاديمي) */
+    .gateway-panel-presidency_office { border-color: #EEDCA8; }
+    .gateway-panel-presidency_office .gateway-header { border-right: 8px solid var(--cat-pres-border) !important; }
+    .gateway-panel-presidency_office .gateway-title { color: var(--cat-pres-color) !important; font-weight: 900 !important; font-size: 1.12rem !important; }
+    .gateway-panel-presidency_office .gateway-count-pill { background: rgba(184, 134, 11, 0.12); color: var(--cat-pres-color); border: 1px solid var(--cat-pres-border); font-weight: 800; }
+    .gateway-panel-presidency_office .gateway-action-button { background: var(--cat-pres-pill) !important; border-color: var(--cat-pres-border) !important; color: #ffffff !important; }
+    .gateway-panel-presidency_office .gateway-state-indicator { color: var(--cat-pres-color) !important; background: rgba(184, 134, 11, 0.12) !important; border: 1px solid var(--cat-pres-border) !important; }
+    .gateway-panel-presidency_office.active .gateway-header { background: #FFFDF7 !important; border-right: 8px solid var(--cat-pres-border) !important; border-bottom: 2px solid #F6E7B8 !important; }
+    .gateway-panel-presidency_office.active .gateway-title { color: var(--cat-pres-color) !important; }
+    .gateway-panel-presidency_office.active .gateway-subtitle { color: #785807 !important; }
+    .gateway-panel-presidency_office .gateway-body { border-top: 3px solid var(--cat-pres-border); background: var(--cat-pres-bg); }
+    .gateway-panel-presidency_office .seat-entity-title { color: var(--cat-pres-color) !important; }
+
+    /* 2. نواب رئيس الجامعة (الأزرق النيلي الملكي) */
+    .gateway-panel-vice_presidents { border-color: #BFDBFE; }
+    .gateway-panel-vice_presidents .gateway-header { border-right: 8px solid var(--cat-vp-border) !important; }
+    .gateway-panel-vice_presidents .gateway-title { color: var(--cat-vp-color) !important; font-weight: 900 !important; font-size: 1.12rem !important; }
+    .gateway-panel-vice_presidents .gateway-count-pill { background: rgba(30, 58, 138, 0.08); color: var(--cat-vp-color); border: 1px solid var(--cat-vp-border); font-weight: 800; }
+    .gateway-panel-vice_presidents .gateway-action-button { background: var(--cat-vp-pill) !important; border-color: var(--cat-vp-border) !important; color: #ffffff !important; }
+    .gateway-panel-vice_presidents .gateway-state-indicator { color: var(--cat-vp-color) !important; background: rgba(30, 58, 138, 0.08) !important; border: 1px solid var(--cat-vp-border) !important; }
+    .gateway-panel-vice_presidents.active .gateway-header { background: #F4F8FF !important; border-right: 8px solid var(--cat-vp-border) !important; border-bottom: 2px solid #BFDBFE !important; }
+    .gateway-panel-vice_presidents.active .gateway-title { color: var(--cat-vp-color) !important; }
+    .gateway-panel-vice_presidents.active .gateway-subtitle { color: #1E3A8A !important; }
+    .gateway-panel-vice_presidents .gateway-body { border-top: 3px solid var(--cat-vp-border); background: var(--cat-vp-bg); }
+    .gateway-panel-vice_presidents .seat-entity-title { color: var(--cat-vp-color) !important; }
+
+    /* 3. عمداء الكليات (الأخضر الزمردي الأكاديمي) */
+    .gateway-panel-deans { border-color: #A7F3D0; }
+    .gateway-panel-deans .gateway-header { border-right: 8px solid var(--cat-dean-border) !important; }
+    .gateway-panel-deans .gateway-title { color: var(--cat-dean-color) !important; font-weight: 900 !important; font-size: 1.12rem !important; }
+    .gateway-panel-deans .gateway-count-pill { background: rgba(6, 95, 70, 0.08); color: var(--cat-dean-color); border: 1px solid var(--cat-dean-border); font-weight: 800; }
+    .gateway-panel-deans .gateway-action-button { background: var(--cat-dean-pill) !important; border-color: var(--cat-dean-border) !important; color: #ffffff !important; }
+    .gateway-panel-deans .gateway-state-indicator { color: var(--cat-dean-color) !important; background: rgba(6, 95, 70, 0.08) !important; border: 1px solid var(--cat-dean-border) !important; }
+    .gateway-panel-deans.active .gateway-header { background: #F0FDF4 !important; border-right: 8px solid var(--cat-dean-border) !important; border-bottom: 2px solid #BBF7D0 !important; }
+    .gateway-panel-deans.active .gateway-title { color: var(--cat-dean-color) !important; }
+    .gateway-panel-deans.active .gateway-subtitle { color: #065F46 !important; }
+    .gateway-panel-deans .gateway-body { border-top: 3px solid var(--cat-dean-border); background: var(--cat-dean-bg); }
+    .gateway-panel-deans .seat-entity-title { color: var(--cat-dean-color) !important; }
+
+    /* 4. الأمانة العامة وإدارة المجلس (العنابي الوقور / البرغندي) */
+    .gateway-panel-secretariat_admin { border-color: #FBCFE8; }
+    .gateway-panel-secretariat_admin .gateway-header { border-right: 8px solid var(--cat-sec-border) !important; }
+    .gateway-panel-secretariat_admin .gateway-title { color: var(--cat-sec-color) !important; font-weight: 900 !important; font-size: 1.12rem !important; }
+    .gateway-panel-secretariat_admin .gateway-count-pill { background: rgba(131, 24, 67, 0.08); color: var(--cat-sec-color); border: 1px solid var(--cat-sec-border); font-weight: 800; }
+    .gateway-panel-secretariat_admin .gateway-action-button { background: var(--cat-sec-pill) !important; border-color: var(--cat-sec-border) !important; color: #ffffff !important; }
+    .gateway-panel-secretariat_admin .gateway-state-indicator { color: var(--cat-sec-color) !important; background: rgba(131, 24, 67, 0.08) !important; border: 1px solid var(--cat-sec-border) !important; }
+    .gateway-panel-secretariat_admin.active .gateway-header { background: #FDF2F8 !important; border-right: 8px solid var(--cat-sec-border) !important; border-bottom: 2px solid #FBCFE8 !important; }
+    .gateway-panel-secretariat_admin.active .gateway-title { color: var(--cat-sec-color) !important; }
+    .gateway-panel-secretariat_admin.active .gateway-subtitle { color: #831843 !important; }
+    .gateway-panel-secretariat_admin .gateway-body { border-top: 3px solid var(--cat-sec-border); background: var(--cat-sec-bg); }
+    .gateway-panel-secretariat_admin .seat-entity-title { color: var(--cat-sec-color) !important; }
+
+    /* 5. ممثلو النقابة وأعضاء هيئة التدريس (البترولي الراقي) */
+    .gateway-panel-representatives { border-color: #99F6E4; }
+    .gateway-panel-representatives .gateway-header { border-right: 8px solid var(--cat-rep-border) !important; }
+    .gateway-panel-representatives .gateway-title { color: var(--cat-rep-color) !important; font-weight: 900 !important; font-size: 1.12rem !important; }
+    .gateway-panel-representatives .gateway-count-pill { background: rgba(15, 118, 110, 0.08); color: var(--cat-rep-color); border: 1px solid var(--cat-rep-border); font-weight: 800; }
+    .gateway-panel-representatives .gateway-action-button { background: var(--cat-rep-pill) !important; border-color: var(--cat-rep-border) !important; color: #ffffff !important; }
+    .gateway-panel-representatives .gateway-state-indicator { color: var(--cat-rep-color) !important; background: rgba(15, 118, 110, 0.08) !important; border: 1px solid var(--cat-rep-border) !important; }
+    .gateway-panel-representatives.active .gateway-header { background: #F0FDFA !important; border-right: 8px solid var(--cat-rep-border) !important; border-bottom: 2px solid #99F6E4 !important; }
+    .gateway-panel-representatives.active .gateway-title { color: var(--cat-rep-color) !important; }
+    .gateway-panel-representatives.active .gateway-subtitle { color: #0F766E !important; }
+    .gateway-panel-representatives .gateway-body { border-top: 3px solid var(--cat-rep-border); background: var(--cat-rep-bg); }
+    .gateway-panel-representatives .seat-entity-title { color: var(--cat-rep-color) !important; }
+
+    /* ── Seat Cards per Category (Touch & Color Optimized for Tablet) ── */
+    .seat-card {
+      min-height: 72px;
+      touch-action: manipulation;
+    }
+    .seat-card-presidency_office { border-right: 6px solid var(--cat-pres-border) !important; }
+    .seat-card-presidency_office:hover { border-color: var(--cat-pres-border) !important; box-shadow: 0 8px 24px rgba(184, 134, 11, 0.18) !important; }
+    .badge-presidency_office { background: var(--cat-pres-grad) !important; color: #ffffff !important; border: 1px solid var(--cat-pres-border) !important; }
+    .enter-bar-presidency_office { background: #FFFBEB !important; color: var(--cat-pres-color) !important; border: 1px solid #FDE68A !important; }
+    .seat-card-presidency_office:hover .enter-bar-presidency_office { background: var(--cat-pres-pill) !important; color: #ffffff !important; border-color: var(--cat-pres-pill) !important; }
+
+    .seat-card-vice_presidents { border-right: 6px solid var(--cat-vp-border) !important; }
+    .seat-card-vice_presidents:hover { border-color: var(--cat-vp-border) !important; box-shadow: 0 8px 24px rgba(30, 58, 138, 0.18) !important; }
+    .badge-vice_presidents { background: var(--cat-vp-grad) !important; color: #ffffff !important; border: 1px solid var(--cat-vp-border) !important; }
+    .enter-bar-vice_presidents { background: #EFF6FF !important; color: var(--cat-vp-color) !important; border: 1px solid #BFDBFE !important; }
+    .seat-card-vice_presidents:hover .enter-bar-vice_presidents { background: var(--cat-vp-pill) !important; color: #ffffff !important; border-color: var(--cat-vp-pill) !important; }
+
+    .seat-card-deans { border-right: 6px solid var(--cat-dean-border) !important; }
+    .seat-card-deans:hover { border-color: var(--cat-dean-border) !important; box-shadow: 0 8px 24px rgba(6, 95, 70, 0.18) !important; }
+    .badge-deans { background: var(--cat-dean-grad) !important; color: #ffffff !important; border: 1px solid var(--cat-dean-border) !important; }
+    .enter-bar-deans { background: #ECFDF5 !important; color: var(--cat-dean-color) !important; border: 1px solid #A7F3D0 !important; }
+    .seat-card-deans:hover .enter-bar-deans { background: var(--cat-dean-pill) !important; color: #ffffff !important; border-color: var(--cat-dean-pill) !important; }
+
+    .seat-card-secretariat_admin { border-right: 6px solid var(--cat-sec-border) !important; }
+    .seat-card-secretariat_admin:hover { border-color: var(--cat-sec-border) !important; box-shadow: 0 8px 24px rgba(131, 24, 67, 0.18) !important; }
+    .badge-secretariat_admin { background: var(--cat-sec-grad) !important; color: #ffffff !important; border: 1px solid var(--cat-sec-border) !important; }
+    .enter-bar-secretariat_admin { background: #FDF2F8 !important; color: var(--cat-sec-color) !important; border: 1px solid #FBCFE8 !important; }
+    .seat-card-secretariat_admin:hover .enter-bar-secretariat_admin { background: var(--cat-sec-pill) !important; color: #ffffff !important; border-color: var(--cat-sec-pill) !important; }
+
+    .seat-card-representatives { border-right: 6px solid var(--cat-rep-border) !important; }
+    .seat-card-representatives:hover { border-color: var(--cat-rep-border) !important; box-shadow: 0 8px 24px rgba(15, 118, 110, 0.18) !important; }
+    .badge-representatives { background: var(--cat-rep-grad) !important; color: #ffffff !important; border: 1px solid var(--cat-rep-border) !important; }
+    .enter-bar-representatives { background: #F0FDFA !important; color: var(--cat-rep-color) !important; border: 1px solid #99F6E4 !important; }
+    .seat-card-representatives:hover .enter-bar-representatives { background: var(--cat-rep-pill) !important; color: #ffffff !important; border-color: var(--cat-rep-pill) !important; }
+
+    /* ── Dynamic Category Theming for Seat Login Modal ── */
+    .modal-header-presidency_office { background: var(--cat-pres-grad) !important; border-bottom: 3px solid var(--cat-pres-border) !important; color: #ffffff !important; }
+    .modal-header-vice_presidents   { background: var(--cat-vp-grad) !important; border-bottom: 3px solid var(--cat-vp-border) !important; color: #ffffff !important; }
+    .modal-header-deans             { background: var(--cat-dean-grad) !important; border-bottom: 3px solid var(--cat-dean-border) !important; color: #ffffff !important; }
+    .modal-header-secretariat_admin { background: var(--cat-sec-grad) !important; border-bottom: 3px solid var(--cat-sec-border) !important; color: #ffffff !important; }
+    .modal-header-representatives   { background: var(--cat-rep-grad) !important; border-bottom: 3px solid var(--cat-rep-border) !important; color: #ffffff !important; }
+
+    .btn-submit-presidency_office { background: var(--cat-pres-pill) !important; border-color: var(--cat-pres-border) !important; color: #ffffff !important; }
+    .btn-submit-vice_presidents   { background: var(--cat-vp-pill) !important; border-color: var(--cat-vp-border) !important; color: #ffffff !important; }
+    .btn-submit-deans             { background: var(--cat-dean-pill) !important; border-color: var(--cat-dean-border) !important; color: #ffffff !important; }
+    .btn-submit-secretariat_admin { background: var(--cat-sec-pill) !important; border-color: var(--cat-sec-border) !important; color: #ffffff !important; }
+    .btn-submit-representatives   { background: var(--cat-rep-pill) !important; border-color: var(--cat-rep-border) !important; color: #ffffff !important; }
+
+    /* ── Fail-Safe Modal Protection (Guarantees zero leakage offline) ── */
+    .modal {
+      display: none;
+    }
+    .modal.show {
+      display: block !important;
     }
 
     html {
@@ -1011,7 +1175,7 @@
 
       <div class="accordion-portals" id="accordionPortals">
         {% for cat in categories_meta %}
-          <div class="gateway-panel" id="gateway-panel-{{ cat.key }}" data-cat-key="{{ cat.key }}">
+          <div class="gateway-panel gateway-panel-{{ cat.key }}" id="gateway-panel-{{ cat.key }}" data-cat-key="{{ cat.key }}">
 
             <!-- Header Strip (Click to toggle) -->
             <div class="gateway-header" onclick="toggleGateway('{{ cat.key }}')">
@@ -1043,7 +1207,7 @@
                 <!-- 1. Official Seats belonging to this gateway -->
                 {% for seat in seats %}
                   {% if seat.category_key == cat.key %}
-                    <div class="seat-card {% if seat.seat_type == 'presidency' %}seat-card-presidency{% endif %}"
+                    <div class="seat-card seat-card-{{ seat.category_key }}"
                          role="button"
                          tabindex="0"
                          data-card-kind="seat"
@@ -1053,7 +1217,7 @@
                          onclick="openSeatModal({{ seat.id }})"
                          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSeatModal({{ seat.id }});}">
                       <div class="tile-identity-side">
-                        <div class="member-initials-badge">{{ seat.primary_initials }}</div>
+                        <div class="member-initials-badge badge-{{ seat.category_key }}">{{ seat.primary_initials }}</div>
                         <div class="tile-text-stack">
                           <div class="seat-entity-title">{{ seat.name }}</div>
                           <div class="member-name-text">
@@ -1076,7 +1240,7 @@
                       </div>
 
                       <div class="tile-action-side">
-                        <div class="card-enter-bar">دخول الحساب</div>
+                        <div class="card-enter-bar enter-bar-{{ seat.category_key }}">دخول الحساب</div>
                       </div>
                     </div>
                   {% endif %}
@@ -1085,7 +1249,7 @@
                 <!-- 2. Standalone Users belonging to this gateway -->
                 {% for u in standalone_users %}
                   {% if u.category_key == cat.key %}
-                    <div class="seat-card"
+                    <div class="seat-card seat-card-{{ u.category_key }}"
                          role="button"
                          tabindex="0"
                          data-card-kind="staff"
@@ -1095,7 +1259,7 @@
                          onclick="openStaffModal({{ u.id }})"
                          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openStaffModal({{ u.id }});}">
                       <div class="tile-identity-side">
-                        <div class="member-initials-badge">{{ u.initials }}</div>
+                        <div class="member-initials-badge badge-{{ u.category_key }}">{{ u.initials }}</div>
                         <div class="tile-text-stack">
                           <div class="seat-entity-title">{{ u.official_title|default:u.get_title_display }}</div>
                           <div class="member-name-text">{{ u.role_badge_label }}</div>
@@ -1103,7 +1267,7 @@
                       </div>
 
                       <div class="tile-action-side">
-                        <div class="card-enter-bar">دخول الحساب</div>
+                        <div class="card-enter-bar enter-bar-{{ u.category_key }}">دخول الحساب</div>
                       </div>
                     </div>
                   {% endif %}
@@ -1147,10 +1311,10 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
 
-      <div class="modal-header">
+      <div class="modal-header" id="seatModalHeader">
         <div>
-          <div class="small fw-bold mb-1" style="color: var(--gold-light);" id="modalSeatTypeLabel">بوابة الدخول الرسمية</div>
-          <h5 class="modal-title fw-bold mb-0" id="modalSeatName">اسم الجهة</h5>
+          <div class="small fw-bold mb-1" style="color: rgba(255,255,255,0.85);" id="modalSeatTypeLabel">بوابة الدخول الرسمية</div>
+          <h5 class="modal-title fw-bold mb-0 text-white" id="modalSeatName">اسم الجهة</h5>
         </div>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -1498,13 +1662,39 @@
     const seat = seatsMap[seatId];
     if (!seat) return;
 
+    const catKey = seat.category_key || 'presidency_office';
+    const catTitles = {
+      'presidency_office': 'بوابة مكتب رئيس الجامعة والمستشارين والمساعدين',
+      'vice_presidents':   'بوابة نيابات رئاسة الجامعة',
+      'deans':             'بوابة عمادات كليات الجامعة',
+      'secretariat_admin': 'بوابة الأمانة العامة وإدارة المجلس',
+      'representatives':   'بوابة ممثلي النقابة وأعضاء هيئة التدريس'
+    };
+    const catSubmitLabels = {
+      'presidency_office': 'تأكيد الدخول – رئاسة الجامعة',
+      'vice_presidents':   'تأكيد الدخول – نيابة الرئاسة',
+      'deans':             'تأكيد الدخول – عمادة الكلية',
+      'secretariat_admin': 'تأكيد الدخول – أمانة المجلس',
+      'representatives':   'تأكيد الدخول – تمثيل المجلس'
+    };
+
     document.getElementById('modalLoginType').value = 'entity';
     document.getElementById('modalSeatId').value = seat.id;
     document.getElementById('modalStaffUserId').value = '';
     document.getElementById('modalHiddenUsername').value = '';
-    document.getElementById('modalSeatTypeLabel').textContent = 'بوابة الدخول الرسمية – مجلس الجامعة';
+    document.getElementById('modalSeatTypeLabel').textContent = catTitles[catKey] || 'بوابة الدخول الرسمية';
     document.getElementById('modalSeatName').textContent = seat.name;
     document.getElementById('modalPasswordHint').textContent = 'يتم تسجيل حضوركم وإثبات اطلاعكم آلياً فور تأكيد الدخول.';
+
+    const modalHeaderEl = document.getElementById('seatModalHeader');
+    if (modalHeaderEl) {
+      modalHeaderEl.className = 'modal-header modal-header-' + catKey;
+    }
+    const btnSubmitModal = document.getElementById('btnSubmitModal');
+    if (btnSubmitModal) {
+      btnSubmitModal.className = 'btn-action-primary btn-submit-' + catKey;
+      btnSubmitModal.textContent = catSubmitLabels[catKey] || 'تأكيد الدخول إلى المجلس';
+    }
 
     const errBox = document.getElementById('modalInlineError');
     if (errorMessage) {
@@ -1603,15 +1793,41 @@
     const u = staffMap[staffId];
     if (!u) return;
 
+    const catKey = u.category_key || 'secretariat_admin';
+    const catTitles = {
+      'presidency_office': 'بوابة مكتب رئيس الجامعة والمستشارين والمساعدين',
+      'vice_presidents':   'بوابة نيابات رئاسة الجامعة',
+      'deans':             'بوابة عمادات كليات الجامعة',
+      'secretariat_admin': 'بوابة الأمانة العامة وإدارة المجلس',
+      'representatives':   'بوابة ممثلي النقابة وأعضاء هيئة التدريس'
+    };
+    const catSubmitLabels = {
+      'presidency_office': 'تأكيد الدخول – رئاسة الجامعة',
+      'vice_presidents':   'تأكيد الدخول – نيابة الرئاسة',
+      'deans':             'تأكيد الدخول – عمادة الكلية',
+      'secretariat_admin': 'تأكيد الدخول – أمانة المجلس',
+      'representatives':   'تأكيد الدخول – تمثيل المجلس'
+    };
+
     document.getElementById('modalLoginType').value = 'direct';
     document.getElementById('modalSeatId').value = '';
     document.getElementById('modalSelectedUserId').value = '';
     document.getElementById('modalStaffUserId').value = u.id;
     document.getElementById('modalHiddenUsername').value = u.username;
 
-    document.getElementById('modalSeatTypeLabel').textContent = u.role_badge_label || 'الأمانة العامة وإدارة المجلس';
+    document.getElementById('modalSeatTypeLabel').textContent = catTitles[catKey] || (u.role_badge_label || 'الأمانة العامة وإدارة المجلس');
     document.getElementById('modalSeatName').textContent = u.title;
     document.getElementById('modalPasswordHint').textContent = 'أدخل كلمة المرور الخاصة بحسابك للدخول إلى النظام.';
+
+    const modalHeaderEl = document.getElementById('seatModalHeader');
+    if (modalHeaderEl) {
+      modalHeaderEl.className = 'modal-header modal-header-' + catKey;
+    }
+    const btnSubmitModal = document.getElementById('btnSubmitModal');
+    if (btnSubmitModal) {
+      btnSubmitModal.className = 'btn-action-primary btn-submit-' + catKey;
+      btnSubmitModal.textContent = catSubmitLabels[catKey] || 'تأكيد الدخول إلى المجلس';
+    }
 
     const errBox = document.getElementById('modalInlineError');
     if (errorMessage) {
