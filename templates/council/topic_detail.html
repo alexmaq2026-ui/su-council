@@ -110,7 +110,13 @@
           <span class="badge rounded-pill px-3 py-2 fw-bold" style="background-color: {{ topic.category_color }}; color: #fff; font-size: 0.78rem;">
             <i class="bi {{ topic.category_icon }} me-1"></i>{{ topic.get_category_display }} · {{ topic.ordinal_label }}
           </span>
-          <span class="uc-badge badge-{{ topic.status }}">{{ topic.get_clear_status_display }}</span>
+          {% if topic.is_new_business %}
+            <span class="badge rounded-pill px-3 py-2 fw-bold" style="background-color: #e11d48; color: #fff; font-size: 0.78rem;">
+              مستجد
+            </span>
+          {% endif %}
+          <span class="uc-badge badge-{{ topic.status }}">'
+{{ topic.get_clear_status_display }}</span>
         </div>
       </div>
       <div class="uc-card-body p-4">
@@ -572,6 +578,11 @@
             <div class="fs-6" style="white-space: pre-line; line-height: 1.8;">
               {{ decision.decision_text }}
             </div>
+            {% if topic.is_new_business %}
+              <div class="mt-2 text-danger fw-bold small pt-2 border-top border-danger border-opacity-25">
+                <i class="bi bi-shield-check me-1"></i>(أُقر هذا الموضوع كبند مستجد بإذن رئيس المجلس وحسب تصويت الأعضاء)
+              </div>
+            {% endif %}
             <div class="text-muted small mt-3 pt-2 border-top border-warning border-opacity-50 d-flex justify-content-between">
               <span>صاغه: {{ decision.drafted_by.full_name|default:"الأمين العام" }}</span>
               <span>{{ decision.drafted_at|date:"Y-m-d H:i" }}</span>

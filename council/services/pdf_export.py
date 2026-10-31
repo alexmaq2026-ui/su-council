@@ -286,6 +286,8 @@ def build_session_decisions_docx(session: CouncilSession) -> io.BytesIO:
             p_top.paragraph_format.space_after = Pt(3)
 
             _add_run_rtl(p_top, f"الموضوع {order_word}: ", font_size=11.5, bold=True, color_rgb=(0x1B, 0x36, 0x5D), font_name='Arial')
+            if getattr(t, 'is_new_business', False):
+                _add_run_rtl(p_top, " [مستجد] ", font_size=11, bold=True, color_rgb=(0xE1, 0x1D, 0x48), font_name='Arial')
             title_text = t.title if t.title else (t.background or "موضوع الجلسة")
             _add_run_rtl(p_top, title_text, font_size=11, bold=False, color_rgb=(0x22, 0x22, 0x22), font_name='Arial')
 
@@ -356,6 +358,10 @@ def build_session_decisions_docx(session: CouncilSession) -> io.BytesIO:
 
             _add_run_rtl(p_dec, "الـقــــــــرار: ", font_size=10.5, bold=True, color_rgb=(0x1B, 0x36, 0x5D), font_name='Arial')
             dec_text = t.decision.decision_text if getattr(t, 'decision', None) else "الموافقة والاعتماد رسمياً."
+            if getattr(t, 'is_new_business', False):
+                clause = " (أُقر هذا الموضوع كبند مستجد بإذن رئيس المجلس وحسب تصويت الأعضاء)."
+                if clause.strip() not in dec_text:
+                    dec_text += clause
             _add_run_rtl(p_dec, dec_text, font_size=10.5, bold=False, color_rgb=(0x15, 0x57, 0x24), font_name='Arial')
 
             # Spacing between topics
@@ -503,6 +509,10 @@ def _build_reportlab_single_decision_pdf(topic: Topic, decision_number: str = ""
         decision_text = topic.decision_summary
     else:
         decision_text = f"الموافقة والاعتماد وفقاً للمذكرة المرفوعة والمقترحات المقدمة لمجلس الجامعة."
+    if getattr(topic, 'is_new_business', False):
+        clause = " (أُقر هذا الموضوع كبند مستجد بإذن رئيس المجلس وحسب تصويت الأعضاء)."
+        if clause.strip() not in decision_text:
+            decision_text += clause
 
     c.setFillColorRGB(1.0, 1.0, 1.0)
     c.setStrokeColorRGB(0.85, 0.85, 0.85)

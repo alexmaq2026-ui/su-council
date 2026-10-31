@@ -13,6 +13,7 @@ Handles:
 - Audio Recording (Chunked Upload & Offset Indexing) APIs
 - Exit Permits (Formal Leave) APIs
 - Quorum Real-time Tracking API
+- New Business Live Request APIs (Zero-DB, In-Memory)
 """
 import os
 import json
@@ -201,7 +202,7 @@ def session_live_view(request, session_pk):
         cat_key = cat['key']
         cat_label = cat['label']
         cat_topics = [t for t in topics if t.category == cat_key]
-        if cat_topics:
+        if cat_topics or cat_key == 'new_business':
             has_active = any((active_topic and t.pk == active_topic.pk) or t.display_state.display_status in ('shown', 'voting') for t in cat_topics)
             theme = CATEGORY_THEMES.get(cat_key, DEFAULT_CUSTOM_THEME)
             topics_by_category.append({
@@ -308,8 +309,10 @@ def session_live_view(request, session_pk):
         'can_view_analytics': user.is_super or user.can_view_analytics,
         'can_open_previous_minutes': user.is_super or user.can_open_previous_minutes,
         'can_broadcast_previous_minutes': user.is_super or user.can_broadcast_previous_minutes,
+        'user_can_use_smart_reader': bool(user.is_super or is_president or getattr(user, 'can_use_smart_reader', False)),
         'can_moderate_live_session': is_president or user.is_super or getattr(user, 'can_moderate_live_session', False) or is_controller,
         'present_members': session.get_present_members() if (is_president or user.is_super or getattr(user, 'can_moderate_live_session', False) or is_controller) else [],
+        'can_request_new_business': user.is_super or getattr(user, 'can_request_new_business', False),
         'quorum_info': quorum_info,
         'user_seat': user_seat,
         'active_speaker': active_speaker,
@@ -1975,3 +1978,386 @@ def api_dismiss_live_directive(request, directive_pk):
     return JsonResponse({'ok': False, 'error': 'غير مصرح.'}, status=403)
 
 
+# ── Tablet Quick-Pairing & Network Discovery API ──────────────────────────────
+@login_required(login_url='/login/')
+def api_tablet_network_info(request):
+    """
+    Returns the server's local LAN IP, active port, and a QR code (base64)
+    allowing Samsung Galaxy Tablets to instantly pair and enter the meeting hall.
+    """
+    import socket, qrcode, io, base64
+
+    # Determine local LAN IP (prioritize Hotspot 192.168.137.x if active)
+    local_ip = None
+    try:
+        _, _, ips = socket.gethostbyname_ex(socket.gethostname())
+        for ip in ips:
+            if ip.startswith('192.168.137.'):
+                local_ip = ip
+                break
+    except Exception:
+        pass
+
+    if not local_ip:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(('10.255.255.255', 1))
+            local_ip = s.getsockname()[0]
+        except Exception:
+            local_ip = '127.0.0.1'
+        finally:
+            s.close()
+
+    port = request.get_port() or '8000'
+    local_url = f"http://{local_ip}:{port}"
+    public_url = os.getenv('PUBLIC_URL', '').rstrip('/')
+    
+    # Target URL for QR code (Public tunnel if available, otherwise local Wi-Fi IP)
+    target_url = public_url if (public_url and not request.GET.get('force_local')) else local_url
+
+    # Generate QR Code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=6,
+        border=2
+    )
+    qr.add_data(target_url)
+    qr.make(fit=True)
+    buf = io.BytesIO()
+    qr.make_image(fill_color="#1B365D", back_color="white").save(buf, format="PNG")
+    qr_b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    return JsonResponse({
+        'ok': True,
+        'local_ip': local_ip,
+        'port': port,
+        'local_url': local_url,
+        'public_url': public_url,
+        'target_url': target_url,
+        'qr_image': f"data:image/png;base64,{qr_b64}"
+    })
+
+
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  🆕  New Business Live Request APIs  (Zero-DB / In-Memory)
+#  طلب إذن إضافة موضوع في «ما استجد من أعمال» — آني بدون قاعدة بيانات
+#  كل حالة تُخزَّن في ذاكرة الخادم فقط وتُحذف عند انتهاء الجلسة أو رفض الطلب
+# ══════════════════════════════════════════════════════════════════════════════
+
+import threading as _threading
+
+# ── In-Memory Store ───────────────────────────────────────────────────────────
+# _NB_STORE[session_pk] = {
+#     'state':      'idle' | 'pending_president' | 'voting' | 'done',
+#     'requester_id':   int,
+#     'requester_name': str,
+#     'description':    str,
+#     'requested_at':   datetime,
+#     'votes': {user_id: 'approve'|'reject'},
+#     'voting_started_at': datetime | None,
+#     'president_decision': 'approved'|'rejected'|None,
+# }
+
+_NB_STORE: dict = {}
+_NB_LOCK  = _threading.Lock()
+_NB_VOTE_DURATION_SECONDS = 120   # دقيقتان
+
+
+def _nb_get(session_pk: int) -> dict:
+    """Return a copy of the current NB state for a session, or idle default."""
+    with _NB_LOCK:
+        return dict(_NB_STORE.get(session_pk, {'state': 'idle'}))
+
+
+def _nb_set(session_pk: int, data: dict):
+    """Overwrite the NB state for a session."""
+    with _NB_LOCK:
+        _NB_STORE[session_pk] = data
+
+
+def _nb_clear(session_pk: int):
+    """Remove the NB state for a session entirely."""
+    with _NB_LOCK:
+        _NB_STORE.pop(session_pk, None)
+
+
+# ── 1. Submit Request (requester → president) ─────────────────────────────────
+@login_required(login_url='/login/')
+@require_POST
+def api_nb_submit_request(request, session_pk):
+    """
+    المستخدم المخوَّل يرسل طلب إضافة موضوع جديد في «ما استجد».
+    ينتقل الطلب مباشرة لشاشة رئيس الجلسة عبر pollQueue.
+    """
+    user = request.user
+    if not (user.is_super or getattr(user, 'can_request_new_business', False)):
+        return JsonResponse({'ok': False, 'error': 'ليس لديك صلاحية طلب إضافة موضوع مستجد.'}, status=403)
+
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+    if session.status not in ('active', 'partial_close'):
+        return JsonResponse({'ok': False, 'error': 'الجلسة غير منعقدة حالياً.'}, status=400)
+
+    state = _nb_get(session_pk)
+    if state.get('state', 'idle') != 'idle':
+        return JsonResponse({'ok': False, 'error': 'يوجد طلب آخر قيد المعالجة حالياً. انتظر انتهاءه.'}, status=400)
+
+    try:
+        body = json.loads(request.body)
+        description = (body.get('description') or '').strip()
+    except Exception:
+        description = (request.POST.get('description') or '').strip()
+
+    if not description:
+        return JsonResponse({'ok': False, 'error': 'يرجى كتابة وصف وحيثيات الموضوع المراد إضافته.'}, status=400)
+
+    _nb_set(session_pk, {
+        'state':           'pending_president',
+        'requester_id':    user.pk,
+        'requester_name':  user.full_name,
+        'description':     description,
+        'requested_at':    timezone.now().isoformat(),
+        'votes':           {},
+        'voting_started_at': None,
+        'president_decision': None,
+    })
+
+    return JsonResponse({'ok': True, 'message': 'تم إرسال طلبك لرئيس الجلسة بنجاح. انتظر قراره.'})
+
+
+# ── 2. Poll State (all users, via pollQueue cycle) ────────────────────────────
+@login_required(login_url='/login/')
+@require_GET
+def api_nb_poll(request, session_pk):
+    """
+    نقطة استطلاع تُستدعى كل نبضة pollQueue.
+    تُعيد الحالة الحالية لطلب المستجد لكل مستخدم.
+    """
+    user = request.user
+    if not (user.is_super or user.can_view_live_session or user.can_start_session_live or getattr(user, 'can_request_new_business', False) or user.can_vote or user.can_prepare_agenda):
+        return JsonResponse({'ok': False, 'error': 'غير مصرح.'}, status=403)
+
+    state = _nb_get(session_pk)
+    now   = timezone.now()
+    result = dict(state)
+
+    # احسب الثواني المتبقية إذا كان التصويت جارياً
+    if state.get('state') == 'voting' and state.get('voting_started_at'):
+        try:
+            from datetime import datetime, timezone as dt_tz
+            started = datetime.fromisoformat(state['voting_started_at'])
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=dt_tz.utc)
+            elapsed = (now - started).total_seconds()
+            remaining = max(0, _NB_VOTE_DURATION_SECONDS - elapsed)
+            result['seconds_remaining'] = int(remaining)
+
+            # إذا انتهى الوقت، احسب النتائج وانتظر قرار الرئيس
+            if remaining <= 0 and state.get('state') == 'voting':
+                votes = state.get('votes', {})
+                approved = sum(1 for v in votes.values() if v == 'approve')
+                rejected = sum(1 for v in votes.values() if v == 'reject')
+                state['state'] = 'awaiting_president'
+                state['vote_approved'] = approved
+                state['vote_rejected'] = rejected
+                _nb_set(session_pk, state)
+                result = dict(state)
+                result['seconds_remaining'] = 0
+        except Exception:
+            pass
+
+    # أضف صوت المستخدم الحالي إن وجد
+    result['my_vote'] = state.get('votes', {}).get(str(user.pk))
+    result['ok'] = True
+    return JsonResponse(result)
+
+
+# ── 3. President Action ───────────────────────────────────────────────────────
+@login_required(login_url='/login/')
+@require_POST
+def api_nb_president_action(request, session_pk):
+    """
+    رئيس الجلسة يختار: موافقة مباشرة / عرض على الأعضاء / رفض.
+    action: 'approve_direct' | 'send_to_members' | 'reject'
+    """
+    user    = request.user
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+    if not session.is_user_president(user) and not user.is_super:
+        return JsonResponse({'ok': False, 'error': 'هذه الصلاحية لرئيس الجلسة فقط.'}, status=403)
+
+    state = _nb_get(session_pk)
+    if state.get('state') not in ('pending_president', 'awaiting_president'):
+        return JsonResponse({'ok': False, 'error': 'لا يوجد طلب معلق حالياً.'}, status=400)
+
+    try:
+        body   = json.loads(request.body)
+        action = body.get('action', '').strip()
+    except Exception:
+        action = request.POST.get('action', '').strip()
+
+    if action == 'approve_direct':
+        state['state']             = 'done'
+        state['president_decision'] = 'approved'
+        _nb_set(session_pk, state)
+        return JsonResponse({'ok': True, 'message': 'تمت الموافقة. يمكن للمقدم الآن إضافة الموضوع.'})
+
+    elif action == 'send_to_members':
+        state['state']             = 'voting'
+        state['voting_started_at'] = timezone.now().isoformat()
+        state['votes']             = {}
+        _nb_set(session_pk, state)
+        return JsonResponse({'ok': True, 'message': 'تم إرسال الطلب لأعضاء المجلس للتصويت. مدة التصويت دقيقتان.'})
+
+    elif action == 'reject':
+        _nb_clear(session_pk)
+        return JsonResponse({'ok': True, 'message': 'تم رفض الطلب وإغلاقه.'})
+
+    elif action == 'final_approve':
+        votes    = state.get('votes', {})
+        approved = state.get('vote_approved', sum(1 for v in votes.values() if v == 'approve'))
+        rejected = state.get('vote_rejected', sum(1 for v in votes.values() if v == 'reject'))
+        state['state']             = 'done'
+        state['president_decision'] = 'approved'
+        state['vote_approved']     = approved
+        state['vote_rejected']     = rejected
+        _nb_set(session_pk, state)
+        return JsonResponse({'ok': True, 'message': 'تمت الموافقة النهائية على إضافة الموضوع.'})
+
+    elif action == 'final_reject':
+        _nb_clear(session_pk)
+        return JsonResponse({'ok': True, 'message': 'تم رفض إضافة الموضوع.'})
+
+    return JsonResponse({'ok': False, 'error': 'إجراء غير معروف.'}, status=400)
+
+
+# ── 4. Member Vote ─────────────────────────────────────────────────────────────
+@login_required(login_url='/login/')
+@require_POST
+def api_nb_member_vote(request, session_pk):
+    """
+    عضو يصوت على طلب إضافة المستجد.
+    vote: 'approve' | 'reject'
+    """
+    user    = request.user
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    if not (user.is_super or user.can_vote):
+        return JsonResponse({'ok': False, 'error': 'ليس لديك حق التصويت.'}, status=403)
+
+    state = _nb_get(session_pk)
+    if state.get('state') != 'voting':
+        return JsonResponse({'ok': False, 'error': 'لا يوجد تصويت جارٍ حالياً.'}, status=400)
+
+    try:
+        body = json.loads(request.body)
+        vote = body.get('vote', '').strip()
+    except Exception:
+        vote = request.POST.get('vote', '').strip()
+
+    if vote not in ('approve', 'reject'):
+        return JsonResponse({'ok': False, 'error': 'قيمة التصويت غير صحيحة.'}, status=400)
+
+    state['votes'][str(user.pk)] = vote
+    _nb_set(session_pk, state)
+    return JsonResponse({'ok': True, 'message': 'تم تسجيل صوتك بنجاح.'})
+
+
+# ── 5. Requester Confirms Add / President Clears ──────────────────────────────
+@login_required(login_url='/login/')
+@require_POST
+def api_nb_clear(request, session_pk):
+    """
+    يُستدعى بعد موافقة الرئيس لتنظيف الحالة وإعادتها لـ idle.
+    يجب أن يكون المستخدم هو مقدم الطلب، الرئيس، أو السوبر أدمن.
+    """
+    user  = request.user
+    state = _nb_get(session_pk)
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+
+    allowed = (
+        user.is_super
+        or session.is_user_president(user)
+        or str(user.pk) == str(state.get('requester_id', ''))
+    )
+    if not allowed:
+        return JsonResponse({'ok': False, 'error': 'غير مصرح.'}, status=403)
+
+    _nb_clear(session_pk)
+    return JsonResponse({'ok': True})
+
+
+# ── 6. Create New Business Topic Directly in Primary Category ────────────────
+@login_required(login_url='/login/')
+@require_POST
+def api_nb_create_topic(request, session_pk):
+    """
+    اعتماد وإدراج الموضوع المستجد في محوره الأساسي فور موافقة رئيس المجلس أو تصويت الأعضاء.
+    المحور الأساسي هو أحد المحاور التخصصية الستة (أو المخصصة)، مع وسم الموضوع بـ is_new_business=True.
+    """
+    user    = request.user
+    session = get_object_or_404(CouncilSession, pk=session_pk)
+    state   = _nb_get(session_pk)
+
+    allowed = (
+        user.is_super
+        or session.is_user_president(user)
+        or user.can_prepare_agenda
+        or str(user.pk) == str(state.get('requester_id', ''))
+    )
+    if not allowed:
+        return JsonResponse({'ok': False, 'error': 'غير مصرح لك بإدراج هذا الموضوع.'}, status=403)
+
+    if state.get('state') != 'done' or state.get('president_decision') != 'approved':
+        return JsonResponse({'ok': False, 'error': 'لم يتم إصدار الموافقة النهائية على إضافة الموضوع بعد.'}, status=400)
+
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        body = request.POST
+
+    title = (body.get('title') or '').strip()
+    primary_category = (body.get('primary_category') or 'general').strip()
+    presenting_entity = (body.get('presenting_entity') or '').strip()
+    background = (body.get('background') or '').strip() or state.get('description', '')
+
+    if not title:
+        return JsonResponse({'ok': False, 'error': 'يرجى كتابة عنوان الموضوع المراد إدراجه.'}, status=400)
+
+    from django.db.models import Max
+    max_sub = Topic.objects.filter(session=session, category=primary_category).aggregate(Max('sub_order'))['sub_order__max'] or 0
+    sub_order = max_sub + 1
+
+    max_order = Topic.objects.filter(session=session).aggregate(Max('order_number'))['order_number__max'] or 0
+    order_number = max_order + 1
+
+    topic = Topic.objects.create(
+        session=session,
+        category=primary_category,
+        sub_order=sub_order,
+        order_number=order_number,
+        title=title,
+        presenting_entity=presenting_entity,
+        background=background,
+        is_new_business=True,
+        status='pending',
+        created_by=user,
+    )
+
+    TopicDisplayState.objects.get_or_create(
+        topic=topic,
+        defaults={'display_status': 'hidden', 'allocated_minutes': 0}
+    )
+
+    Topic.resequence_category(session.pk, primary_category)
+
+    _nb_clear(session_pk)
+
+    return JsonResponse({
+        'ok': True,
+        'topic_id': topic.pk,
+        'category': primary_category,
+        'message': f'تم إدراج الموضوع المستجد «{title}» بنجاح في محوره الأساسي.'
+    })

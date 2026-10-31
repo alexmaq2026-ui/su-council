@@ -160,7 +160,31 @@ def api_smart_reader_log(request):
         chunks_count=chunks_count
     )
 
+    # تدوير تلقائي فوري: الاحتفاظ بآخر 30 عملية فقط ومسح الأقدم
+    try:
+        excess_ids = list(SmartReaderLog.objects.order_by('-created_at').values_list('id', flat=True)[30:])
+        if excess_ids:
+            SmartReaderLog.objects.filter(id__in=excess_ids).delete()
+    except Exception:
+        pass
+
     return JsonResponse({'success': True})
+
+
+@login_required(login_url='/login/')
+@require_POST
+def smart_reader_clear_log_view(request):
+    """
+    Administrative view to clear all Smart Audio Reader usage logs.
+    Requires can_manage_smart_reader or is_super.
+    """
+    if not (request.user.is_super or getattr(request.user, 'can_manage_smart_reader', False)):
+        messages.error(request, 'غير مصرح لك بتفريغ السجل.')
+        return redirect('council:smart_reader_settings')
+
+    count, _ = SmartReaderLog.objects.all().delete()
+    messages.success(request, f'تم تفريغ سجل القراءة الذكية بنجاح (حذف {count} عملية مسجلة).')
+    return redirect('council:smart_reader_settings')
 
 
 @login_required(login_url='/login/')

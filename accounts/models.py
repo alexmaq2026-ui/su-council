@@ -439,9 +439,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def can_moderate_live_session(self): return self._has_perm('can_moderate_live_session')
     @property
+    def can_request_new_business(self):  return self._has_perm('can_request_new_business')
+    @property
     def enforce_force_majeure(self):
         """Returns True only if the Super Admin explicitly applied Force Majeure on this user."""
         if self.is_super:
+            return False
+        # Staff scanner / data entry support staff are never subjected to force majeure lockdown
+        if self.title in ('موظف_المساعدة', 'مدير_عام_المساعدة', 'ادارة_مساعدة') and not self.can_vote:
             return False
         perm = self.get_permission()
         return bool(perm and getattr(perm, 'enforce_force_majeure', False))
@@ -541,6 +546,7 @@ class CouncilPermission(models.Model):
         'can_view_projector', 'can_view_analytics',
         'can_open_previous_minutes', 'can_broadcast_previous_minutes',
         'can_moderate_live_session', 'enforce_force_majeure',
+        'can_request_new_business',
         # 10. Search, Notifications, Smart Reader & Audit
         'can_search_minutes', 'can_search_person',
         'can_view_notifications', 'can_view_notification_log',
@@ -666,8 +672,10 @@ class CouncilPermission(models.Model):
                                                          help_text='إظهار وإتاحة زر «بث لشاشات الأعضاء» لبث المحضر السابق لشاشات الأعضاء وإيقافه')
     can_moderate_live_session      = models.BooleanField('اللوحة العائمة للتوجيه والتنبيه التفاعلي ونقاط النظام للأعضاء', default=False,
                                                          help_text='إظهار اللوحة العائمة المنكمشة لرئيس الجلسة أو المفوّض لإرسال نقاط النظام ورسائل الهدوء والتوجيهات المخصصة للأعضاء الحاضرين')
-    enforce_force_majeure          = models.BooleanField('زر تطبيق القوة القاهرة (تجميد شاشة العضو والتنقل أثناء النقاش)', default=False,
-                                                         help_text='تطبيق القوة القاهرة حصراً على هذا العضو بقرار المدير الأعلى؛ بحيث تُوجَّه شاشته إجبارياً لموضوع النقاش وتُجمَّد روابط التنقل في السايدبار والنافبار أثناء انعقاد الجلسة')
+    enforce_force_majeure          = models.BooleanField('إخضاع هذا الحساب للقوة القاهرة وتجميد الشاشة والتنقل (قيد إداري حصري)', default=False,
+                                                         help_text='قيد إداري يفرضه المدير الأعلى حصراً على هذا العضو؛ بحيث تُوجَّه شاشته إجبارياً لموضوع النقاش وتُجمَّد روابط التنقل في السايدبار والنافبار أثناء انعقاد الجلسة. تركه غير محدد يعني أن المستخدم حر التنقل.')
+    can_request_new_business       = models.BooleanField('زر طلب إذن إضافة موضوع في ما استجد من أعمال', default=False,
+                                                         help_text='إظهار زر طلب الإذن في شريط محور «ما استجد من أعمال» أثناء انعقاد الجلسة، لإرسال طلب إضافة موضوع طارئ لرئيس الجلسة، مع آلية تصويت فوري آني للأعضاء خلال دقيقتين')
 
     # 10. Search, Notifications, Smart Reader & Audit
     can_search_minutes        = models.BooleanField('استخدام شاشة البحث في المحاضر', default=False)

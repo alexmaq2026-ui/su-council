@@ -79,7 +79,8 @@ def extract_topic_smart_text(topic: Topic) -> dict:
     idx = 0
 
     # 1. Topic Title & Order
-    order_str = f"الموضوع رقم ({topic.order_number})"
+    raw_order = getattr(topic, 'ordinal_label', '') or f"الموضوع رقم ({topic.order_number})"
+    order_str = re.sub(r'\s*\(\d+\)', '', raw_order).strip()
     if topic.category:
         order_str += f" ضمن تصنيف {topic.get_category_display()}"
     title_text = f"{order_str}: {topic.title}."
@@ -222,10 +223,12 @@ def extract_session_smart_text(session: CouncilSession) -> dict:
     # 3. Topics & Decisions sequentially
     topics = session.topics.all().order_by('order_number')
     for t in topics:
+        raw_label = getattr(t, 'ordinal_label', '') or f"الموضوع رقم ({t.order_number})"
+        order_label = re.sub(r'\s*\(\d+\)', '', raw_label).strip()
         chunks.append({
             'id': idx,
-            'label': f"الموضوع ({t.order_number})",
-            'text': f"الموضوع رقم ({t.order_number}): {t.title}.",
+            'label': order_label,
+            'text': f"{order_label}: {t.title}.",
             'field': f'topic_{t.id}_title',
             'is_header': True
         })
@@ -236,7 +239,7 @@ def extract_session_smart_text(session: CouncilSession) -> dict:
             for s in s_list[:2]: # First 2 sentences of background for session overview
                 chunks.append({
                     'id': idx,
-                    'label': f"حيثيات الموضوع ({t.order_number})",
+                    'label': f"حيثيات {order_label}",
                     'text': s,
                     'field': f'topic_{t.id}_background',
                     'is_header': False
@@ -247,7 +250,7 @@ def extract_session_smart_text(session: CouncilSession) -> dict:
         if dec and dec.decision_text:
             chunks.append({
                 'id': idx,
-                'label': f"قرار الموضوع ({t.order_number})",
+                'label': f"قرار {order_label}",
                 'text': f"قرار المجلس بشأنه: {dec.decision_text}",
                 'field': f'topic_{t.id}_decision',
                 'is_header': True

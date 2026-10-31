@@ -273,6 +273,34 @@
               </div>
             </div>
 
+            <!-- can_request_new_business -->
+            <div class="col-12 col-sm-6">
+              <div class="perm-toggle-card {% if form.can_request_new_business.value %}active{% endif %}" id="card-can_request_nb">
+                <div class="d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="perm-icon" style="background:rgba(225,29,72,0.12); color:#e11d48;">
+                      <i class="bi bi-lightning-charge-fill"></i>
+                    </div>
+                    <div>
+                      <div class="fw-semibold">طلب إضافة ما استجد</div>
+                      <small class="text-muted">طلب إذن إضافة موضوع في «ما استجد من أعمال» أثناء الانعقاد</small>
+                    </div>
+                  </div>
+                  <div class="form-check form-switch mb-0">
+                    <input
+                      type="checkbox"
+                      name="{{ form.can_request_new_business.html_name }}"
+                      id="{{ form.can_request_new_business.id_for_label }}"
+                      class="form-check-input perm-switch"
+                      role="switch"
+                      {% if form.can_request_new_business.value %}checked{% endif %}
+                      onchange="toggleCard(this, 'card-can_request_nb')"
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
           <!-- /Permission Toggles -->
 
@@ -343,6 +371,10 @@
             <i class="bi bi-circle{% if target_user.can_grant_permissions %}-fill text-success{% else %} text-muted{% endif %}" id="icon-can_grant"></i>
             <span>تخويل الصلاحيات</span>
           </div>
+          <div class="perm-summary-item d-flex align-items-center gap-2 py-2" id="sum-can_request_nb">
+            <i class="bi bi-circle{% if target_user.can_request_new_business %}-fill text-success{% else %} text-muted{% endif %}" id="icon-can_request_nb"></i>
+            <span>طلب إضافة ما استجد</span>
+          </div>
         </div>
       </div>
     </div>
@@ -360,12 +392,13 @@ function toggleCard(checkbox, cardId) {
 
   // Map card id to icon id
   const iconMap = {
-    'card-can_add':    'icon-can_add',
-    'card-can_edit':   'icon-can_edit',
-    'card-can_delete': 'icon-can_delete',
-    'card-can_vote':   'icon-can_vote',
-    'card-can_draft':  'icon-can_draft',
-    'card-can_grant':  'icon-can_grant',
+    'card-can_add':        'icon-can_add',
+    'card-can_edit':       'icon-can_edit',
+    'card-can_delete':     'icon-can_delete',
+    'card-can_vote':       'icon-can_vote',
+    'card-can_draft':      'icon-can_draft',
+    'card-can_grant':      'icon-can_grant',
+    'card-can_request_nb': 'icon-can_request_nb',
   };
   const iconId = iconMap[cardId];
   if (iconId) {

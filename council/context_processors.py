@@ -103,3 +103,14 @@ def isolation_context(request):
         return {'is_system_isolated': True, 'is_external_server': False}
 
 
+
+
+def license_context(request):
+    """
+    Exposes license status to all templates for the draggable real-time countdown widget.
+    """
+    try:
+        from license_guard import get_license_status
+        return {'license_status': get_license_status()}
+    except Exception:
+        return {'license_status': {'is_licensed': False}}

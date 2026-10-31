@@ -6,13 +6,15 @@
     left: 0;
     right: 0;
     background: #ffffff;
-    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.35);
     border-top: 4px solid #1B365D;
-    z-index: 1060;
+    z-index: 2050;
+    display: none;
     transform: translateY(105%);
-    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .smart-reader-overlay.show {
+    display: block !important;
     transform: translateY(0);
   }
   .smart-reader-content-box {
@@ -82,7 +84,7 @@
             صوت محلي (المتصفح)
           </button>
         </div>
-        <button type="button" class="btn btn-outline-danger btn-sm px-3 fw-bold" onclick="closeSmartReader()">
+        <button type="button" id="btnSmartReaderClose" class="btn btn-outline-danger btn-sm px-3 fw-bold" onclick="closeSmartReader()" ontouchstart="closeSmartReader()">
           إغلاق القارئ
         </button>
       </div>
@@ -151,8 +153,7 @@ let smartReaderState = {
   targetTitle: '',
   sessionId: null,
   topicId: null,
-  audioElement: null,
-  synthUtterance: null
+  audioElement: null
 };
 
 // Initialize HTML5 Audio Element for Cloud Neural mode
@@ -163,24 +164,95 @@ if (!smartReaderState.audioElement) {
   };
   smartReaderState.audioElement.onerror = function() {
     console.warn("Cloud Neural audio error, falling back to local speech");
-    playChunkLocal(smartReaderState.chunks[smartReaderState.currentIndex]);
+    if (smartReaderState.active && !smartReaderState.paused) {
+      playChunkLocal(smartReaderState.chunks[smartReaderState.currentIndex]);
+    }
   };
 }
 
+// Global reference for Android Chrome Speech Keep-Alive and Timers
+window._smartReaderActiveUtterance = null;
+window._smartReaderKeepAliveTimer = null;
+window._smartReaderSafetyTimer = null;
+window._cachedArabicVoice = null;
+
+// Search and select best available Arabic voice on device
+function getArabicVoice() {
+  if (!window.speechSynthesis) return null;
+  const voices = window.speechSynthesis.getVoices() || [];
+  if (!voices.length) return null;
+
+  // 1. Direct Arabic dialect (ar-SA, ar_SA, ar-EG, etc.)
+  let v = voices.find(x => x.lang && (x.lang.toLowerCase() === 'ar-sa' || x.lang.toLowerCase() === 'ar_sa'));
+  if (v) return v;
+
+  // 2. Any Arabic language tag
+  v = voices.find(x => x.lang && x.lang.toLowerCase().startsWith('ar'));
+  if (v) return v;
+
+  // 3. Name matches Arabic keywords
+  v = voices.find(x => x.name && (x.name.toLowerCase().includes('arabic') || x.name.includes('عربي') || x.name.includes('Tariq') || x.name.includes('Maged') || x.name.includes('Laila')));
+  return v || null;
+}
+
+// Cache voices as soon as browser registers them
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  window._cachedArabicVoice = getArabicVoice();
+  if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    window.speechSynthesis.onvoiceschanged = function() {
+      window._cachedArabicVoice = getArabicVoice();
+    };
+  }
+}
+
+// Clean speech text from redundant parenthesized digits like (1) so TTS speaks pure Arabic
+function sanitizeArabicSpeech(text) {
+  if (!text) return '';
+  let s = text;
+  // Replace "الموضوع الأول (1)" with "الموضوع الأول"
+  s = s.replace(/الموضوع\s+(الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر|الحادي\s+عشر|الثاني\s+عشر|الثالث\s+عشر|الرابع\s+عشر|الخامس\s+عشر|السادس\s+عشر|السابع\s+عشر|الثامن\s+عشر|التاسع\s+عشر|العشرون)\s*\(\d+\)/g, 'الموضوع $1');
+  // Remove any remaining parenthesized numbers e.g. (1) or (22)
+  s = s.replace(/\s*\(\d+\)/g, '');
+  // Remove leading bullet symbols
+  s = s.replace(/^[\s•\-\*]+/gm, '');
+  return s.trim();
+}
+
+// Control progress bar animation
+function setProgressBarAnimation(active) {
+  const pBar = document.getElementById('smartReaderProgressBar');
+  if (!pBar) return;
+  if (active) {
+    pBar.classList.add('progress-bar-animated');
+  } else {
+    pBar.classList.remove('progress-bar-animated');
+  }
+}
+
 function openSmartReader(params) {
-  smartReaderState.sessionId = params.sessionId || null;
-  smartReaderState.topicId = params.topicId || null;
-  
+  params = params || {};
+  const topicId = (params.topicId && params.topicId !== '0' && params.topicId !== 0) ? params.topicId : null;
+  const sessionId = params.sessionId || null;
+
+  if (!topicId && !sessionId) {
+    alert('يرجى تحديد الموضوع أو الجلسة المراد قراءتها.');
+    return;
+  }
+
+  smartReaderState.sessionId = sessionId;
+  smartReaderState.topicId = topicId;
+
   const overlay = document.getElementById('smartReaderOverlay');
-  overlay.classList.add('show');
-  
+  overlay.style.display = 'block';
+  setTimeout(() => overlay.classList.add('show'), 20);
+
   document.getElementById('smartReaderStatusBadge').className = 'badge bg-warning text-dark px-2 py-1';
   document.getElementById('smartReaderStatusBadge').innerText = 'جاري تحضير النص...';
-  
+
   let url = '/api/smart-reader/data/?';
-  if (params.topicId) url += 'topic_id=' + params.topicId;
-  else if (params.sessionId) url += 'session_id=' + params.sessionId;
-  
+  if (topicId) url += 'topic_id=' + topicId;
+  else if (sessionId) url += 'session_id=' + sessionId;
+
   fetch(url)
     .then(r => r.json())
     .then(data => {
@@ -189,18 +261,32 @@ function openSmartReader(params) {
         closeSmartReader();
         return;
       }
-      
+
       smartReaderState.chunks = data.chunks;
       smartReaderState.totalChunks = data.total_chunks;
       smartReaderState.targetTitle = data.title;
       smartReaderState.currentIndex = 0;
-      
+
+      // تطبيق إعدادات السيرفر المعتمدة (النمط والسرعة واللون)
+      if (data.settings) {
+        if (data.settings.voice_mode) {
+          setReaderMode(data.settings.voice_mode);
+        }
+        if (data.settings.default_speed) {
+          setReaderSpeed(parseFloat(data.settings.default_speed));
+        }
+        if (data.settings.highlight_color) {
+          smartReaderState.highlightColor = data.settings.highlight_color;
+        }
+      }
+
       document.getElementById('smartReaderTargetTitle').innerText = data.title;
       document.getElementById('smartReaderProgressText').innerText = `0 / ${data.total_chunks}`;
       document.getElementById('smartReaderProgressBar').style.width = '0%';
+      setProgressBarAnimation(false);
       document.getElementById('smartReaderStatusBadge').className = 'badge bg-success px-2 py-1';
       document.getElementById('smartReaderStatusBadge').innerText = 'جاهز للقراءة';
-      
+
       renderChunksInBox(data.chunks);
     })
     .catch(err => {
@@ -211,14 +297,28 @@ function openSmartReader(params) {
 }
 
 function closeSmartReader() {
-  stopSmartReader();
-  document.getElementById('smartReaderOverlay').classList.remove('show');
+  try {
+    stopSmartReader();
+  } catch (e) {
+    console.error("Error in stopSmartReader:", e);
+  }
+
+  const overlay = document.getElementById('smartReaderOverlay');
+  if (overlay) {
+    overlay.classList.remove('show');
+    // Definitive hidden style
+    setTimeout(() => {
+      if (!overlay.classList.contains('show')) {
+        overlay.style.display = 'none';
+      }
+    }, 250);
+  }
 }
 
 function renderChunksInBox(chunks) {
   const box = document.getElementById('smartReaderTextBox');
   box.innerHTML = '';
-  
+
   chunks.forEach((chunk, i) => {
     const span = document.createElement('span');
     span.id = 'chunk_dom_' + i;
@@ -236,7 +336,7 @@ function setReaderMode(mode) {
   smartReaderState.mode = mode;
   document.getElementById('btnModeNeural').classList.toggle('active', mode === 'cloud_neural');
   document.getElementById('btnModeLocal').classList.toggle('active', mode === 'browser_local');
-  
+
   if (smartReaderState.active && !smartReaderState.paused) {
     playCurrentChunk();
   }
@@ -244,46 +344,58 @@ function setReaderMode(mode) {
 
 function setReaderSpeed(speed, btn) {
   smartReaderState.speed = speed;
-  document.querySelectorAll('.reader-btn-speed').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.reader-btn-speed').forEach(b => {
+    b.classList.remove('active');
+    if (!btn && b.textContent.includes(speed + 'x')) {
+      b.classList.add('active');
+    }
+  });
   if (btn) btn.classList.add('active');
-  
+
   if (smartReaderState.audioElement) {
     smartReaderState.audioElement.playbackRate = speed;
   }
   if (smartReaderState.active && !smartReaderState.paused && smartReaderState.mode === 'browser_local') {
-    // Restart local utterance with new rate
     window.speechSynthesis.cancel();
     playChunkLocal(smartReaderState.chunks[smartReaderState.currentIndex]);
   }
 }
 
+let _hasLoggedThisRun = false;
+
 function startSmartReader() {
-  if (smartReaderState.chunks.length === 0) return;
-  
+  if (!smartReaderState.chunks || smartReaderState.chunks.length === 0) return;
+
   smartReaderState.active = true;
   smartReaderState.paused = false;
-  
+  _hasLoggedThisRun = false;
+
   document.getElementById('btnReaderPlay').classList.add('d-none');
   document.getElementById('btnReaderPause').classList.remove('d-none');
   document.getElementById('btnReaderResume').classList.add('d-none');
   document.getElementById('smartReaderStatusBadge').className = 'badge bg-primary px-2 py-1';
   document.getElementById('smartReaderStatusBadge').innerText = 'جاري القراءة الآن...';
-  
-  // Log audit
-  logReaderUsage();
-  
+
+  setProgressBarAnimation(true);
+  if (smartReaderState.mode === 'browser_local') {
+    logReaderUsage('browser_local');
+  }
   playCurrentChunk();
 }
 
 function pauseSmartReader() {
   smartReaderState.paused = true;
-  
+
+  if (window._smartReaderSafetyTimer) clearTimeout(window._smartReaderSafetyTimer);
+
+  setProgressBarAnimation(false);
+
   if (smartReaderState.mode === 'cloud_neural' && smartReaderState.audioElement) {
     smartReaderState.audioElement.pause();
   } else {
-    window.speechSynthesis.pause();
+    try { window.speechSynthesis.cancel(); } catch(e) {}
   }
-  
+
   document.getElementById('btnReaderPause').classList.add('d-none');
   document.getElementById('btnReaderResume').classList.remove('d-none');
   document.getElementById('smartReaderStatusBadge').className = 'badge bg-warning text-dark px-2 py-1';
@@ -292,15 +404,15 @@ function pauseSmartReader() {
 
 function resumeSmartReader() {
   smartReaderState.paused = false;
-  
+
+  setProgressBarAnimation(true);
+
   if (smartReaderState.mode === 'cloud_neural' && smartReaderState.audioElement && smartReaderState.audioElement.src) {
     smartReaderState.audioElement.play();
-  } else if (window.speechSynthesis.paused) {
-    window.speechSynthesis.resume();
   } else {
     playCurrentChunk();
   }
-  
+
   document.getElementById('btnReaderResume').classList.add('d-none');
   document.getElementById('btnReaderPause').classList.remove('d-none');
   document.getElementById('smartReaderStatusBadge').className = 'badge bg-primary px-2 py-1';
@@ -310,16 +422,26 @@ function resumeSmartReader() {
 function stopSmartReader() {
   smartReaderState.active = false;
   smartReaderState.paused = false;
-  
+
+  if (window._smartReaderKeepAliveTimer) clearInterval(window._smartReaderKeepAliveTimer);
+  if (window._smartReaderSafetyTimer) clearTimeout(window._smartReaderSafetyTimer);
+  window._smartReaderActiveUtterance = null;
+
+  setProgressBarAnimation(false);
+
   if (smartReaderState.audioElement) {
-    smartReaderState.audioElement.pause();
-    smartReaderState.audioElement.currentTime = 0;
+    try {
+      smartReaderState.audioElement.pause();
+      smartReaderState.audioElement.currentTime = 0;
+    } catch(e) {}
   }
-  window.speechSynthesis.cancel();
-  
+  try {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+  } catch(e) {}
+
   // Clear visual highlights
   document.querySelectorAll('.reader-chunk').forEach(el => el.classList.remove('active-reading'));
-  
+
   document.getElementById('btnReaderPlay').classList.remove('d-none');
   document.getElementById('btnReaderPause').classList.add('d-none');
   document.getElementById('btnReaderResume').classList.add('d-none');
@@ -342,14 +464,15 @@ function jumpToChunk(index) {
 function playCurrentChunk() {
   if (smartReaderState.currentIndex >= smartReaderState.chunks.length) {
     stopSmartReader();
+    setProgressBarAnimation(false);
     document.getElementById('smartReaderStatusBadge').className = 'badge bg-success px-2 py-1';
     document.getElementById('smartReaderStatusBadge').innerText = 'اكتملت القراءة';
     return;
   }
-  
+
   const chunk = smartReaderState.chunks[smartReaderState.currentIndex];
   updateVisualHighlight(smartReaderState.currentIndex);
-  
+
   if (smartReaderState.mode === 'cloud_neural') {
     playChunkNeural(chunk);
   } else {
@@ -362,11 +485,9 @@ function updateVisualHighlight(index) {
   const currentDom = document.getElementById('chunk_dom_' + index);
   if (currentDom) {
     currentDom.classList.add('active-reading');
-    // Auto-scroll inside text box
     currentDom.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
-  
-  // Update progress
+
   const total = smartReaderState.totalChunks;
   const current = index + 1;
   const pct = Math.round((current / total) * 100);
@@ -375,7 +496,7 @@ function updateVisualHighlight(index) {
 }
 
 function playChunkNeural(chunk) {
-  // Call server synthesis endpoint
+  const currentIdx = smartReaderState.currentIndex;
   fetch('/api/smart-reader/synthesize/', {
     method: 'POST',
     headers: {
@@ -389,41 +510,106 @@ function playChunkNeural(chunk) {
   })
   .then(r => r.json())
   .then(res => {
+    if (!smartReaderState.active || smartReaderState.paused || smartReaderState.currentIndex !== currentIdx) return;
     if (res.success && res.audio_url) {
+      logReaderUsage('cloud_neural');
       smartReaderState.audioElement.src = res.audio_url;
       smartReaderState.audioElement.playbackRate = smartReaderState.speed;
       smartReaderState.audioElement.play().catch(e => {
         console.warn("Autoplay audio blocked, falling back to local speech");
-        playChunkLocal(chunk);
+        if (smartReaderState.active && !smartReaderState.paused && smartReaderState.currentIndex === currentIdx) {
+          logReaderUsage('browser_local');
+          playChunkLocal(chunk);
+        }
       });
     } else {
       // Local fallback
+      logReaderUsage('browser_local');
       playChunkLocal(chunk);
     }
   })
   .catch(err => {
+    if (!smartReaderState.active || smartReaderState.paused || smartReaderState.currentIndex !== currentIdx) return;
     console.warn("Neural synthesis fetch failed, falling back to local speech:", err);
+    logReaderUsage('browser_local');
     playChunkLocal(chunk);
   });
 }
 
 function playChunkLocal(chunk) {
-  window.speechSynthesis.cancel();
-  
-  const utterance = new SpeechSynthesisUtterance(chunk.text);
-  utterance.lang = 'ar-SA';
-  utterance.rate = smartReaderState.speed;
-  
-  utterance.onend = function() {
+  if (!smartReaderState.active || smartReaderState.paused) return;
+
+  if (window._smartReaderSafetyTimer) clearTimeout(window._smartReaderSafetyTimer);
+
+  const currentIdx = smartReaderState.currentIndex;
+  try {
+    window.speechSynthesis.cancel();
+  } catch(e) {}
+
+  // Clean text from English numbers e.g. (1) and formatting symbols
+  const cleanText = sanitizeArabicSpeech(chunk.text);
+  if (!cleanText) {
     advanceToNextChunk();
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  window._smartReaderActiveUtterance = utterance;
+
+  // Prevent Chrome garbage collection of active utterance
+  window._speechUtteranceHolder = window._speechUtteranceHolder || [];
+  window._speechUtteranceHolder.push(utterance);
+
+  // Assign Arabic Voice explicitly
+  const arVoice = getArabicVoice() || window._cachedArabicVoice;
+  if (arVoice) {
+    utterance.voice = arVoice;
+    utterance.lang = arVoice.lang;
+  } else {
+    utterance.lang = 'ar-SA';
+  }
+
+  utterance.rate = smartReaderState.speed || 1.0;
+
+  const cleanupAndAdvance = () => {
+    if (window._smartReaderSafetyTimer) clearTimeout(window._smartReaderSafetyTimer);
+    window._smartReaderActiveUtterance = null;
+    if (window._speechUtteranceHolder) {
+      const idx = window._speechUtteranceHolder.indexOf(utterance);
+      if (idx > -1) window._speechUtteranceHolder.splice(idx, 1);
+    }
+    if (smartReaderState.active && !smartReaderState.paused && smartReaderState.currentIndex === currentIdx) {
+      advanceToNextChunk();
+    }
   };
-  
+
+  utterance.onend = cleanupAndAdvance;
   utterance.onerror = function(e) {
+    if (e && (e.error === 'canceled' || e.error === 'interrupted')) {
+      return;
+    }
     console.warn("Local speech error:", e);
-    advanceToNextChunk();
+    cleanupAndAdvance();
   };
-  
-  window.speechSynthesis.speak(utterance);
+
+  // Safe generous watchdog ONLY to prevent indefinite hang (90 seconds)
+  window._smartReaderSafetyTimer = setTimeout(() => {
+    if (smartReaderState.active && !smartReaderState.paused && smartReaderState.currentIndex === currentIdx) {
+      console.warn("Watchdog timeout reached, advancing chunk");
+      cleanupAndAdvance();
+    }
+  }, 90000);
+
+  // Slight 40ms delay after cancel to allow Android audio focus reset
+  setTimeout(() => {
+    if (!smartReaderState.active || smartReaderState.paused || smartReaderState.currentIndex !== currentIdx) return;
+    try {
+      window.speechSynthesis.speak(utterance);
+    } catch(e) {
+      console.warn("Speech synthesis speak error:", e);
+      cleanupAndAdvance();
+    }
+  }, 40);
 }
 
 function advanceToNextChunk() {
@@ -432,7 +618,10 @@ function advanceToNextChunk() {
   playCurrentChunk();
 }
 
-function logReaderUsage() {
+function logReaderUsage(overrideMode) {
+  if (_hasLoggedThisRun && !overrideMode) return;
+  _hasLoggedThisRun = true;
+  const effectiveMode = overrideMode || (smartReaderState.actualMode || smartReaderState.mode);
   fetch('/api/smart-reader/log/', {
     method: 'POST',
     headers: {
@@ -443,7 +632,7 @@ function logReaderUsage() {
       session_id: smartReaderState.sessionId,
       topic_id: smartReaderState.topicId,
       target_title: smartReaderState.targetTitle,
-      voice_mode: smartReaderState.mode,
+      voice_mode: effectiveMode,
       speed: smartReaderState.speed,
       chunks_count: smartReaderState.totalChunks
     })

@@ -1162,6 +1162,7 @@ def direct_gate_login_view(request, token):
 
     context = {
         'target_user': target_user,
+        'initials': target_user.avatar_initials or compute_avatar_initials(target_user.full_name),
         'seat': seat,
         'seat_display_name': seat_display_name,
         'role_label': role_label,

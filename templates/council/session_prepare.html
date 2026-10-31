@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% load crispy_forms_tags %}
 
 {% block title %}{{ page_title }} – مجلس الجامعة{% endblock %}
@@ -673,6 +673,17 @@
           <span><span class="d-none d-sm-inline">إضافة موضوع جديد</span><span class="d-sm-none">إضافة موضوع</span></span>
         </button>
         {% endif %}
+
+        {# زر طلب الإذن — يظهر في محور ما استجد للمستخدم المخوّل #}
+        {% if cat_key == 'new_business' and can_request_new_business %}
+        <button class="btn btn-sm btn-danger fw-bold px-2.5 py-1 shadow-sm d-inline-flex align-items-center gap-1 rounded-2"
+                style="font-size: 0.78rem;"
+                onclick="openNbRequestModalFromPrepare(event)"
+                title="طلب إذن إضافة موضوع مستجد في ما استجد من أعمال لإرساله لرئيس الجلسة">
+          <i class="bi bi-shield-plus"></i>
+          <span><span class="d-none d-sm-inline">طلب إذن إضافة موضوع</span><span class="d-sm-none">طلب إذن</span></span>
+        </button>
+        {% endif %}
       </div>
     </div>
 
@@ -830,8 +841,11 @@
             <div class="d-flex align-items-start gap-2.5 flex-grow-1 min-width-0">
               <span class="topic-order-badge" title="الترتيب داخل المحور">{{ topic.sub_order }}</span>
               <div class="flex-grow-1 min-width-0">
-                <div class="topic-item-title mb-1.5 text-break">
-                  {{ topic.title }}
+                <div class="topic-item-title mb-1.5 text-break d-flex align-items-center flex-wrap gap-2">
+                  <span>{{ topic.title }}</span>
+                  {% if topic.is_new_business %}
+                    <span class="badge" style="background-color: #e11d48; color: #fff; font-size: 0.72rem; padding: 0.18rem 0.5rem; border-radius: 6px; font-weight: 700;">مستجد</span>
+                  {% endif %}
                 </div>
                 <div class="d-flex flex-wrap gap-2 align-items-center" id="topicMetaBox-{{ topic.pk }}">
                   {% if topic.memo_number %}
@@ -2840,4 +2854,295 @@ function showToast(type, message) {
   setTimeout(() => toast.remove(), 4000);
 }
 </script>
+{% if can_request_new_business and session_is_active %}
+{% comment %}
+════════════════════════════════════════════════════════════════════════════
+   🆕 NEW BUSINESS LIVE REQUEST — نوافذ وسكريبت طلب ما استجد (شاشة الإعداد)
+════════════════════════════════════════════════════════════════════════════
+{% endcomment %}
+
+{# ── Modal 1: مقدم الطلب — تعبئة وصف الموضوع ── #}
+<div class="modal fade" id="nbRequestModal" tabindex="-1" aria-labelledby="nbRequestModalLabel" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header bg-danger text-white rounded-top-4 border-0 py-3">
+        <h5 class="modal-title mb-0 fw-bold" id="nbRequestModalLabel">
+          <i class="bi bi-lightning-charge-fill me-2"></i>طلب إذن إضافة موضوع — ما استجد من أعمال
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="alert alert-warning small py-2 mb-3">
+          <i class="bi bi-info-circle-fill me-1"></i>
+          هذا الطلب سيُرسل فوراً إلى رئيس الجلسة المنعقدة حالياً للبتّ فيه.
+        </div>
+        <label class="form-label fw-bold">وصف وحيثيات الموضوع المقترح:</label>
+        <textarea id="nbDescriptionInput" class="form-control" rows="4"
+                  placeholder="اكتب وصفاً وافياً للموضوع الذي تريد إضافته إلى جدول الأعمال..."></textarea>
+        <div id="nbDescError" class="text-danger small mt-1" style="display:none;">يرجى كتابة وصف الموضوع أولاً.</div>
+      </div>
+      <div class="modal-footer border-0 pt-0 px-4 pb-4">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button>
+        <button type="button" class="btn btn-danger fw-bold px-4" onclick="nbSubmitRequestFromPrepare()">
+          <i class="bi bi-send-fill me-1"></i>إرسال الطلب إلى رئيس الجلسة
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Modal 2: انتظار قرار الرئيس ── #}
+<div class="modal fade" id="nbWaitModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-lg rounded-4 text-center p-4">
+      <div class="spinner-border text-danger mx-auto mb-3" role="status"></div>
+      <h6 class="fw-bold text-danger mb-1">بانتظار قرار رئيس الجلسة</h6>
+      <p class="text-muted small mb-0">تم إرسال طلبك. سيتم إخطارك فور البتّ فيه.</p>
+    </div>
+  </div>
+</div>
+
+{# ── Modal 3: الأعضاء — تصويت ما استجد ── #}
+<div class="modal fade" id="nbMemberVoteModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header bg-warning text-dark rounded-top-4 border-0 py-3">
+        <h5 class="modal-title mb-0 fw-bold">
+          <i class="bi bi-hand-index-fill me-2"></i>طلب إضافة موضوع مستجد — تصويت
+        </h5>
+      </div>
+      <div class="modal-body p-4">
+        <div class="alert alert-light border mb-3">
+          <div class="fw-bold mb-1">حيثيات الموضوع المقترح:</div>
+          <div id="nbVoteDescription" class="text-dark small" style="white-space:pre-wrap;"></div>
+        </div>
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <span class="text-muted small">الوقت المتبقي للتصويت:</span>
+          <span id="nbVoteCountdown" class="badge bg-danger fs-6 px-3">02:00</span>
+        </div>
+        <div class="d-grid gap-2">
+          <button class="btn btn-success btn-lg fw-bold" onclick="nbMemberVoteFromPrepare('approve')">
+            <i class="bi bi-check-circle-fill me-2"></i>موافق على إضافة الموضوع
+          </button>
+          <button class="btn btn-outline-danger btn-lg fw-bold" onclick="nbMemberVoteFromPrepare('reject')">
+            <i class="bi bi-x-circle-fill me-2"></i>أرفض الإضافة
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Modal 4: النتيجة — موافقة للمقدّم ── #}
+<div class="modal fade" id="nbApprovedModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-lg rounded-4 text-center p-4">
+      <div class="text-success mb-3" style="font-size:3rem;">✅</div>
+      <h5 class="fw-bold text-success mb-2">تمت الموافقة!</h5>
+      <p class="text-muted small mb-4" id="nbApprovedMsg">وافق رئيس الجلسة على إضافة موضوعك. يمكنك الآن إضافة الموضوع.</p>
+      <button type="button" class="btn btn-success fw-bold px-4" onclick="nbConfirmAndCloseFromPrepare()">
+        <i class="bi bi-plus-circle-fill me-1"></i>حسناً — سأضيف الموضوع الآن
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ── Modal 5: النتيجة — رفض ── #}
+<div class="modal fade" id="nbRejectedModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow-lg rounded-4 text-center p-4">
+      <div class="text-danger mb-3" style="font-size:3rem;">❌</div>
+      <h5 class="fw-bold text-danger mb-2">تم الرفض</h5>
+      <p class="text-muted small mb-4" id="nbRejectedMsg">رفض رئيس الجلسة إضافة الموضوع في هذا الوقت.</p>
+      <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">حسناً</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// 🆕 NEW BUSINESS — من شاشة إعداد الجلسة
+// ══════════════════════════════════════════════════════════════════════════════
+(function() {
+  'use strict';
+
+  let _nbPollTimer    = null;
+  let _nbVoteTimer    = null;
+  let _nbLastState    = null;
+  let _nbVotedAlready = false;
+  const _NB_SESSION_PK = SESSION_PK;
+
+  // ── فتح نافذة الطلب ──────────────────────────────────────────────────────
+  window.openNbRequestModalFromPrepare = function(e) {
+    if (e) e.stopPropagation();
+    document.getElementById('nbDescriptionInput').value = '';
+    document.getElementById('nbDescError').style.display = 'none';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('nbRequestModal')).show();
+  };
+
+  // ── إرسال الطلب ──────────────────────────────────────────────────────────
+  window.nbSubmitRequestFromPrepare = async function() {
+    const desc = (document.getElementById('nbDescriptionInput').value || '').trim();
+    if (!desc) {
+      document.getElementById('nbDescError').style.display = '';
+      return;
+    }
+    document.getElementById('nbDescError').style.display = 'none';
+    bootstrap.Modal.getInstance(document.getElementById('nbRequestModal'))?.hide();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('nbWaitModal')).show();
+
+    try {
+      const res = await fetch(`/api/sessions/${_NB_SESSION_PK}/new-business/submit/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ description: desc })
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        bootstrap.Modal.getInstance(document.getElementById('nbWaitModal'))?.hide();
+        showToast('danger', data.error || 'حدث خطأ أثناء إرسال الطلب.');
+        return;
+      }
+      _nbLastState    = null;
+      _nbVotedAlready = false;
+      _nbStartPollingFromPrepare();
+    } catch(err) {
+      bootstrap.Modal.getInstance(document.getElementById('nbWaitModal'))?.hide();
+      showToast('danger', 'تعذّر الاتصال بالخادم.');
+    }
+  };
+
+  // ── دورة الاستطلاع ────────────────────────────────────────────────────────
+  function _nbStartPollingFromPrepare() {
+    if (_nbPollTimer) clearInterval(_nbPollTimer);
+    _nbPollTimer = setInterval(_nbPollFromPrepare, 3000);
+  }
+
+  async function _nbPollFromPrepare() {
+    try {
+      const res  = await fetch(`/api/sessions/${_NB_SESSION_PK}/new-business/poll/`);
+      const data = await res.json();
+      _nbHandleStateFromPrepare(data);
+    } catch(_) {}
+  }
+
+  function _nbHandleStateFromPrepare(data) {
+    const state = data.state || 'idle';
+    const myId  = window._NB_CURRENT_USER_ID || 0;
+
+    // idle = لا طلب نشط
+    if (state === 'idle') {
+      if (_nbPollTimer) { clearInterval(_nbPollTimer); _nbPollTimer = null; }
+      _nbClearVoteCountdown();
+      _hideAllNbModals();
+      return;
+    }
+
+    // pending_president = انتظار قرار الرئيس (فقط مقدم الطلب يرى نافذة الانتظار)
+    if (state === 'pending_president' && data.requester_id == myId) {
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('nbWaitModal')).show();
+      return;
+    }
+
+    // voting = الأعضاء يصوّتون (من لديه حق التصويت يرى نافذة التصويت)
+    if (state === 'voting' && !_nbVotedAlready) {
+      bootstrap.Modal.getInstance(document.getElementById('nbWaitModal'))?. hide();
+      const desc = data.description || '';
+      document.getElementById('nbVoteDescription').textContent = desc;
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('nbMemberVoteModal')).show();
+      const started = data.voting_started_at ? new Date(data.voting_started_at) : new Date();
+      const elapsed = Math.floor((Date.now() - started.getTime()) / 1000);
+      const remaining = Math.max(0, 120 - elapsed);
+      _nbStartVoteCountdown(remaining);
+      return;
+    }
+
+    // done + approved = موافقة (فقط مقدم الطلب)
+    if (state === 'done' && data.president_decision === 'approved' && data.requester_id == myId) {
+      _stopAll();
+      bootstrap.Modal.getInstance(document.getElementById('nbWaitModal'))?. hide();
+      const approved = data.vote_approved || 0;
+      const rejected = data.vote_rejected || 0;
+      const msg = (approved || rejected)
+        ? `وافق رئيس الجلسة على إضافة موضوعك (${approved} موافقة، ${rejected} رفض).`
+        : 'وافق رئيس الجلسة مباشرةً على إضافة موضوعك.';
+      document.getElementById('nbApprovedMsg').textContent = msg;
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('nbApprovedModal')).show();
+      return;
+    }
+  }
+  }
+
+  // ── مؤقت التصويت ─────────────────────────────────────────────────────────
+  function _nbStartVoteCountdown(secs) {
+    _nbClearVoteCountdown();
+    let remaining = secs;
+    const el = document.getElementById('nbVoteCountdown');
+    function _tick() {
+      if (!el) return;
+      const m = String(Math.floor(remaining / 60)).padStart(2,'0');
+      const s = String(remaining % 60).padStart(2,'0');
+      el.textContent = `${m}:${s}`;
+      if (remaining <= 0) {
+        _nbClearVoteCountdown();
+        bootstrap.Modal.getInstance(document.getElementById('nbMemberVoteModal'))?.hide();
+        _nbVotedAlready = true;
+        showToast('warning', 'انتهى وقت التصويت — تم تسجيل امتناعك.');
+      }
+      remaining--;
+    }
+    _tick();
+    _nbVoteTimer = setInterval(_tick, 1000);
+  }
+
+  function _nbClearVoteCountdown() {
+    if (_nbVoteTimer) { clearInterval(_nbVoteTimer); _nbVoteTimer = null; }
+  }
+
+  // ── تصويت العضو ──────────────────────────────────────────────────────────
+  window.nbMemberVoteFromPrepare = async function(vote) {
+    _nbVotedAlready = true;
+    _nbClearVoteCountdown();
+    bootstrap.Modal.getInstance(document.getElementById('nbMemberVoteModal'))?.hide();
+    try {
+      await fetch(`/api/sessions/${_NB_SESSION_PK}/new-business/vote/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ vote: vote })
+      });
+    } catch(_) {}
+    showToast(vote === 'approve' ? 'success' : 'warning', vote === 'approve' ? 'تم تسجيل موافقتك.' : 'تم تسجيل رفضك.');
+  };
+
+  // ── إغلاق نافذة الموافقة ─────────────────────────────────────────────────
+  window.nbConfirmAndCloseFromPrepare = function() {
+    bootstrap.Modal.getInstance(document.getElementById('nbApprovedModal'))?.hide();
+    fetch(`/api/sessions/${_NB_SESSION_PK}/new-business/clear/`, {
+      method: 'POST', headers: { 'X-CSRFToken': CSRF }
+    }).catch(_=>{});
+    showToast('success', 'يمكنك الآن إضافة الموضوع تحت محور «ما استجد من أعمال».');
+  };
+
+  // ── إيقاف كل شيء ─────────────────────────────────────────────────────────
+  function _stopAll() {
+    if (_nbPollTimer) { clearInterval(_nbPollTimer); _nbPollTimer = null; }
+    _nbClearVoteCountdown();
+  }
+
+  function _hideAllNbModals() {
+    ['nbRequestModal','nbWaitModal','nbMemberVoteModal','nbApprovedModal','nbRejectedModal'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) bootstrap.Modal.getInstance(el)?.hide();
+    });
+  }
+
+  // ── بدء الاستطلاع تلقائياً عند تحميل الصفحة (لاستقبال تصويت الأعضاء) ──
+  window._NB_CURRENT_USER_ID = {{ request.user.pk }};
+  document.addEventListener('DOMContentLoaded', function() {
+    // نبدأ الاستطلاع لاستقبال أي طلب تصويت عند تحميل الصفحة
+    _nbStartPollingFromPrepare();
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

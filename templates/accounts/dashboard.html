@@ -6,16 +6,47 @@
 {% block page_header %}
 <div class="page-header">
   <div class="page-header-inner">
-    <div class="d-flex align-items-center gap-3">
-      <div class="page-header-icon text-gold">
-        <i class="bi bi-house-door-fill fs-3"></i>
-      </div>
+    <div class="d-flex align-items-center gap-3 flex-wrap">
       <div>
         <h1 class="page-title mb-1">الصفحة الرئيسية</h1>
         <div class="page-subtitle">
           <i class="bi bi-person-check text-gold me-1"></i>
           مرحباً، {{ user.full_name }}
         </div>
+      </div>
+
+      <!-- Quick Action Buttons (Relocated From Navbar) -->
+      <div class="d-flex align-items-center gap-2 me-4 flex-wrap">
+        <!-- Tablet & Mobile QR Connect Button -->
+        <button type="button" 
+                onclick="openTabletQRModal()"
+                class="uc-nav-btn uc-nav-btn-tablet shadow-sm"
+                title="عرض باركود الاتصال السريع لأجهزة التابلت والموبايل (Wi-Fi / Internet QR)">
+          <i class="bi bi-qr-code"></i>
+          <span>ربط التابلت 📱</span>
+        </button>
+
+        <!-- PWA Install Button -->
+        <button type="button" 
+                id="btnPwaInstall"
+                onclick="installPwaApp()"
+                class="uc-nav-btn uc-nav-btn-pwa shadow-sm"
+                title="تثبيت النظام كتطبيق أصلي على شاشة التابلت أو الهاتف أو الكمبيوتر">
+          <i class="bi bi-download"></i>
+          <span>تثبيت التطبيق 📲</span>
+        </button>
+
+        {% if user.is_super and not is_external_server %}
+        <!-- Local Server Air-Gap Strict Isolation Toggle Button -->
+        <button type="button" 
+                id="navbarIsolationBtn"
+                onclick="toggleGlobalIsolation(this)"
+                class="btn btn-sm {% if is_system_isolated %}btn-success text-white{% else %}btn-warning text-dark{% endif %} uc-nav-btn-iso shadow-sm d-inline-flex align-items-center gap-1.5"
+                title="انقر للتبديل الفوري بين العزل المحلي والربط السحابي">
+          <i class="bi {% if is_system_isolated %}bi-shield-check{% else %}bi-cloud-check-fill{% endif %}" id="navbarIsoIcon"></i>
+          <span id="navbarIsoText">{% if is_system_isolated %}محلي معزول 100%{% else %}ربط سحابي مفعل{% endif %}</span>
+        </button>
+        {% endif %}
       </div>
     </div>
     <div class="text-white-50 small">

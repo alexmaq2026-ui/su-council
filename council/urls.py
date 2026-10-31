@@ -151,6 +151,7 @@ urlpatterns = [
     path('api/sessions/<int:session_pk>/directive/send/', live_session_views.api_send_live_directive, name='api_send_live_directive'),
     path('api/directives/<int:directive_pk>/dismiss/', live_session_views.api_dismiss_live_directive, name='api_dismiss_live_directive'),
     path('api/users/<int:user_pk>/toggle-force-majeure/', live_session_views.api_toggle_force_majeure, name='api_toggle_force_majeure'),
+    path('api/network-info/', live_session_views.api_tablet_network_info, name='api_tablet_network_info'),
 
     # ── Phase 4: Signed Decisions, Faculty Dispatches & Digital Hash ─────
     path('dispatch-center/', dispatch_views.dispatch_center_view, name='dispatch_center'),
@@ -187,10 +188,19 @@ urlpatterns = [
     # Backward-compatible aliases for legacy /council/ prefix
     path('council/api/smart-reader/data/', smart_reader_views.api_smart_reader_data),
     path('smart-reader/settings/', smart_reader_views.smart_reader_settings_view, name='smart_reader_settings'),
+    path('smart-reader/clear-log/', smart_reader_views.smart_reader_clear_log_view, name='smart_reader_clear_log'),
     
     # ── Strict Air-Gap Isolation & Cloud Connection APIs ──────────────────
     path('api/admin/isolation/status/', isolation_views.api_isolation_status, name='api_isolation_status'),
     path('api/admin/isolation/toggle/', isolation_views.api_toggle_isolation, name='api_toggle_isolation'),
-    path('api/admin/isolation/sync/', isolation_views.api_manual_sync_cloud, name='api_manual_sync_cloud'),
+    path('api/admin/isolation/sync/',   isolation_views.api_manual_sync_cloud, name='api_manual_sync_cloud'),
+
+    # ── New Business Live Request APIs (Zero-DB / In-Memory) ──────────────
+    path('api/sessions/<int:session_pk>/new-business/submit/',          live_session_views.api_nb_submit_request,   name='api_nb_submit_request'),
+    path('api/sessions/<int:session_pk>/new-business/poll/',            live_session_views.api_nb_poll,             name='api_nb_poll'),
+    path('api/sessions/<int:session_pk>/new-business/president-action/', live_session_views.api_nb_president_action, name='api_nb_president_action'),
+    path('api/sessions/<int:session_pk>/new-business/vote/',            live_session_views.api_nb_member_vote,      name='api_nb_member_vote'),
+    path('api/sessions/<int:session_pk>/new-business/clear/',           live_session_views.api_nb_clear,            name='api_nb_clear'),
+    path('api/sessions/<int:session_pk>/new-business/create-topic/',     live_session_views.api_nb_create_topic,     name='api_nb_create_topic'),
 ]
 

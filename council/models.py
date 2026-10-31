@@ -1018,6 +1018,10 @@ class Topic(models.Model):
         help_text='أدخل الأسماء مفصولة بفاصلة – تُستخدم في البحث'
     )
     status            = models.CharField('حالة الموضوع', max_length=20, choices=TOPIC_STATUS, default='pending')
+    is_new_business   = models.BooleanField(
+        'موضوع مستجد', default=False,
+        help_text='تمت إضافته أثناء الجلسة كبند مستجد بإذن رئيس المجلس وحسب تصويت الأعضاء'
+    )
     postponed_to      = models.CharField('جهة / موعد التأجيل', max_length=200, blank=True, help_text='مثال: الجلسة القادمة أو للجنة الشؤون الأكاديمية')
     postpone_reason   = models.TextField('سبب ومبرر التأجيل', blank=True)
     suspended_at      = models.DateTimeField('وقت التعليق المؤقت', null=True, blank=True)
@@ -1084,6 +1088,13 @@ class Topic(models.Model):
 
     def __str__(self):
         return f'{self.get_category_display()} – {self.title[:60]}'
+
+    @property
+    def new_business_legal_clause(self):
+        """Official legal wording documented for new business topics in final minutes and decisions."""
+        if self.is_new_business:
+            return "أُقر هذا الموضوع كبند مستجد بإذن رئيس المجلس وحسب تصويت الأعضاء"
+        return ""
 
     @classmethod
     def resequence_category(cls, session_id, category):
@@ -1386,6 +1397,13 @@ class Decision(models.Model):
         import re
         clean = re.sub(r'^[\s\-\*]*(?:ال+ق+[\u0640]*رار|التوصيات)[\s\:\-\–]*', '', text).strip()
         return clean or text
+
+    @property
+    def legal_clause(self):
+        """Official legal wording if the topic was introduced as new business."""
+        if hasattr(self, 'topic') and self.topic and getattr(self.topic, 'is_new_business', False):
+            return self.topic.new_business_legal_clause
+        return ""
 
     def save(self, *args, **kwargs):
         if self.decision_text:

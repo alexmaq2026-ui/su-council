@@ -71,8 +71,8 @@
       {% endif %}
       
       {% if user_can_use_smart_reader %}
-        <button type="button" class="btn btn-warning text-dark btn-sm session-header-btn fw-bold shadow-sm d-inline-flex align-items-center gap-1" onclick="openSmartReader({sessionId: {{ session.pk }}})">
-          <i class="bi bi-mic-fill"></i><span>القراءة الذكية للمحضر</span>
+        <button type="button" class="btn btn-warning text-dark btn-sm session-header-btn fw-bold shadow-sm d-inline-flex align-items-center gap-1" onclick="openSmartReader({sessionId: {{ session.pk }}})" title="استماع لجدول أعمال ومحضر الجلسة كاملاً">
+          <i class="bi bi-mic-fill"></i><span>قراءة المحضر كاملاً (جدول الأعمال)</span>
         </button>
       {% endif %}
 
@@ -438,8 +438,8 @@
                       <span class="text-primary small" title="توجد مرفقات"><i class="bi bi-paperclip"></i> {{ t.attachments.all|length }}</span>
                     {% endif %}
                     {% if user_can_use_smart_reader %}
-                      <button type="button" class="btn btn-sm btn-outline-warning text-dark fw-bold" onclick="openSmartReader({topicId: {{ t.pk }}})" title="استماع بالقراءة الذكية">
-                        🎙️ قراءة صوتية
+                      <button type="button" class="btn btn-sm btn-warning text-dark fw-bold shadow-sm" onclick="openSmartReader({topicId: {{ t.pk }}})" title="استماع لتفاصيل هذا الموضوع بالقراءة الذكية">
+                        <i class="bi bi-mic-fill me-1"></i>قراءة هذا الموضوع
                       </button>
                     {% endif %}
                     {% if user_can_view_topics %}
@@ -455,13 +455,16 @@
                   </div>
                 </div>
 
-                <h5 class="fw-bold mb-2">
+                <h5 class="fw-bold mb-2 d-flex align-items-center flex-wrap gap-2">
                   {% if user_can_view_topics %}
                     <a href="{% url 'council:topic_detail' pk=t.pk %}" class="text-navy text-decoration-none">
                       {{ t.title }}
                     </a>
                   {% else %}
                     <span class="text-navy">{{ t.title }}</span>
+                  {% endif %}
+                  {% if t.is_new_business %}
+                    <span class="badge" style="background-color: #e11d48; color: #fff; font-size: 0.72rem; padding: 0.18rem 0.5rem; border-radius: 6px; font-weight: 700;">مستجد</span>
                   {% endif %}
                 </h5>
 

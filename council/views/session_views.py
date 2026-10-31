@@ -1,4 +1,4 @@
-"""
+﻿"""
 Session Views
 University Council Management System
 
@@ -448,6 +448,8 @@ def session_prepare_view(request, pk=None):
         'user_can_delete_topic': user.is_super or user.can_delete_topic or getattr(user, 'can_prepare_agenda', False),
         'user_can_upload':       user.is_super or user.can_upload_attachments or getattr(user, 'can_prepare_agenda', False),
         'user_can_add_table':    user.is_super or user.can_add_table or getattr(user, 'can_prepare_agenda', False),
+        'can_request_new_business': user.is_super or getattr(user, 'can_request_new_business', False),
+        'session_is_active':     bool(session and session.status in ('active', 'partial_close')),
         'preset_choices':        TABLE_PRESET_CHOICES,
         'presets_json':          json.dumps(PRESET_HEADERS_MAP, ensure_ascii=False),
         'preset_sum_cols_json':  json.dumps(PRESET_SUM_COLS_MAP, ensure_ascii=False),

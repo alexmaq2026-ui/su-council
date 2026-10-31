@@ -305,6 +305,13 @@ def _build_topics_by_categories(doc, session):
             r_ord.font.color.rgb = RGBColor(0x1B, 0x36, 0x5D)
             _mark_run_cs(r_ord)
 
+            if getattr(t, 'is_new_business', False):
+                r_nb = p_top_order.add_run(" [مستجد]")
+                r_nb.bold = True
+                r_nb.font.size = Pt(11)
+                r_nb.font.color.rgb = RGBColor(0xE1, 0x1D, 0x48)
+                _mark_run_cs(r_nb)
+
             # Topic Title / Background
             p_body = doc.add_paragraph()
             _set_rtl_paragraph(p_body, align='both')
@@ -394,6 +401,10 @@ def _build_topics_by_categories(doc, session):
             _mark_run_cs(r_dec_label)
 
             dec_text = t.decision.decision_text if hasattr(t, 'decision') and t.decision else "الموافقة وعلى مسؤولية الشؤون المختصة صحة البيانات وسلامة الإجراءات."
+            if getattr(t, 'is_new_business', False):
+                clause = " (أُقر هذا الموضوع كبند مستجد بإذن رئيس المجلس وحسب تصويت الأعضاء)."
+                if clause.strip() not in dec_text:
+                    dec_text += clause
             r_dec_val = p_dec.add_run(dec_text)
             r_dec_val.font.size = Pt(11.5)
             _mark_run_cs(r_dec_val)
